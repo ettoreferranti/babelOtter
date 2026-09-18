@@ -1,0 +1,9 @@
+# Files permitted to reference networking APIs. NFR-P4.
+#
+# Adding a line here weakens the guarantee that babelOtter opens no
+# non-loopback connection. Do not add one without understanding why the
+# existing call site cannot serve. Every entry must route through
+# OllamaEndpoint, which makes a non-loopback destination unrepresentable.
+#
+# Paths are relative to the repository root.
+Sources/BabelOtterKit/LLM/OllamaClient.swift
