@@ -1,0 +1,61 @@
+# ─── Swift / SwiftPM ───────────────────────────────────────────────
+.build/
+.swiftpm/
+Packages/
+*.xcodeproj/
+*.xcworkspace/
+!*.xcodeproj/project.pbxproj
+DerivedData/
+*.o
+*.dia
+*.swiftmodule
+*.swiftdoc
+*.swiftsourceinfo
+
+# ─── Xcode user state ──────────────────────────────────────────────
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+*.xccheckout
+*.moved-aside
+
+# ─── Mutation testing ──────────────────────────────────────────────
+.muter/
+muter-report/
+mutation-report.*
+
+# ─── macOS ─────────────────────────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+
+# ─── PRIVACY: local user data must NEVER be committed ──────────────
+# babelOtter stores everything under ~/Library/Application Support,
+# never inside the repo. These rules are belt-and-braces: this repo is
+# PUBLIC, and nothing derived from real correspondence may enter it.
+*.sqlite
+*.sqlite3
+*.db
+*.db-wal
+*.db-shm
+history/
+glossary.local.*
+config.local.*
+profiles.local.*
+*.personal.json
+evals/**/local/
+evals/**/*.private.*
+secrets/
+*.pem
+*.p12
+*.mobileprovision
+.env
+.env.*
+
+# ─── Logs & transient output ───────────────────────────────────────
+*.log
+logs/
+tmp/
+.scratch/
