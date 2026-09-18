@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+# BABELOTTER_INTEGRATION is deliberately unset: integration tests are local-only.
+jobs:
+  test:
+    name: Build and test
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show available Xcode versions
+        run: ls /Applications | grep Xcode || echo "no /Applications/Xcode*.app found"
+
+      # The package declares swift-tools-version: 6.0. Select a newer Xcode only
+      # if the image actually ships one at this path; otherwise fall back to
+      # whatever xcode-select already points at rather than failing the job.
+      # No third-party setup action — this is the built-in switch only.
+      - name: Select Xcode
+        run: |
+          if [ -d "/Applications/Xcode_16.4.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_16.4.app
+          else
+            echo "Xcode_16.4.app not present on this image; using the default Xcode."
+          fi
+
+      - name: Show toolchain
+        run: |
+          swift --version
+          xcodebuild -version
+
+      - name: Build
+        run: swift build --build-tests
+
+      - name: Test
+        run: swift test
