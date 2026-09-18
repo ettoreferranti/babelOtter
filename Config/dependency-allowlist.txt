@@ -1,0 +1,10 @@
+# Reviewed runtime dependencies. NFR-P6.
+#
+# This file is intentionally empty. babelOtter has no third-party runtime
+# dependencies, and that is a feature: every package added is code that could
+# perform networking or telemetry inside a process holding the user's writing.
+#
+# Prefer system libraries. SQLite is reached through the system libsqlite3
+# rather than a package wrapper, for exactly this reason.
+#
+# One identity per line, lowercase, as it appears in Package.resolved.
