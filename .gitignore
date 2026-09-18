@@ -59,3 +59,6 @@ secrets/
 logs/
 tmp/
 .scratch/
+
+# SDD scratch workspace (ledger, briefs, review packages)
+.superpowers/
