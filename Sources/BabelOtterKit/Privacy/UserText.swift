@@ -39,6 +39,20 @@ extension UserText: CustomStringConvertible, CustomDebugStringConvertible {
     public var debugDescription: String { description }
 }
 
+extension UserText: CustomReflectable {
+    /// `Mirror(reflecting:)` and `dump(_:)` read stored properties directly —
+    /// they do not consult `description`/`debugDescription` at all — so
+    /// without this conformance, `dump(userText)` while debugging would print
+    /// the real content despite every textual representation above being
+    /// redacted. This closes that path by replacing the reflected children
+    /// with the redacted representation only. ``value`` remains the
+    /// deliberate, reviewable way to reach the real content; this only closes
+    /// the *accidental* one.
+    public var customMirror: Mirror {
+        Mirror(self, children: ["redacted": description], displayStyle: .struct)
+    }
+}
+
 /// What babelOtter is allowed to say about the user's text in a log.
 public struct UserTextSummary: Sendable, Equatable, CustomStringConvertible {
     public let characterCount: Int
