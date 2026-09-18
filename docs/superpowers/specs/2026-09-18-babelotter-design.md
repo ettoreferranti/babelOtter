@@ -250,8 +250,9 @@ matching in `TokenProtector`, and loopback validation in `OllamaEndpoint`.
 
 | Milestone | Contents |
 |---|---|
-| **M0 Foundations** | Package structure, CI, muter spike, focus-loss spike, privacy guards, config store |
-| **M1 Translate** | Hotkeys, capture/replace, detection, structure, DNT, prompts, streaming client, parser, locale rules, popup — end to end |
+| **M0 Foundations** | Package structure, CI, muter spike (#18), focus-loss spike (#30), privacy enforcement guards |
+| **M1a Pipeline** | Capture/replace, detection, structure, DNT, prompts, streaming client, parser, locale rules, configuration model — no UI |
+| **M1b Translate UX** | Hotkeys, menu bar, permissions, non-activating popup, streaming render, direction swap, profile control, end-to-end Translate |
 | **M2 Correct & Tutor** | Correction pipeline, error taxonomy, explanations, inline diff |
 | **M3 Explain, Re-pitch & Polish** | Remaining actions, history, settings, onboarding, Privacy panel, eval harness |
 | **M4 Post-v1** | Strict privacy mode, mistake tracking, CEFR drills, rich text, more languages, distribution |

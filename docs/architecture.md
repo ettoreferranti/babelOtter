@@ -255,8 +255,8 @@ and no real text may ever execute on a third-party runner from a public repo.
 
 1. **Focus loss.** Showing the popup can deactivate the source app and drop the
    selection. Mitigated by capturing the `AXUIElement` and PID at trigger time
-   and using a non-activating panel. **De-risking spike in M0** — this is the
-   most likely thing to make the app feel broken.
+   and using a non-activating panel. **De-risking spike in M0 (#30)** — this is
+   the most likely thing to make the app feel broken.
 2. **`muter` maturity.** May not run cleanly on Swift 6.4 / macOS 27.
    **Spike in M0.** Fallback: a SwiftSyntax-based in-house harness. Last resort:
    report-only — which would be reported, not quietly adopted.

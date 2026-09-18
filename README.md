@@ -147,7 +147,8 @@ with Given/When/Then acceptance criteria, grouped into milestones:
 | Milestone | Scope |
 |---|---|
 | **M0 Foundations** | Package structure, CI, mutation testing, de-risking spikes, privacy guards |
-| **M1 Translate** | The complete translation path, end to end |
+| **M1a Pipeline** | The headless translation path: capture, detection, structure, prompts, streaming, parsing, config |
+| **M1b Translate UX** | Hotkeys, menu bar, permissions, the streaming popup, and the end-to-end Translate action |
 | **M2 Correct & Tutor** | Corrections, error explanations, inline diff |
 | **M3 Explain, Re-pitch & Polish** | Remaining actions, history, settings, onboarding, eval harness |
 | **M4 Post-v1** | Strict privacy mode, mistake tracking, CEFR drills, more languages, distribution |
