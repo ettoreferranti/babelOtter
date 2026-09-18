@@ -9,11 +9,19 @@ struct NetworkingCallSiteTests {
 
     /// Symbols that can open a socket. Substring matching is intentional: it is
     /// better to flag a comment mentioning URLSession than to miss a real call.
+    ///
+    /// `connect(`, `send(`, and `recv(` are generic enough to collide with an
+    /// unrelated method of the same name on a local type. That is accepted
+    /// deliberately: over-matching is the safe direction here — a false positive
+    /// costs one allowlist line and is loud, a false negative is silent. If one of
+    /// these trips on non-networking code, the fix is an allowlist entry plus
+    /// review, not deleting the symbol.
     static let networkingSymbols = [
-        "URLSession", "URLRequest", "URLDownload",
+        "URLSession", "URLRequest", "URLDownload", "NSURLConnection",
         "NWConnection", "NWBrowser", "NWListener",
-        "CFSocket", "CFStream", "import Network",
-        "getaddrinfo", "socket(",
+        "CFSocket", "CFReadStream", "CFWriteStream", "import Network",
+        "getaddrinfo", "getStreamsToHost", "NetService",
+        "socket(", "connect(", "send(", "recv(",
     ]
 
     static func allowlist() throws -> Set<String> {
@@ -24,6 +32,35 @@ struct NetworkingCallSiteTests {
                 .map { $0.trimmingCharacters(in: .whitespaces) }
                 .filter { !$0.isEmpty && !$0.hasPrefix("#") }
         )
+    }
+
+    /// A symbol that matches nothing (or that is a strict substring of another
+    /// entry, so it never distinguishes anything the other entry doesn't already
+    /// catch) is a silent hole in `networkingSymbols` — `"CFStream"` was exactly
+    /// this: intended to catch `CFReadStream`/`CFWriteStream`, but not a
+    /// contiguous substring of either, so it matched nothing. This check would
+    /// have caught nothing else in today's list, but keeping the list well-formed
+    /// is cheap insurance against the next edit reintroducing that mistake.
+    @Test("the networking symbol list has no dud entries")
+    func networkingSymbolListIsWellFormed() {
+        let symbols = Self.networkingSymbols
+
+        for symbol in symbols {
+            #expect(!symbol.isEmpty, "networkingSymbols contains an empty string, which would match every file")
+        }
+
+        for a in symbols {
+            for b in symbols where b != a {
+                #expect(
+                    !b.contains(a),
+                    Comment(rawValue:
+                        "\"\(a)\" is a strict substring of \"\(b)\" — anything matching "
+                        + "\"\(b)\" already matches \"\(a)\", so \"\(a)\" never distinguishes "
+                        + "anything on its own. Remove the redundant entry."
+                    )
+                )
+            }
+        }
     }
 
     @Test("no file outside the allowlist references networking APIs")
