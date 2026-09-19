@@ -17,9 +17,10 @@ unit in history with every commit intact.
 | Dependencies | zero, enforced by test |
 | Local toolchain | Xcode 27 / Swift 6.4 — **two majors ahead of CI**, so CI is the binding check |
 
-Issues #16–#25 and #30 are closed, and the M0 milestone is closed. Epics #1 and
-#2 stay open — both span past M0. Milestones: M1a Pipeline (28), M1b Translate
-UX (13), M2 (5), M3 (17), M4 (8).
+Issues #16–#25 and #30 are closed, and the M0 milestone is closed with nothing
+open in it. Epic #1 (foundations & CI) is closed, fully delivered. Epic #2
+(privacy) moved to M1a, where its one remaining child #77 now lives.
+Milestones: M1a Pipeline (29), M1b Translate UX (13), M2 (5), M3 (17), M4 (8).
 
 ## Documents that matter
 
@@ -68,7 +69,9 @@ issue #30.
 - **#77 (strict AX-only mode) pulled forward from M4 into M1a.** Spike #30
   showed the clipboard path is common, not rare, so the strict mode now lands
   in the same milestone as the clipboard fallback it guards (#32) — the gap
-  never ships unguarded.
+  never ships unguarded. It was reparented from #15 (post-v1 backlog) to #2
+  (privacy), and `PRIVACY.md`'s accepted-risk section still understates how
+  load-bearing the clipboard path is — revisit it with that work.
 
 ## Open decisions for the user
 
