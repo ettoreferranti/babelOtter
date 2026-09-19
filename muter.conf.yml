@@ -1,0 +1,97 @@
+# Task 3 spike (Refs #18): muter 16, installed via
+# `brew install muter-mutation-testing/formulae/muter`, verified on
+# Swift 6.4 / Xcode 27 / macOS 27 (arm64). NOT yet verified on CI's
+# Swift 6.1.2 / Xcode 16.4 (macos-15) — that image was not available to
+# this spike; re-confirm the first time CI actually runs this.
+#
+# `exclude` uses substring matching on file paths (NOT globs, per muter's
+# own docs), so these two entries drop the placeholder executable targets
+# (BabelOtterApp, babelotter-eval) from mutation entirely — only
+# BabelOtterKit is mutated. Muter's built-in default exclude list already
+# substring-matches "Test", so Tests/ is never mutated regardless.
+#
+# ============================== KNOWN BUG / WORKAROUND ==============================
+# muter's RelationalOperatorReplacement operator mis-parses a `while` loop whose
+# condition is a comma-conjunction list (e.g.
+# `while components.count > 1, !exists(...) { }`, as used in
+# StorageLocator.resolveAsFarAsExists). It emits syntactically invalid Swift
+# (drops the numeric literal, e.g. `while components.count > <  !exists(...)`),
+# which fails to compile. Because muter uses mutant schemata (every mutant for
+# a file is compiled into one binary, gated by env vars), this ONE bad mutant
+# poisons the ENTIRE file's build — all mutants in that file become
+# unmeasurable, not just the broken one. Confirmed reproducible with:
+#   muter run --files-to-mutate Sources/BabelOtterKit/Privacy/StorageLocator.swift
+#
+# Workaround (no source changes): run StorageLocator.swift in a second pass
+# with RelationalOperatorReplacement excluded, and run everything else
+# (including RelationalOperatorReplacement) normally:
+#
+#   muter run \
+#     --files-to-mutate Sources/BabelOtterKit/LLM/OllamaEndpoint.swift \
+#     --files-to-mutate Sources/BabelOtterKit/BabelOtterKit.swift \
+#     --files-to-mutate Sources/BabelOtterKit/Privacy/UserText.swift \
+#     --format json -o muter-report-1.json
+#
+#   muter run \
+#     --files-to-mutate Sources/BabelOtterKit/Privacy/StorageLocator.swift \
+#     --operators ChangeLogicalConnector RemoveSideEffects SwapTernary \
+#     --format json -o muter-report-2.json
+#
+# Cost: this drops 4 of StorageLocator.swift's 8 RelationalOperatorReplacement
+# mutants from measurement (including the well-tested `==`/`!=` boundary
+# comparison at line 83 — hand-verified independently to be killed, see the
+# Task 3 report), so the measured score for that file is a legitimate
+# lower-bound sample, not the true achievable score. Report upstream to
+# muter-mutation-testing/muter before Task 11 relies on this long-term.
+# ======================================================================================
+#
+# ========================= FIX ROUND 1: -c release (Refs #19, CI run 35426258237) =========
+# muter's own Process.Factory (Sources/muterCore/BuildSystems/ProcessFactory.swift in
+# muter 16) REPLACES the entire environment of every `swift test` child process it
+# spawns with a single key (`IS_MUTER_RUNNING=YES`) — not a merge, a hard overwrite.
+# No PATH, no DEVELOPER_DIR, nothing inherited. This is true on every platform muter
+# runs on; it is not something a job-level `env:` or a muter.conf.yml key can patch,
+# since muter's own compiled binary sets it in Swift code after reading this config.
+#
+# `swift test`, with no target/product scoping, builds every product in the package —
+# including the two placeholder executables `BabelOtterApp` and `babelotter-eval` —
+# even though only BabelOtterKit is *mutated* (the `exclude` list below only scopes
+# mutation, not what `swift test` builds). On CI's Xcode 16.4 / Swift 6.1.2, building
+# an executable product in DEBUG configuration on macOS triggers an automatic
+# "Applying debug entitlements" step that shells out to a bare `codesign` — which
+# needs PATH to resolve. With PATH entirely absent from the environment muter hands
+# that child process, this fails: "unable to spawn process 'codesign' (No such file
+# or directory)", which kills the whole baseline run. This did not reproduce locally
+# on Xcode 27 / Swift 6.4 (same muter behavior, same wiped environment) — apparently
+# that codesign invocation resolves without needing PATH there, whether via a libc
+# execvp fallback search path or a SwiftPM/TSCBasic difference between those two
+# toolchain versions. Root cause confirmed by reading muter's own source (extracted
+# from the Homebrew cache), not by guessing from the CI log alone.
+#
+# Fix: build/test in `release` configuration instead of `debug`. The debug-entitlements
+# step is specific to debug builds (get-task-allow, for lldb attachment) — it does not
+# run for `-c release`, so `codesign` is never invoked, sidestepping the environment
+# problem entirely rather than depending on what PATH happens to be. `release` alone
+# breaks `@testable import BabelOtterKit` in the test target (testability isn't
+# compiled into a release library module by default), so `-Xswiftc -enable-testing`
+# is required alongside it. Verified locally (Xcode 27 / Swift 6.4): both the initial
+# `swift test -c release -Xswiftc -enable-testing` and the per-mutant
+# `... --skip-build` rerun (what muter's `testWithoutBuildArguments` appends to
+# whatever is in `arguments` below) build and run cleanly, with the same Swift Testing
+# native output format muter parses, and reproduce the same 6/6 (100%) two-pass score
+# as the debug configuration did before this fix. Not yet reverified against CI's
+# actual failure at the time of writing — that is what the next CI run of this branch
+# confirms.
+# ============================================================================================
+arguments:
+- test
+- -c
+- release
+- -Xswiftc
+- -enable-testing
+executable: /usr/bin/swift
+exclude:
+- Package.swift
+- Sources/BabelOtterApp
+- Sources/babelotter-eval
+excludeCalls: []

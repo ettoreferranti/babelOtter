@@ -1,0 +1,324 @@
+name: CI
+
+# `push` deliberately carries a branch filter. Without one, every push to a
+# branch with an open pull request runs this whole pipeline twice — the
+# mutation job included, which is by far the most expensive thing here.
+# `pull_request` already covers every branch on its way to main.
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      # This milestone's own branch, so its pre-merge runs keep working before
+      # a pull request exists for it. REMOVE THIS LINE when the branch merges:
+      # while both this entry and `pull_request` are live, a PR on this branch
+      # is the one case still double-running.
+      - feat/m0-foundations
+
+# BABELOTTER_INTEGRATION is deliberately unset: integration tests are local-only.
+jobs:
+  test:
+    name: Build and test
+    runs-on: macos-15
+    # The default is 360 minutes. Nothing here has ever taken more than a
+    # minute; a job that hangs should fail, not idle for six hours.
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show available Xcode versions
+        run: ls /Applications | grep Xcode || echo "no /Applications/Xcode*.app found"
+
+      # The package declares swift-tools-version: 6.0. Select a newer Xcode only
+      # if the image actually ships one at this path; otherwise fall back to
+      # whatever xcode-select already points at rather than failing the job.
+      # No third-party setup action — this is the built-in switch only.
+      - name: Select Xcode
+        run: |
+          if [ -d "/Applications/Xcode_16.4.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_16.4.app
+          else
+            echo "Xcode_16.4.app not present on this image; using the default Xcode."
+          fi
+
+      - name: Show toolchain
+        run: |
+          swift --version
+          xcodebuild -version
+
+      - name: Build
+        run: swift build --build-tests
+
+      - name: Test
+        run: swift test
+
+  mutation:
+    name: Mutation testing (BabelOtterKit >= 80%)
+    runs-on: macos-15
+    needs: test
+    # Generous, because this job installs muter from source via Homebrew and
+    # then runs the test suite once per mutant — but still bounded. The default
+    # of 360 minutes would let an unpinned third-party tool hang all day.
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      # Same toolchain selection as the "test" job, kept in sync deliberately:
+      # muter shells out to `swift test` itself, so it must run under the same
+      # compiler the rest of CI uses.
+      - name: Select Xcode
+        run: |
+          if [ -d "/Applications/Xcode_16.4.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_16.4.app
+          else
+            echo "Xcode_16.4.app not present on this image; using the default Xcode."
+          fi
+
+      - name: Install muter
+        # Verified invocation from the Task 3 spike (Refs #18), run on Swift
+        # 6.4 / Xcode 27. NOT yet verified on this job's Swift 6.1.2 / Xcode
+        # 16.4 image — that is exactly what this job exists to find out. No
+        # `|| true` and no continue-on-error here: if muter cannot install on
+        # this toolchain, this step must fail the job, not skip the gate.
+        run: |
+          brew tap muter-mutation-testing/formulae
+          brew install muter-mutation-testing/formulae/muter
+
+      - name: Show muter version and toolchain
+        # Deliberately its own step, run before any mutation testing: the
+        # first thing a CI run of this job should tell us is exactly what
+        # versions it ran against, since muter has never been run on this
+        # image before (Task 3's spike used Swift 6.4 / Xcode 27).
+        #
+        # The codesign/PATH block is diagnostic residue from Fix round 1
+        # (Refs #19, CI run 35426258237): muter's own child-process spawning
+        # replaces the environment with a single key, no PATH, which broke a
+        # debug-only SwiftPM codesign step. The real fix is building in
+        # release configuration (see muter.conf.yml's "FIX ROUND 1" comment),
+        # which sidesteps that step rather than depending on PATH — but these
+        # lines stay so the next CI run keeps showing this environment
+        # plainly, in case a related issue resurfaces.
+        run: |
+          echo "muter version:"
+          muter --version
+          echo "swift --version:"
+          swift --version
+          echo "xcodebuild -version:"
+          xcodebuild -version
+          echo "which codesign:"
+          which codesign || echo "codesign not found on PATH"
+          echo "ls -la /usr/bin/codesign:"
+          ls -la /usr/bin/codesign || echo "no /usr/bin/codesign"
+          echo "PATH:"
+          echo "$PATH"
+          echo "xcode-select -p:"
+          xcode-select -p
+          echo "xcrun --find codesign:"
+          xcrun --find codesign || echo "xcrun could not find codesign"
+
+      - name: Check the mutation file list covers every core source file
+        # `--files-to-mutate` is an INCLUDE list: passing it overrides muter's
+        # own file discovery entirely, so muter.conf.yml's `exclude:` block is
+        # never consulted on these invocations. A file simply absent from the
+        # list is therefore not mutated, and nothing anywhere says so.
+        #
+        # With the list hardcoded, M1a adding OllamaClient.swift,
+        # LanguageDetector.swift, PromptBuilder.swift and ResponseParser.swift
+        # would mutate none of them, warn about nothing, and still report
+        # 100% — because the files that ARE measured are already fully killed.
+        # A shrinking population is indistinguishable from a healthy one, and
+        # the gate would report success having measured less and less.
+        #
+        # So the list is written once, here, and diffed against what is
+        # actually on disk. A new core file fails this step loudly until
+        # somebody assigns it to a pass. Both `muter run` steps below read
+        # their file list from this step's output rather than restating it.
+        run: |
+          set -euo pipefail
+
+          # Pass 2 is StorageLocator.swift alone, run with
+          # RelationalOperatorReplacement excluded — see muter.conf.yml's
+          # KNOWN BUG block for why it cannot go in pass 1.
+          PASS2="Sources/BabelOtterKit/Privacy/StorageLocator.swift"
+          PASS1="Sources/BabelOtterKit/LLM/OllamaEndpoint.swift
+          Sources/BabelOtterKit/BabelOtterKit.swift
+          Sources/BabelOtterKit/Privacy/UserText.swift"
+
+          MUTATED=$(printf '%s\n%s\n' "$PASS1" "$PASS2")
+          ACTUAL=$(find Sources/BabelOtterKit -name '*.swift' | sort)
+
+          if [ "$(printf '%s\n' "$MUTATED" | sort)" != "$ACTUAL" ]; then
+            echo "::error::Files under Sources/BabelOtterKit are not in the mutation file list. Assign every core file to pass 1 or pass 2 in .github/workflows/ci.yml — an unlisted file is silently never mutated, and the score stays high while covering less and less."
+            echo "'<' listed for mutation but not on disk; '>' on disk but not listed for mutation:"
+            diff <(printf '%s\n' "$MUTATED" | sort) <(printf '%s\n' "$ACTUAL") || true
+            exit 1
+          fi
+
+          printf '%s\n' "$PASS1" > muter-pass-1-files.txt
+          printf '%s\n' "$PASS2" > muter-pass-2-files.txt
+
+          echo "Mutation file list matches Sources/BabelOtterKit exactly:"
+          echo "pass 1 (all operators):"
+          sed 's/^/  /' muter-pass-1-files.txt
+          echo "pass 2 (RelationalOperatorReplacement excluded):"
+          sed 's/^/  /' muter-pass-2-files.txt
+
+      - name: Run mutation testing — pass 1 (all operators)
+        # Exact invocation verified in the Task 3 spike report. These files run
+        # together because none of them trips the
+        # RelationalOperatorReplacement/comma-while bug described in
+        # muter.conf.yml. The file list comes from the step above, so it cannot
+        # drift from what is on disk.
+        run: |
+          set -euo pipefail
+          args=()
+          while IFS= read -r file; do
+            if [ -n "$file" ]; then args+=(--files-to-mutate "$file"); fi
+          done < muter-pass-1-files.txt
+          if [ ${#args[@]} -eq 0 ]; then
+            echo "::error::Pass 1 was handed no files to mutate. That is not a passing run of zero mutants; it means the file list step produced nothing."
+            exit 1
+          fi
+          muter run "${args[@]}" --format json -o muter-report-1.json
+
+      - name: Run mutation testing — pass 2 (StorageLocator, workaround)
+        # StorageLocator.swift is run in its own pass with
+        # RelationalOperatorReplacement excluded. That operator mis-parses the
+        # comma-conjunction `while` condition in
+        # `StorageLocator.resolveAsFarAsExists` (`while components.count > 1,
+        # !exists(...) { }`), emitting invalid Swift. Muter compiles every
+        # mutant for a file into one schema binary, so that single bad mutant
+        # fails the build for the *entire file*, not just itself — the whole
+        # default run dies if this file is included with all operators.
+        # Full writeup: Task 3 report and the comment block at the top of
+        # muter.conf.yml.
+        run: |
+          set -euo pipefail
+          args=()
+          while IFS= read -r file; do
+            if [ -n "$file" ]; then args+=(--files-to-mutate "$file"); fi
+          done < muter-pass-2-files.txt
+          if [ ${#args[@]} -eq 0 ]; then
+            echo "::error::Pass 2 was handed no files to mutate. That is not a passing run of zero mutants; it means the file list step produced nothing."
+            exit 1
+          fi
+          muter run "${args[@]}" \
+            --operators ChangeLogicalConnector RemoveSideEffects SwapTernary \
+            --format json -o muter-report-2.json
+
+      - name: Enforce the combined threshold (>= 80%)
+        run: |
+          set -euo pipefail
+
+          killed1=$(jq -r '.numberOfKilledMutants' muter-report-1.json)
+          total1=$(jq -r '.totalAppliedMutationOperators' muter-report-1.json)
+          killed2=$(jq -r '.numberOfKilledMutants' muter-report-2.json)
+          total2=$(jq -r '.totalAppliedMutationOperators' muter-report-2.json)
+
+          echo "Pass 1 (all operators):                   ${killed1}/${total1} killed, globalMutationScore=$(jq -r '.globalMutationScore' muter-report-1.json)%"
+          echo "Pass 2 (StorageLocator, workaround):      ${killed2}/${total2} killed, globalMutationScore=$(jq -r '.globalMutationScore' muter-report-2.json)%"
+
+          killed=$((killed1 + killed2))
+          total=$((total1 + total2))
+
+          if [ "$total" -eq 0 ]; then
+            echo "::error::No mutants were measured across either pass. That is not a passing 0-mutant score — it means muter did not actually run mutation testing. Failing loudly rather than reporting a false pass."
+            exit 1
+          fi
+
+          # Per-mutant outcomes, read from the reports rather than inferred by
+          # subtracting the two aggregate totals. `numberOfKilledMutants`
+          # counts muter's `failed` and `runtimeError`;
+          # `totalAppliedMutationOperators` also counts mutants that never
+          # ran at all. `total - killed` therefore blurs two different faults
+          # together: a mutant the suite did not catch (`passed` — a real
+          # survivor) and a mutant that failed to compile, so nothing was
+          # learned about it either way (`buildError` — unmeasured). Both
+          # must fail this gate; conflating them makes the log accuse the
+          # test suite of a hole it may not have.
+          outcome_count() {
+            jq -r --arg outcome "$1" \
+              '[.fileReports[]?.appliedOperators[]? | select(.testSuiteOutcome == $outcome)] | length' "$2"
+          }
+          survived=$(( $(outcome_count passed muter-report-1.json) + $(outcome_count passed muter-report-2.json) ))
+          unmeasured=$(( $(outcome_count buildError muter-report-1.json) + $(outcome_count buildError muter-report-2.json) ))
+          echo "Outcomes: ${killed} killed, ${survived} survived, ${unmeasured} never built, ${total} applied"
+
+          # If those three do not account for every applied mutant, muter
+          # reported an outcome this gate does not understand — and a gate
+          # that cannot read its own input has not cleared anything. Same
+          # ruling as ResolvedDependenciesDecoder's unrecognised schema.
+          if [ $((killed + survived + unmeasured)) -ne "$total" ]; then
+            echo "::error::Mutant accounting does not add up: ${killed} killed + ${survived} survived + ${unmeasured} never built != ${total} applied. muter reported an outcome this gate does not recognise, so it cannot say whether the suite caught anything. Teach it that outcome before trusting the number again."
+            exit 1
+          fi
+
+          # An unmeasured mutant is not a killed one. It is also not a
+          # survivor, and saying so would blame the tests for a toolchain
+          # failure — so it gets its own message and its own exit.
+          if [ "$unmeasured" -gt 0 ]; then
+            echo "::error::${unmeasured} of ${total} mutants failed to build and were therefore never evaluated. Nothing was learned about them, so this run cannot show the suite catching them. See the uploaded mutation-report artifact for which mutants did not build."
+            exit 1
+          fi
+
+          # Combining the two passes: sum killed/total mutant counts across
+          # both, then take one percentage of the combined pool. NOT an
+          # average of the two passes' percentages — the passes measure
+          # different-sized, non-overlapping mutant populations (2 mutants in
+          # pass 1, 4 in pass 2 as of this writing), and averaging two
+          # percentages over unequal populations misweights the smaller one.
+          score=$(awk "BEGIN { printf \"%.1f\", (${killed} * 100.0) / ${total} }")
+          echo "Combined mutation score: ${killed}/${total} mutants killed = ${score}%"
+
+          # Why a small-population rule exists at all: the whole mutant pool is
+          # six mutants today, and at that size a single survivor still scores
+          # 5/6 = 83% and clears the 80% bar — measured, not assumed. A
+          # percentage only means something once the denominator is large
+          # enough for one mutant not to be worth 17 points, so below 20
+          # mutants the rule is simply that nothing may survive; above it, the
+          # 80% threshold takes over.
+          if [ "$total" -lt 20 ] && [ "$survived" -gt 0 ]; then
+            echo "::error::${killed}/${total}, with ${survived} surviving — at a population this small the percentage is not informative; no surviving mutant is acceptable. See the uploaded mutation-report artifact for which mutants survived."
+            exit 1
+          fi
+
+          # Integer comparison, deliberately. The previous check rounded with
+          # printf "%.0f" before comparing, so a genuine 79.5% (159 of 200)
+          # printed as "80" and passed a gate documented as ">= 80%".
+          # killed * 100 >= 80 * total has no rounding slack at any size.
+          awk "BEGIN { exit !(${killed} * 100 >= 80 * ${total}) }" || {
+            echo "::error::Mutation score ${score}% is below the required 80%. Surviving mutants indicate tests that do not actually catch regressions. See the uploaded mutation-report artifact for which mutants survived."
+            exit 1
+          }
+
+      - name: Show muter's own logs when a mutant did not build
+        if: failure()
+        # muter copies the package to ../babelOtter_mutated and leaves the
+        # build/test output for each mutant there. When a mutant is reported
+        # as `buildError` the report itself says only that — the compiler
+        # diagnostic that would explain it never reaches the job log. Without
+        # this, a mutant that cannot be measured on this toolchain looks
+        # identical to one the tests failed to catch.
+        run: |
+          set -uo pipefail
+          root="$(cd .. && pwd)/babelOtter_mutated"
+          echo "Looking for muter logs under: $root"
+          if [ ! -d "$root" ]; then
+            echo "No mutated project directory — muter did not get as far as copying the package."
+            exit 0
+          fi
+          find "$root" -maxdepth 3 -name '*.log' -print0 2>/dev/null | while IFS= read -r -d '' log; do
+            echo "──────── $log ────────"
+            grep -nE "error:|warning:|fatal|cannot|Compiling|Build" "$log" | tail -60 || tail -60 "$log"
+          done
+          echo "──────── any muter_logs directory ────────"
+          find "$root" -maxdepth 3 -type d -name '*muter*' -print 2>/dev/null || true
+
+      - name: Upload mutation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-report
+          path: |
+            muter-report-1.json
+            muter-report-2.json

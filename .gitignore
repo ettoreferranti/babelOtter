@@ -23,6 +23,10 @@ xcuserdata/
 .muter/
 muter-report/
 mutation-report.*
+muter-report-*.json
+muter-pass-*-files.txt
+# muter clones the package to ../babelOtter_mutated while it runs; it lives
+# outside this repo, but delete it if a run is interrupted before cleanup.
 
 # ─── macOS ─────────────────────────────────────────────────────────
 .DS_Store
@@ -59,3 +63,13 @@ secrets/
 logs/
 tmp/
 .scratch/
+
+# SDD scratch workspace (ledger, briefs, review packages)
+.superpowers/
+
+# muter run logs
+muter_logs/
+
+# Throwaway spikes (e.g. Spikes/focus-loss) — findings get written up and
+# kept; the prototype code itself never enters the public repo.
+Spikes/

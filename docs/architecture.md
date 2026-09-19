@@ -37,7 +37,7 @@ flowchart TB
 
     CLOUD["ollama.com<br/>model registry"]
 
-    SRC <-->|"Accessibility API<br/>clipboard fallback"| SHELL
+    SRC <-->|"AX text · AX markers<br/>clipboard fallback"| SHELL
     SHELL <--> KIT
     EVAL --> KIT
     KIT <-->|"HTTP · loopback only<br/>streaming NDJSON"| OLLAMA
@@ -66,7 +66,7 @@ flowchart TB
         direction LR
         MB["MenuBarController"]
         HK["HotkeyManager<br/><i>RegisterEventHotKey</i>"]
-        SEL["SelectionService<br/><i>AX → clipboard fallback</i>"]
+        SEL["SelectionService<br/><i>3 tiers — see §7</i>"]
         POP["PopupPanelController<br/><i>non-activating NSPanel</i>"]
         WIN["Onboarding · Settings<br/>History · Privacy panel"]
         PERM["PermissionsService"]
@@ -253,10 +253,12 @@ and no real text may ever execute on a third-party runner from a public repo.
 
 ### Known risks
 
-1. **Focus loss.** Showing the popup can deactivate the source app and drop the
-   selection. Mitigated by capturing the `AXUIElement` and PID at trigger time
-   and using a non-activating panel. **De-risking spike in M0 (#30)** — this is
-   the most likely thing to make the app feel broken.
+1. ~~**Focus loss.**~~ **RESOLVED by measurement (#30, 2026-09-19).** A
+   non-activating `NSPanel` keeps the source app frontmost, the captured
+   `AXUIElement` stays valid across the panel's lifetime, and the selection
+   survives. Verified end to end in TextEdit: capture → panel → re-activate →
+   write back. This was the highest risk in the design and it does not
+   materialise. See §7 for what the same spike *did* overturn.
 2. **`muter` maturity.** May not run cleanly on Swift 6.4 / macOS 27.
    **Spike in M0.** Fallback: a SwiftSyntax-based in-house harness. Last resort:
    report-only — which would be reported, not quietly adopted.
@@ -264,3 +266,78 @@ and no real text may ever execute on a third-party runner from a public repo.
    validation across candidate models via the eval harness.
 4. **Clipboard fallback vs Universal Clipboard.** Knowingly accepted for v1;
    see [`../PRIVACY.md`](../PRIVACY.md).
+
+
+---
+
+## 7. Selection capture — measured, not assumed
+
+Everything in this section replaces the earlier "Accessibility API, else
+clipboard" model, which was wrong. It was corrected by spike #30, run against
+real applications on macOS 27 on 2026-09-19.
+
+### Three tiers, not two
+
+| Tier | Mechanism | Works in | Measured |
+|---|---|---|---|
+| 1 | `kAXSelectedTextAttribute` | Native AppKit | TextEdit ✅ read + write |
+| 2 | `AXSelectedTextMarkerRange` → `AXStringForTextMarkerRange` (parameterized) | WebKit | Safari, Mail HTML view ✅ read |
+| 3 | Clipboard simulation | Electron, and anywhere tier 1–2 return empty | VS Code |
+
+WebKit surfaces return `noValue` for `kAXSelectedTextAttribute` and expose the
+selection through **text markers** instead. Missing tier 2 means treating Safari
+and Mail as clipboard-only, which is both less private and less reliable than
+necessary.
+
+### `AXUIElementSetAttributeValue` lies
+
+On Mail's read-only HTML view, setting `kAXSelectedTextAttribute` returns
+`.success` and **changes nothing**. Measured directly.
+
+**The replace step must read the selection back and compare before reporting
+success.** A caller trusting the return code tells the user "Replaced" over
+untouched text — the exact failure story #34 exists to prevent, with the false
+signal originating in the OS rather than in our code. Only a verified match may
+report success; anything else falls through to the next tier or surfaces the
+failure.
+
+### Attribute presence is not capability
+
+VS Code's focused element reports `AXRole = AXTextArea`,
+`AXRoleDescription = editor`, and advertises `AXSelectedText`,
+`AXSelectedTextRange`, `AXSelectedTextRanges` **and** `AXSelectedTextMarkerRange`.
+With text genuinely selected, all three read paths return empty. Monaco renders
+the editor itself and exposes only a hidden `<textarea>` input shim.
+
+**Capability detection must attempt a real capture and require a non-empty
+result.** Probing for attribute *names* classifies VS Code as tier 1; it is
+tier 3. This is the single most misleading result the spike produced.
+
+### Electron needs accessibility enabled in advance
+
+Chromium keeps its accessibility tree switched off until an assistive tool asks.
+Setting `AXManualAccessibility` on the application element returns `success`, but
+the tree is built **asynchronously**: the first capture afterwards still fails
+with `noValue`, and a later one succeeds.
+
+So this must be enabled **when an Electron app is first seen frontmost**, not at
+capture time. Enabling at capture time makes every Electron app look permanently
+unreachable — which is precisely what the first prototype concluded.
+
+Note this switches on accessibility work inside applications we do not own. That
+is ordinary behaviour for assistive software and is what VoiceOver does, but it
+is a side effect worth stating rather than burying.
+
+### Consequence for the accepted clipboard risk
+
+`PRIVACY.md` accepts a Universal Clipboard exposure for v1 on the assumption that
+the clipboard is a rare fallback. The measurements say otherwise: it is the only
+path for Electron, and the only path for replacement into web content. The M4
+strict-mode work (#77) is therefore more load-bearing than its milestone suggests
+and is worth reconsidering for v1.
+
+### Not yet measured
+
+Teams; the focus-taking panel variant (#52); Chrome; Word; and whether a
+managed ZHAW Mac permits the Accessibility grant at all — if MDM blocks it,
+no tier works.
