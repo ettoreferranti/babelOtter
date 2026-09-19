@@ -7,11 +7,16 @@ Highlight text anywhere in macOS, hit a hotkey, and get a translation,
 a correction, or an explanation — without a single byte of your writing
 leaving your machine.
 
-> **Status: design phase.** Requirements are captured as GitHub issues
+> **Status: M0 Foundations.** The skeleton and the guards are built, not the
+> product: four SwiftPM targets, 65 tests in 8 suites, the six privacy
+> mechanisms below, and a CI pipeline that gates on all of them plus mutation
+> testing of `BabelOtterKit` at ≥80%. **None of the behaviour described below
+> this line is implemented yet** — that begins with M1a.
+>
+> Requirements are captured as GitHub issues
 > (see [the backlog](../../issues)); the architecture is in
 > [`docs/architecture.md`](docs/architecture.md) and the full specification in
 > [`docs/superpowers/specs/2026-09-18-babelotter-design.md`](docs/superpowers/specs/2026-09-18-babelotter-design.md).
-> No implementation has started yet.
 
 ---
 
@@ -65,10 +70,12 @@ local Ollama daemon, so babelOtter's own egress is loopback-only and provably so
 
 This is enforced in code and proven by tests, not merely promised: a
 loopback-only endpoint type that ignores `OLLAMA_HOST`, an architecture test
-asserting exactly one networking call site exists, a dependency allowlist, a
-type-enforced log redactor, and a storage resolver that refuses iCloud-synced
-paths. Mutation testing exists to prove those tests would actually catch a
-regression.
+refusing any networking call site outside a one-entry allowlist, a dependency
+allowlist, a log redactor that makes every accidental path to a log safe by
+default, and a storage resolver that refuses iCloud-synced paths. Mutation
+testing proves the tests around the first, fourth and fifth of those would
+actually catch a regression; `PRIVACY.md` says plainly which mechanisms it
+does **not** cover.
 
 **v1 has one knowingly accepted privacy gap** involving the clipboard fallback
 and Universal Clipboard. It is documented plainly, along with the full threat
@@ -118,8 +125,32 @@ invariants provable. Full diagram in [`docs/architecture.md`](docs/architecture.
 swift build
 swift test                     # pure unit + contract tests, no Ollama needed
 swift run babelotter-eval      # score models against the golden set (needs Ollama)
-muter run                      # mutation testing on BabelOtterKit
 ```
+
+Mutation testing runs in **two passes**, never as a bare `muter run`. A muter
+bug mis-parses the comma-conjunction `while` condition in `StorageLocator`, and
+because muter compiles every mutant for a file into one binary, that single
+invalid mutant makes the whole file unmeasurable — so a plain `muter run` fails
+rather than reporting a score. The full writeup is at the top of
+`muter.conf.yml`.
+
+```sh
+# Pass 1 — every core file except StorageLocator, all operators.
+muter run \
+  --files-to-mutate Sources/BabelOtterKit/LLM/OllamaEndpoint.swift \
+  --files-to-mutate Sources/BabelOtterKit/BabelOtterKit.swift \
+  --files-to-mutate Sources/BabelOtterKit/Privacy/UserText.swift
+
+# Pass 2 — StorageLocator, with the mis-parsing operator excluded.
+muter run \
+  --files-to-mutate Sources/BabelOtterKit/Privacy/StorageLocator.swift \
+  --operators ChangeLogicalConnector RemoveSideEffects SwapTernary
+```
+
+`.github/workflows/ci.yml` is the source of truth for which file belongs to
+which pass, and it fails loudly if a new file under `Sources/BabelOtterKit/` is
+not assigned to one — so copy the lists from there rather than from here if the
+two ever disagree.
 
 ### Testing approach
 

@@ -47,13 +47,13 @@ So the guarantee is made **in code and proven by tests**:
 
 | Mechanism | What it guarantees |
 |---|---|
-| `OllamaEndpoint` value type | Only constructs from `127.0.0.1` / `::1` / `localhost`. Deliberately ignores `OLLAMA_HOST`. Rejects everything else. |
-| Networking call-site allowlist test | Asserts exactly one file in the codebase references `URLSession` / `Network` / `NWConnection`. A new call site fails CI. |
-| Dependency allowlist test | `Package.resolved` is checked against a reviewed allowlist. No package may perform networking. |
-| Log redaction wrapper | User-content types cannot reach a logging API without passing through a redactor the type system enforces. |
-| Storage path resolver | Refuses any history path resolving inside an iCloud-synced tree. |
-| Fixture content guard | CI rejects non-synthetic test data (this repo is public). |
-| Mutation testing (≥80%) | Proves the above tests would actually *catch* a regression, rather than merely existing. |
+| `OllamaEndpoint` value type | Only constructs from the literal loopback addresses `127.0.0.1` / `::1`. `localhost` is accepted as a spelling and stored as `127.0.0.1`, because a *name* is resolved by `/etc/hosts` and the system resolver rather than by this type. Deliberately ignores `OLLAMA_HOST`. Rejects everything else. |
+| Networking call-site allowlist test | No file outside `Config/networking-allowlist.txt` may mention any of ~19 networking symbols (`URLSession`, `NWConnection`, `getaddrinfo`, `socket(`, …), and that allowlist may hold at most one path. Today **zero** files mention them — the single allowlisted path is `OllamaClient.swift`, which M1a has yet to write. A new call site fails CI. This is a lexical scan of source text: it catches the accidental introduction of networking, not a contributor deliberately evading it — the limits are listed in full in `NetworkingCallSiteTests`' own documentation. |
+| Dependency allowlist test | `Package.resolved` and `Package.swift`'s `.package(` / `.binaryTarget(` declarations are checked against a reviewed allowlist, and a declaration the scan cannot parse counts as unreviewed. Nothing here inspects what a package *does*: every dependency is human-reviewed and attested in its allowlist commit not to perform networking. The list is empty today, which is the point. |
+| Log redaction wrapper | Every textual representation of a user-content type is redacted — interpolation, `description`, `debugDescription`, `dump()`, `Mirror`. The **accidental** path to a log is therefore safe by default. This is not type-system enforcement: `UserText.value` is `public`, so `logger.info("\(text.value)")` compiles. The deliberate path is left open on purpose and is a greppable, reviewable token. |
+| Storage path resolver | Refuses any history path resolving at or inside an iCloud-synced tree, comparing case-insensitively and after resolving symlinks on both sides. |
+| Fixture content guard | CI rejects test data carrying any of four markers of real correspondence (email, Swiss phone, IBAN, AHV), and reports — rather than skips — any file it cannot read as UTF-8 text, such as a `.docx`, a PDF or a screenshot. It does not detect names or addresses; a human reading the fixture is still the actual control. |
+| Mutation testing (≥80%) | Proves the tests around the three mechanisms implemented in `Sources/` — `OllamaEndpoint`, the log redaction wrapper, the storage path resolver — would actually *catch* a regression. **It says nothing about the other three.** The networking, dependency and fixture guards are lexical scanners implemented entirely in `Tests/`, which muter excludes; nothing mutates them. What stands in for it there is that each scanner's detection logic is extracted and exercised directly against synthetic input in memory, so it is proven regardless of what happens to be on disk — a weaker guarantee than mutation coverage, stated here rather than implied away. |
 
 The in-app **Privacy panel** reports live status: resolved endpoint, Ollama's
 listening interface, history location, iCloud exposure of that path, and
