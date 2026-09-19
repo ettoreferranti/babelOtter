@@ -66,3 +66,6 @@ tmp/
 
 # SDD scratch workspace (ledger, briefs, review packages)
 .superpowers/
+
+# muter run logs
+muter_logs/
