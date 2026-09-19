@@ -8,29 +8,53 @@ import Foundation
 ///
 /// ## What this guard is, and is not
 ///
-/// This is a lexical scan for regex-shaped markers (email, Swiss phone, IBAN,
-/// AHV number) in `Tests/Fixtures` and `evals`. It exists to catch a
-/// contributor pasting a real email thread or a real student's details into a
-/// fixture. It is not, and cannot be, a complete PII scanner. Confirmed gaps,
-/// found by testing each marker against concrete real-world spellings rather
-/// than assuming it works (see `task-10-report.md` for the full table):
+/// This guard catches exactly four machine-recognisable, regex-shaped
+/// markers — an email address, a Swiss phone number, an IBAN, an AHV
+/// number — appearing anywhere under `Tests/Fixtures` or `evals`. That is
+/// the entire list. State it plainly, because a guard that reads as more
+/// than it is trains people to trust it more than it deserves:
 ///
-/// - The Swiss phone pattern (`\+41[\s0-9]{9,}`) matches `+41 79 123 45 67`
-///   and `+41791234567`, but **not** `+41-79-123-45-67`, `+41.79.123.45.67`,
-///   `0041 79 123 45 67`, or the bare local form `079 123 45 67` — all
-///   common real spellings. This is the same shape of gap as the `"CFStream"`
-///   symbol that matched nothing: a marker that reads as coverage but misses
-///   realistic input.
-/// - The IBAN pattern does not match a hyphen-grouped IBAN
-///   (`CH93-0076-2011-6238-5295-7`), only space- or run-together digits.
+/// **It does NOT detect names, street addresses, matriculation/student
+/// numbers, dates of birth, `zhaw.ch` URLs, or any other free-text personal
+/// detail.** None of these are reliably expressible as a regex without
+/// either missing real instances or false-positiving on every ordinary
+/// sentence a fixture contains (German prose is made of names). No marker
+/// exists for them, and none will be added — a marker that fires
+/// unpredictably would teach contributors to allowlist reflexively, which
+/// destroys this guard's value for the markers it *can* check reliably.
+///
+/// **This narrows what a careless skim misses. It does not replace a human
+/// reading a fixture before committing it.** `Tests/Fixtures/README.md`'s
+/// instruction to write only about invented `Frau Muster`/`Herr Beispiel`
+/// subjects is still the actual control; this test is a backstop against
+/// the specific, mechanical mistake of a real email/phone/IBAN/AHV number
+/// slipping through that review, not a substitute for the review itself.
+///
+/// **The allowlist is for genuine false positives, not for silencing a real
+/// finding.** Every entry in `Config/fixture-guard-allowlist.txt` asserts
+/// that a specific person read the flagged file and confirmed by hand that
+/// it is synthetic; the commit adding an entry should name who did that
+/// check.
+///
+/// Even within its four markers, this guard is not exhaustive — verified
+/// against concrete real-world spellings, not assumed (see `task-10-report.md`
+/// for the full table and Fix round 1 for the phone/IBAN corrections it
+/// prompted):
+///
+/// - The Swiss phone pattern (fixed in Fix round 1) now matches `+41` and
+///   `0041` international prefixes and the bare local `0xx` form, with
+///   space, hyphen, dot, or no separator at all. Deliberately over-matching:
+///   the bare local form cannot be distinguished from any other 10-digit
+///   numeral that happens to start with `0` — confirmed as the one real
+///   cost, and accepted, in exchange for not missing the way most Swiss
+///   people actually write their own number.
+/// - The IBAN pattern (fixed in Fix round 1) now matches hyphen-grouped
+///   IBANs alongside the space-grouped and run-together forms it already
+///   matched.
 /// - The AHV pattern requires the dotted `756.XXXX.XXXX.XX` grouping; a
-///   13-digit run with no punctuation is not caught.
-///
-/// Categories with **no marker at all**: German/Swiss names, street
-/// addresses, matriculation/student numbers, dates of birth, and
-/// `zhaw.ch`-hosted URLs that could identify a course or cohort. A person
-/// still has to read a fixture before trusting it; this guard narrows what a
-/// skim misses, it does not replace the read.
+///   13-digit run with no punctuation is not caught. Left as-is by ruling —
+///   widening it risks matching ordinary numbers with no punctuation to
+///   anchor on.
 ///
 /// Scope: this suite scans `Tests/Fixtures` and `evals` only, matching the
 /// brief. `Sources/`, `docs/`, and commit messages are not scanned by this
@@ -43,8 +67,40 @@ struct FixtureContentGuardTests {
 
     static let markers: [Marker] = [
         .init(name: "email address", pattern: #"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"#),
-        .init(name: "Swiss phone number", pattern: #"\+41[\s0-9]{9,}"#),
-        .init(name: "IBAN", pattern: #"\bCH\d{2}[\s0-9]{15,}\b"#),
+        // Fix round 1 (Refs #25): the original `\+41[\s0-9]{9,}` only matched
+        // one punctuation convention and missed the international `0041`
+        // prefix and the bare local `0xx` form entirely — the same shape of
+        // gap as the `"CFStream"` symbol that matched nothing, and worse
+        // here, since `079 123 45 67` is the single most common way a Swiss
+        // person writes their own number. This pattern matches `+41` or
+        // `0041` or a lone leading `0`, then nine more digits grouped
+        // 2-3-2-2 with space, hyphen, dot, or no separator at all between
+        // groups. `(?<!\d)`/`(?!\d)` require the match not be glued to
+        // further digits, so it can't fire on a fragment of a longer digit
+        // run (an IBAN's digit groups, for instance) — without narrowing
+        // what it catches of an actual phone number, since a real phone
+        // number is never itself embedded inside a longer numeral.
+        // Deliberately over-matching in the safe direction: the local form
+        // is indistinguishable from any other bare 10-digit numeral that
+        // happens to start with 0 (e.g. a matriculation number in that
+        // exact shape) — confirmed as the one real cost, and accepted,
+        // because a false positive there costs one allowlist line and is
+        // loud, while a false negative on a real phone number costs a
+        // disclosure. Tested against a battery of realistic non-phone
+        // fixture content (dates, version numbers, room/course codes) that
+        // must NOT match — see `scannerIgnoresRealisticCleanProse` — and
+        // none of it does; see the task report for the full table.
+        .init(
+            name: "Swiss phone number",
+            pattern: #"(?<!\d)(?:\+41|0041|0)[\s.-]?\d{2}[\s.-]?\d{3}[\s.-]?\d{2}[\s.-]?\d{2}(?!\d)"#
+        ),
+        // Fix round 1 (Refs #25): widened to also match a hyphen-grouped IBAN
+        // (`CH93-0076-2011-6238-5295-7`), alongside the space-grouped and
+        // run-together forms it already matched.
+        .init(name: "IBAN", pattern: #"\bCH\d{2}[\s0-9-]{15,}\b"#),
+        // AHV number: left as-is per ruling. An undotted 13-digit run is a
+        // lower-realism gap, and widening this pattern risks matching
+        // ordinary numbers with no punctuation to anchor on.
         .init(name: "AHV number", pattern: #"\b756\.\d{4}\.\d{4}\.\d{2}\b"#),
     ]
 
@@ -116,8 +172,20 @@ struct FixtureContentGuardTests {
     @Test("marker scanner: fires on a realistic instance of each marker", arguments: [
         (marker: "email address", sample: "Bitte antworten Sie an vorname.nachname@example.org."),
         (marker: "email address", sample: "Kontakt: j.mueller+kurs@stud.zhaw.ch"),
+        // Swiss phone number: every spelling a person actually writes, per
+        // Fix round 1 — international with each separator, international
+        // with none, local with each separator, local with none.
         (marker: "Swiss phone number", sample: "Rufen Sie mich an: +41 79 123 45 67."),
+        (marker: "Swiss phone number", sample: "Rufen Sie mich an: +41-79-123-45-67."),
+        (marker: "Swiss phone number", sample: "Rufen Sie mich an: +41.79.123.45.67."),
+        (marker: "Swiss phone number", sample: "Rufen Sie mich an: +41791234567."),
+        (marker: "Swiss phone number", sample: "Rufen Sie mich an: 0041 79 123 45 67."),
+        (marker: "Swiss phone number", sample: "Rufen Sie mich an: 0041791234567."),
+        (marker: "Swiss phone number", sample: "Rufen Sie mich an: 079 123 45 67."),
+        (marker: "Swiss phone number", sample: "Rufen Sie mich an: 079-123-45-67."),
+        (marker: "Swiss phone number", sample: "Rufen Sie mich an: 0791234567."),
         (marker: "IBAN", sample: "IBAN CH93 0076 2011 6238 5295 7"),
+        (marker: "IBAN", sample: "IBAN CH93-0076-2011-6238-5295-7"),
         (marker: "AHV number", sample: "AHV-Nr. 756.1234.5678.90"),
     ] as [(marker: String, sample: String)])
     func scannerFiresOnRealisticMarkerInstances(marker: String, sample: String) throws {
@@ -134,6 +202,19 @@ struct FixtureContentGuardTests {
         "Der Kurs Nr. 756 beginnt am Montag im Raum TB 2.14.",
         "Bitte korrigieren Sie den Satz: 'Er sind gestern nach Hause gegangen.'",
         "Postleitzahl 8400 Winterthur, Bahnhofplatz 1.",
+        // Fix round 1: the widened bare-local phone shape (a lone leading
+        // "0" plus nine more digits) is the part of the pattern that trades
+        // away precision for recall, so it gets checked against exactly the
+        // kind of short numerals ordinary fixture prose actually contains —
+        // dates, versions, course/room numbers — not just clean sentences.
+        "Kursnummer 079 2026 startet im Herbstsemester.",
+        "Build v0.79.1 behebt einen Darstellungsfehler.",
+        "Kurs Nr. 2026-079-123 ist ausgebucht.",
+        "Am 07.09.2026 findet die Prüfung statt.",
+        "Postfach 079, 8400 Winterthur.",
+        // IBAN: a "CH"-prefixed course/date code must not be mistaken for a
+        // hyphen-grouped IBAN merely because both start with "CH".
+        "CH-2026-01-15 Sprachprüfung, Frau Muster.",
     ])
     func scannerIgnoresRealisticCleanProse(sample: String) throws {
         let found = try FixtureContentScanner.matchedMarkerNames(in: sample, markers: Self.markers)
