@@ -1,0 +1,5 @@
+# Fixture paths exempted from the content guard, one per line, relative to the
+# repository root.
+#
+# An entry here asserts a human read the file and confirmed it is synthetic
+# despite tripping a heuristic. Empty is the expected state.
