@@ -325,4 +325,26 @@ struct ResolveAsFarAsExistsTests {
         )
         #expect(result.path(percentEncoded: false) == "/fake/a/b/c")
     }
+
+    /// Mutation-testing gap (Refs #19): every other case here walks up from an
+    /// absolute URL, so the surviving ancestor's first path component is
+    /// always `"/"` and the private `url(fromPathComponents:)` helper's
+    /// "is the first component already root?" branch is never exercised with
+    /// a `false` answer. `URL(string:)` with no scheme is the one construction
+    /// that yields pathComponents not anchored at `"/"` (see the
+    /// `rejectsRelativePaths` test above for why `URL(filePath:)` cannot do
+    /// this — it always resolves against the CWD before `pathComponents` is
+    /// ever read). This pins down that a non-root first component survives
+    /// the walk-up instead of being silently collapsed to `"/"`.
+    @Test("a non-root first path component is preserved by the ancestor walk, not forced to root")
+    func nonRootFirstComponentIsPreserved() {
+        let url = URL(string: "relative/history.sqlite")!
+        let result = StorageLocator.resolveAsFarAsExists(
+            url,
+            exists: { _ in false },
+            resolveSymlinks: { $0 }
+        )
+        #expect(result.lastPathComponent == "history.sqlite")
+        #expect(result.deletingLastPathComponent().lastPathComponent == "relative")
+    }
 }

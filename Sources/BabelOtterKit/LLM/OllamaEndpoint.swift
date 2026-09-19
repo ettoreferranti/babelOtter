@@ -48,7 +48,6 @@ public struct OllamaEndpoint: Sendable, Equatable, Hashable {
     /// the intent is visible at the call site. `OLLAMA_HOST` is never honoured:
     /// a remote value there would ship the user's writing off the machine.
     public static func resolved(ignoring environment: [String: String]) -> OllamaEndpoint {
-        _ = environment
         return .loopback
     }
 

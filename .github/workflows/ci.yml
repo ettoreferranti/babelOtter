@@ -37,3 +37,115 @@ jobs:
 
       - name: Test
         run: swift test
+
+  mutation:
+    name: Mutation testing (BabelOtterKit >= 80%)
+    runs-on: macos-15
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+
+      # Same toolchain selection as the "test" job, kept in sync deliberately:
+      # muter shells out to `swift test` itself, so it must run under the same
+      # compiler the rest of CI uses.
+      - name: Select Xcode
+        run: |
+          if [ -d "/Applications/Xcode_16.4.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_16.4.app
+          else
+            echo "Xcode_16.4.app not present on this image; using the default Xcode."
+          fi
+
+      - name: Install muter
+        # Verified invocation from the Task 3 spike (Refs #18), run on Swift
+        # 6.4 / Xcode 27. NOT yet verified on this job's Swift 6.1.2 / Xcode
+        # 16.4 image — that is exactly what this job exists to find out. No
+        # `|| true` and no continue-on-error here: if muter cannot install on
+        # this toolchain, this step must fail the job, not skip the gate.
+        run: |
+          brew tap muter-mutation-testing/formulae
+          brew install muter-mutation-testing/formulae/muter
+
+      - name: Show muter version and toolchain
+        # Deliberately its own step, run before any mutation testing: the
+        # first thing a CI run of this job should tell us is exactly what
+        # versions it ran against, since muter has never been run on this
+        # image before (Task 3's spike used Swift 6.4 / Xcode 27).
+        run: |
+          echo "muter version:"
+          muter --version
+          echo "swift --version:"
+          swift --version
+          echo "xcodebuild -version:"
+          xcodebuild -version
+
+      - name: Run mutation testing — pass 1 (OllamaEndpoint, BabelOtterKit, UserText)
+        # Exact invocation verified in the Task 3 spike report. These three
+        # files run together because none of them trips the
+        # RelationalOperatorReplacement/comma-while bug described below.
+        run: |
+          muter run \
+            --files-to-mutate Sources/BabelOtterKit/LLM/OllamaEndpoint.swift \
+            --files-to-mutate Sources/BabelOtterKit/BabelOtterKit.swift \
+            --files-to-mutate Sources/BabelOtterKit/Privacy/UserText.swift \
+            --format json -o muter-report-1.json
+
+      - name: Run mutation testing — pass 2 (StorageLocator, workaround)
+        # StorageLocator.swift is run in its own pass with
+        # RelationalOperatorReplacement excluded. That operator mis-parses the
+        # comma-conjunction `while` condition in
+        # `StorageLocator.resolveAsFarAsExists` (`while components.count > 1,
+        # !exists(...) { }`), emitting invalid Swift. Muter compiles every
+        # mutant for a file into one schema binary, so that single bad mutant
+        # fails the build for the *entire file*, not just itself — the whole
+        # default run dies if this file is included with all operators.
+        # Full writeup: Task 3 report and the comment block at the top of
+        # muter.conf.yml.
+        run: |
+          muter run \
+            --files-to-mutate Sources/BabelOtterKit/Privacy/StorageLocator.swift \
+            --operators ChangeLogicalConnector RemoveSideEffects SwapTernary \
+            --format json -o muter-report-2.json
+
+      - name: Enforce the combined threshold (>= 80%)
+        run: |
+          set -euo pipefail
+
+          killed1=$(jq -r '.numberOfKilledMutants' muter-report-1.json)
+          total1=$(jq -r '.totalAppliedMutationOperators' muter-report-1.json)
+          killed2=$(jq -r '.numberOfKilledMutants' muter-report-2.json)
+          total2=$(jq -r '.totalAppliedMutationOperators' muter-report-2.json)
+
+          echo "Pass 1 (OllamaEndpoint/BabelOtterKit/UserText): ${killed1}/${total1} killed, globalMutationScore=$(jq -r '.globalMutationScore' muter-report-1.json)%"
+          echo "Pass 2 (StorageLocator, workaround):            ${killed2}/${total2} killed, globalMutationScore=$(jq -r '.globalMutationScore' muter-report-2.json)%"
+
+          killed=$((killed1 + killed2))
+          total=$((total1 + total2))
+
+          if [ "$total" -eq 0 ]; then
+            echo "::error::No mutants were measured across either pass. That is not a passing 0-mutant score — it means muter did not actually run mutation testing. Failing loudly rather than reporting a false pass."
+            exit 1
+          fi
+
+          # Combining the two passes: sum killed/total mutant counts across
+          # both, then take one percentage of the combined pool. NOT an
+          # average of the two passes' percentages — the passes measure
+          # different-sized, non-overlapping mutant populations (2 mutants in
+          # pass 1, 4 in pass 2 as of this writing), and averaging two
+          # percentages over unequal populations misweights the smaller one.
+          score=$(awk "BEGIN { printf \"%.0f\", (${killed} * 100.0) / ${total} }")
+          echo "Combined mutation score: ${killed}/${total} mutants killed = ${score}%"
+
+          if [ "$score" -lt 80 ]; then
+            echo "::error::Mutation score ${score}% is below the required 80%. Surviving mutants indicate tests that do not actually catch regressions. See the uploaded mutation-report artifact for which mutants survived."
+            exit 1
+          fi
+
+      - name: Upload mutation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-report
+          path: |
+            muter-report-1.json
+            muter-report-2.json
