@@ -104,8 +104,8 @@ struct NetworkingCallSiteTests {
         )
     }
 
-    /// The well-formedness check for `networkingSymbols` itself. Two
-    /// independent failure modes, both real:
+    /// The well-formedness check for `networkingSymbols` itself. Three
+    /// independent failure modes, all real:
     ///
     /// 1. **Internal redundancy** — an entry that is a strict substring of
     ///    another entry in this same list never distinguishes anything the
@@ -121,6 +121,13 @@ struct NetworkingCallSiteTests {
     ///    in between. A reviewer confirmed the redundancy check alone
     ///    passes against the pre-fix list containing `"CFStream"`; check 2
     ///    is what closes that gap.
+    /// 3. **Coverage** — a corpus entry that no symbol matches. Checks 1 and
+    ///    2 only ever run symbols → corpus, so they prove the list has no
+    ///    dead weight and cannot prove it is *complete* — which is precisely
+    ///    what round 1 got wrong, with `NSURLConnection`, `getStreamsToHost`
+    ///    and `NetService` all absent and no test able to say so. Check 3
+    ///    runs corpus → symbols, so an API documented here but not actually
+    ///    guarded fails instead of reading as coverage.
     @Test("the networking symbol list has no dud entries")
     func networkingSymbolListIsWellFormed() {
         let symbols = Self.networkingSymbols
@@ -155,6 +162,27 @@ struct NetworkingCallSiteTests {
                     + "API. Either it targets a real API and the corpus is missing an entry "
                     + "for it, or it is a dud (like \"CFStream\" was) and should be fixed or "
                     + "removed."
+                )
+            )
+        }
+
+        // Check 3: coverage — every corpus entry must be matched by some
+        // symbol. Checks 1 and 2 run the relation in one direction only: they
+        // prove the symbol list carries no dead weight, and cannot prove it is
+        // complete. Completeness is exactly what round 1 got wrong —
+        // `NSURLConnection`, `getStreamsToHost` and `NetService` were all
+        // missing, and no test noticed. Without this, someone can add a known
+        // dangerous API to the corpus as documentation, ship it believing it
+        // is guarded, and nothing fails: the corpus would record an intention
+        // the scanner never acquired.
+        for reference in corpus {
+            #expect(
+                symbols.contains { reference.contains($0) },
+                Comment(rawValue:
+                    "\"\(reference)\" is a real networking API that no entry in "
+                    + "networkingSymbols matches — the guard does not catch it. Add a "
+                    + "symbol that does, or remove the corpus entry if it was never "
+                    + "meant to be guarded."
                 )
             )
         }

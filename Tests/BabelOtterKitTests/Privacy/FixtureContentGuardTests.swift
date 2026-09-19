@@ -10,9 +10,25 @@ import Foundation
 ///
 /// This guard catches exactly four machine-recognisable, regex-shaped
 /// markers — an email address, a Swiss phone number, an IBAN, an AHV
-/// number — appearing anywhere under `Tests/Fixtures` or `evals`. That is
-/// the entire list. State it plainly, because a guard that reads as more
-/// than it is trains people to trust it more than it deserves:
+/// number — in every file under `Tests/Fixtures` or `evals` **that decodes
+/// as UTF-8 text**. That is the entire list. State it plainly, because a
+/// guard that reads as more than it is trains people to trust it more than
+/// it deserves:
+///
+/// **A file that does not decode as UTF-8 is not scanned — and is reported
+/// as unscannable rather than skipped.** `.docx`, `.pdf`, `.eml`,
+/// screenshots (NFR-P8 names them explicitly) and UTF-16 text — which is
+/// what Word and TextEdit produce on export — carry no readable marker for
+/// a UTF-8 regex scan. The previous version of this suite `continue`d past
+/// exactly these, and past every extensionless file as well, and then
+/// reported the tree clean while listing nothing: a `.docx`, an
+/// extensionless file and a UTF-16 `.txt`, each containing a real email
+/// address and phone number, all passed. On a public repo those are the
+/// most likely way real correspondence actually arrives. They now fail the
+/// suite until a human either removes them or adds them to
+/// `Config/fixture-guard-allowlist.txt` — which for a binary fixture is the
+/// right answer anyway, since that entry means exactly what the allowlist's
+/// header says: a person read the file and confirmed it is synthetic.
 ///
 /// **It does NOT detect names, street addresses, matriculation/student
 /// numbers, dates of birth, `zhaw.ch` URLs, or any other free-text personal
@@ -107,6 +123,19 @@ struct FixtureContentGuardTests {
     /// Directories whose contents must be synthetic.
     static let scannedDirectories = ["Tests/Fixtures", "evals"]
 
+    /// The only filename exempted by name rather than by allowlist entry.
+    ///
+    /// `.DS_Store` is Finder metadata: binary, regenerated the moment anyone
+    /// opens the folder, and already unpublishable because `.gitignore`
+    /// refuses it — so it can never reach the public repository this guard
+    /// exists to protect. Reporting it as unscannable would fail the suite on
+    /// every machine where someone has looked at `Tests/Fixtures` in Finder,
+    /// and the only remedy on offer would be an allowlist line: precisely the
+    /// reflexive allowlisting this suite's documentation warns destroys the
+    /// guard's value. Nothing else is exempted by name — a hidden file that is
+    /// *not* `.DS_Store` is scanned like any other.
+    static let filenamesExemptedByName: Set<String> = [".DS_Store"]
+
     static func allowlist() throws -> Set<String> {
         let url = SourceTree.repositoryRoot.appending(path: "Config/fixture-guard-allowlist.txt")
         guard let contents = try? SourceTree.read(url) else { return [] }
@@ -121,18 +150,36 @@ struct FixtureContentGuardTests {
     func fixturesAreSynthetic() throws {
         let permitted = try Self.allowlist()
         var violations: [String] = []
+        var unscannable: [String] = []
 
         for directory in Self.scannedDirectories {
             let root = SourceTree.repositoryRoot.appending(path: directory)
             guard FileManager.default.fileExists(atPath: root.path(percentEncoded: false)),
-                  let walker = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil)
+                  let walker = FileManager.default.enumerator(
+                      at: root,
+                      includingPropertiesForKeys: [.isDirectoryKey]
+                  )
             else { continue }
 
             for case let file as URL in walker {
-                guard file.pathExtension != "",
-                      let contents = try? SourceTree.read(file) else { continue }
+                // Directories are containers, not content. Everything else is
+                // either scanned or reported — a file whose kind cannot even be
+                // determined falls through to the unscannable list rather than
+                // being skipped, which is the whole point of this rewrite.
+                let isDirectory = (try? file.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory
+                guard isDirectory != true else { continue }
+                guard !Self.filenamesExemptedByName.contains(file.lastPathComponent) else { continue }
+
                 let relative = SourceTree.relativePath(file)
                 guard !permitted.contains(relative) else { continue }
+
+                guard let contents = try? SourceTree.read(file) else {
+                    unscannable.append(
+                        "\(relative) could not be read as UTF-8 text — "
+                        + "the marker scan did not run on it"
+                    )
+                    continue
+                }
 
                 let found = try FixtureContentScanner.matchedMarkerNames(in: contents, markers: Self.markers)
                 for name in found {
@@ -152,6 +199,26 @@ struct FixtureContentGuardTests {
             who checked it.
 
             \(violations.joined(separator: "\n"))
+            """
+        )
+
+        #expect(
+            unscannable.isEmpty,
+            """
+            This repository is public and CI runs on third-party machines.
+
+            These files are not UTF-8 text, so no marker scan ran on them at
+            all. A binary attachment, a screenshot, a .docx, a .pdf, an .eml,
+            or a UTF-16 export is exactly how real correspondence usually
+            arrives — and a guard that quietly skipped them while reporting
+            the tree clean would be worse than no guard.
+
+            Read each file yourself. If it is genuinely synthetic, add its
+            path to Config/fixture-guard-allowlist.txt in a commit saying who
+            checked it — for a binary fixture that human check is the only
+            control there is.
+
+            \(unscannable.joined(separator: "\n"))
             """
         )
     }

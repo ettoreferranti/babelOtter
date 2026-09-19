@@ -39,7 +39,13 @@ public struct StorageLocator: Sendable {
 
     /// `~/Library/Application Support/ch.babelotter` — never validated here;
     /// callers pass the result to ``validate(_:)`` or ``prepare(_:)``.
-    public func applicationSupportDirectory() throws -> URL {
+    ///
+    /// Deliberately non-throwing: the body is pure URL appending and has no
+    /// failure mode. It was declared `throws` and could not throw, which in
+    /// the one type standing between the user's history and iCloud reads as
+    /// "this checks something" when it checks nothing. ``validate(_:)`` and
+    /// ``prepare(_:)`` are where the refusal lives; this only names a path.
+    public func applicationSupportDirectory() -> URL {
         home
             .appending(path: "Library/Application Support")
             .appending(path: BabelOtter.bundleIdentifier)

@@ -13,11 +13,21 @@ public struct OllamaEndpoint: Sendable, Equatable, Hashable {
     /// Ollama's default port.
     public static let defaultPort = 11_434
 
-    /// Exactly the hosts that cannot leave this machine.
+    /// Exactly the literal loopback addresses. Nothing here is a *name*, so
+    /// nothing here can be redirected by the resolver.
+    ///
+    /// `localhost` is deliberately absent, and deliberately still accepted:
+    /// ``normalize(_:)`` rewrites it to `127.0.0.1` before this check. It is a
+    /// name resolved through `/etc/hosts` and the system resolver, neither of
+    /// which this type controls, and neither of which guarantees loopback — so
+    /// storing it in ``host`` would mean the stored value's destination is
+    /// decided elsewhere. Rewriting instead of rejecting keeps
+    /// `OllamaEndpoint(host: "localhost")` working for callers while making
+    /// ``host`` always an address a resolver cannot point anywhere else.
     ///
     /// `0.0.0.0` is deliberately absent: it is a wildcard *bind* address, not a
     /// loopback destination.
-    private static let permittedHosts: Set<String> = ["127.0.0.1", "::1", "localhost"]
+    private static let permittedHosts: Set<String> = ["127.0.0.1", "::1"]
 
     public let host: String
     public let port: Int
@@ -36,6 +46,10 @@ public struct OllamaEndpoint: Sendable, Equatable, Hashable {
         if value.hasPrefix("["), value.hasSuffix("]"), value.count > 2 {
             value = String(value.dropFirst().dropLast())
         }
+        // The one name this type accepts becomes the address it stands for, so
+        // `host` is never something the resolver could send elsewhere. See
+        // `permittedHosts`.
+        if value == "localhost" { return "127.0.0.1" }
         return value
     }
 

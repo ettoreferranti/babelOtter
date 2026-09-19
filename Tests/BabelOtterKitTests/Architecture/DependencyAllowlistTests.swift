@@ -44,6 +44,33 @@ struct DependencyAllowlistTests {
         )
     }
 
+    /// The declarations whose identity is not on `permitted`.
+    ///
+    /// A declaration this scanner cannot extract an identity from counts as
+    /// **unreviewed, not clean** — the same ruling as
+    /// `ResolvedDependenciesDecoder`'s unrecognised schema. A guard that
+    /// cannot read its input has not cleared it.
+    ///
+    /// This replaces the prior `declarations.isEmpty || !permitted.isEmpty`
+    /// formulation, which never compared a declaration against the allowlist
+    /// at all: it asserted only "either nothing is declared, or the allowlist
+    /// is non-empty". With an empty allowlist that reduces to
+    /// `declarations.isEmpty` and appears to work — but the first entry added
+    /// to the allowlist, which is the documented procedure for adding a
+    /// reviewed dependency, makes the right-hand side permanently true and
+    /// both guards vacuous forever. The act the guard gates was the act that
+    /// disabled it. Verified before the fix: with a hostile
+    /// `.package(url: ".../swift-log.git", ...)` present, the old assertion
+    /// passed for an allowlist of `{"sneakysdk"}`.
+    static func unreviewed(_ declarations: [String], permitted: Set<String>) -> [String] {
+        declarations.filter { declaration in
+            guard let identity = PackageManifestScanner.identity(of: declaration) else {
+                return true  // unparseable ⇒ unreviewed
+            }
+            return !permitted.contains(identity.lowercased())
+        }
+    }
+
     @Test("Package.swift declares no unreviewed package dependencies")
     func manifestDeclaresNoUnreviewedPackages() throws {
         let manifest = try SourceTree.read(
@@ -52,12 +79,18 @@ struct DependencyAllowlistTests {
         let declarations = PackageManifestScanner.declarations(withPrefix: ".package(", in: manifest)
 
         let permitted = try Self.allowlist()
+        let unreviewed = Self.unreviewed(declarations, permitted: permitted)
 
         #expect(
-            declarations.isEmpty || !permitted.isEmpty,
+            unreviewed.isEmpty,
             Comment(rawValue:
-                "Package.swift declares dependencies but the allowlist is empty:\n"
-                + declarations.joined(separator: "\n")
+                "Package.swift declares dependencies that are not on "
+                + "Config/dependency-allowlist.txt:\n"
+                + unreviewed.joined(separator: "\n")
+                + "\n\nA declaration this scan cannot extract an identity from is listed "
+                + "here too: an unparseable declaration is unreviewed, not clean. Add the "
+                + "identity to Config/dependency-allowlist.txt in a commit that says what "
+                + "the package does and confirms it performs no networking."
             )
         )
     }
@@ -85,12 +118,13 @@ struct DependencyAllowlistTests {
         let declarations = PackageManifestScanner.declarations(withPrefix: ".binaryTarget(", in: manifest)
 
         let permitted = try Self.allowlist()
+        let unreviewed = Self.unreviewed(declarations, permitted: permitted)
 
         #expect(
-            declarations.isEmpty || !permitted.isEmpty,
+            unreviewed.isEmpty,
             Comment(rawValue:
-                "Package.swift declares a binary target but the allowlist is empty:\n"
-                + declarations.joined(separator: "\n")
+                "Package.swift declares a binary target that is not on the allowlist:\n"
+                + unreviewed.joined(separator: "\n")
                 + "\n\n.binaryTarget pulls unaudited compiled code into the process "
                 + "that holds the user's writing, and is invisible to the "
                 + ".package( scan and possibly to Package.resolved as well. Review "
@@ -130,17 +164,59 @@ struct DependencyAllowlistTests {
 
         // This mirrors the real test's assertion exactly: with an empty
         // allowlist, a non-empty declarations list must fail it.
-        let emptyAllowlist = Set<String>()
-        #expect(!(declarations.isEmpty || !emptyAllowlist.isEmpty))
+        #expect(!Self.unreviewed(declarations, permitted: []).isEmpty)
 
-        // A reviewed allowlist entry lets the same declaration pass.
-        let reviewedAllowlist: Set<String> = ["sneakysdk"]
-        #expect(declarations.isEmpty || !reviewedAllowlist.isEmpty)
+        // The allowlist entry that matches this declaration's identity lets it
+        // pass...
+        #expect(Self.unreviewed(declarations, permitted: ["sneakysdk"]).isEmpty)
+
+        // ...and an allowlist entry that does NOT match must still fail. This
+        // pair is the whole point: the previous version of this test asserted
+        // `declarations.isEmpty || !reviewedAllowlist.isEmpty`, which passes
+        // for *any* non-empty set — `["swift-log"]`, `["totally-unrelated"]`,
+        // anything — so it read as though "sneakysdk" corresponded to the
+        // planted `.binaryTarget(name: "SneakySDK", ...)` when it did not.
+        #expect(Self.unreviewed(declarations, permitted: ["swift-log"]) == declarations)
 
         // No binary target at all must pass regardless of the allowlist.
         let cleanManifest = "let package = Package(targets: [.target(name: \"BabelOtterKit\")])"
         let cleanDeclarations = PackageManifestScanner.declarations(withPrefix: ".binaryTarget(", in: cleanManifest)
         #expect(cleanDeclarations.isEmpty)
+        #expect(Self.unreviewed(cleanDeclarations, permitted: []).isEmpty)
+    }
+
+    @Test("manifest scanner: identities are extracted from every declaration shape", arguments: [
+        (declaration: #".binaryTarget(name: "SneakySDK", url: "https://e.com/s.zip", checksum: "dead"),"#,
+         identity: "SneakySDK"),
+        (declaration: #".package(url: "https://github.com/apple/swift-log.git", from: "1.0.0"),"#,
+         identity: "swift-log"),
+        (declaration: #".package(url: "https://github.com/apple/swift-log", from: "1.0.0"),"#,
+         identity: "swift-log"),
+        (declaration: #".package(id: "apple.swift-log", from: "1.0.0"),"#,
+         identity: "apple.swift-log"),
+        (declaration: #".package(path: "../LocalSneakySDK"),"#,
+         identity: "LocalSneakySDK"),
+        (declaration: #".package(name: "Legacy", url: "https://github.com/x/legacy-pkg.git", from: "1.0.0"),"#,
+         identity: "legacy-pkg"),
+        // Unparseable ⇒ nil ⇒ counted as unreviewed by `unreviewed(_:permitted:)`.
+        // A declaration split across lines reaches this scanner as a bare
+        // `.package(` with its arguments on the following lines, so it lands
+        // here rather than being silently cleared.
+        (declaration: ".package(", identity: nil),
+        (declaration: #".package(url: someVariable, from: "1.0.0"),"#, identity: nil),
+    ] as [(declaration: String, identity: String?)])
+    func manifestScannerExtractsIdentities(declaration: String, identity: String?) {
+        #expect(PackageManifestScanner.identity(of: declaration) == identity)
+    }
+
+    @Test("manifest scanner: an unparseable declaration counts as unreviewed, not clean")
+    func unparseableDeclarationIsUnreviewed() {
+        // Even with a generous allowlist, a declaration whose identity cannot
+        // be read must be reported. The alternative — treating "I could not
+        // parse this" as "this is fine" — is exactly the Package.resolved
+        // unrecognised-schema failure in a different costume.
+        let unparseable = [".package("]
+        #expect(Self.unreviewed(unparseable, permitted: ["sneakysdk", "swift-log"]) == unparseable)
     }
 
     // MARK: - Resolved-schema decoder coverage
@@ -290,5 +366,75 @@ enum PackageManifestScanner {
             .split(separator: "\n")
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { $0.hasPrefix(prefix) }
+    }
+
+    /// Argument labels that carry a dependency's identity, in the order
+    /// SwiftPM itself prefers. A registry `id:` is already the identity; a
+    /// `url:`/`location:`/`path:` identity is its last path component with
+    /// any `.git` suffix removed (`.../swift-log.git` → `swift-log`), which
+    /// is how SwiftPM derives one; `name:` is last because on `.package` it
+    /// is a deprecated alias.
+    ///
+    /// `.binaryTarget` is the exception and gets `name:` only: its `url:` is
+    /// the artifact download (`.../SneakySDK-1.0.xcframework.zip`), which is
+    /// not the target's identity — reading it as one would put a zip filename
+    /// on the allowlist and quietly stop matching the moment the version in
+    /// that filename changed.
+    private static func identityLabels(for declaration: String) -> [String] {
+        declaration.hasPrefix(".binaryTarget(")
+            ? ["name"]
+            : ["id", "url", "location", "path", "name"]
+    }
+
+    /// The identity of a single declaration line, or `nil` if this scanner
+    /// cannot read one.
+    ///
+    /// `nil` means "unparseable", and callers must treat that as **unreviewed**
+    /// rather than clean — see `DependencyAllowlistTests.unreviewed(_:permitted:)`.
+    /// The realistic `nil` cases are a declaration split across several lines
+    /// (this scanner is line-based, so it sees only `.package(`) and one whose
+    /// URL comes from a variable rather than a string literal. Both are
+    /// situations where a human should look, not situations where a guard
+    /// should shrug.
+    static func identity(of declaration: String) -> String? {
+        for label in identityLabels(for: declaration) {
+            guard let raw = quotedArgument(labelled: label, in: declaration), !raw.isEmpty else {
+                continue
+            }
+            let lastComponent = raw.split(separator: "/").last.map(String.init) ?? raw
+            let candidate = (label == "id" || label == "name") ? raw : lastComponent
+            let identity = candidate.hasSuffix(".git") ? String(candidate.dropLast(4)) : candidate
+            return identity.isEmpty ? nil : identity
+        }
+        return nil
+    }
+
+    /// The string literal given for `label:`, e.g. `url: "https://…"` → the URL.
+    /// The label must sit on an argument boundary, so `url:` cannot be matched
+    /// inside some longer label that merely ends with those characters.
+    private static func quotedArgument(labelled label: String, in declaration: String) -> String? {
+        var searchStart = declaration.startIndex
+        while let labelRange = declaration.range(of: "\(label):", range: searchStart..<declaration.endIndex) {
+            searchStart = labelRange.upperBound
+            let precedingIsBoundary: Bool
+            if labelRange.lowerBound == declaration.startIndex {
+                precedingIsBoundary = true
+            } else {
+                let preceding = declaration[declaration.index(before: labelRange.lowerBound)]
+                precedingIsBoundary = preceding == "(" || preceding == "," || preceding.isWhitespace
+            }
+            guard precedingIsBoundary else { continue }
+
+            // The value must be a string literal, and it must be the *next*
+            // thing after the label — `url: someVariable` yields nil rather
+            // than reaching forward and stealing a later argument's literal.
+            let rest = declaration[labelRange.upperBound...]
+            guard let firstNonSpace = rest.firstIndex(where: { !$0.isWhitespace }),
+                  rest[firstNonSpace] == "\"" else { return nil }
+            let contentStart = rest.index(after: firstNonSpace)
+            guard let closingQuote = rest[contentStart...].firstIndex(of: "\"") else { return nil }
+            return String(rest[contentStart..<closingQuote])
+        }
+        return nil
     }
 }

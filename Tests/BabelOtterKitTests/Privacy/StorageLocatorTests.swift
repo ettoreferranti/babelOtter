@@ -76,8 +76,8 @@ struct StorageLocatorTests {
     }
 
     @Test("resolves Application Support under the bundle identifier")
-    func resolvesApplicationSupport() throws {
-        let directory = try locator.applicationSupportDirectory()
+    func resolvesApplicationSupport() {
+        let directory = locator.applicationSupportDirectory()
         #expect(directory.path(percentEncoded: false)
             == "/Users/example/Library/Application Support/ch.babelotter")
     }
@@ -89,7 +89,7 @@ struct StorageLocatorTests {
         defer { try? FileManager.default.removeItem(at: sandbox) }
 
         let real = StorageLocator(home: sandbox, iCloudRoots: [])
-        let directory = try real.applicationSupportDirectory()
+        let directory = real.applicationSupportDirectory()
         try real.prepare(directory)
 
         let attributes = try FileManager.default

@@ -30,6 +30,21 @@ struct OllamaEndpointTests {
         #expect(OllamaEndpoint(host: host) == nil, "\(host) is not loopback and must be rejected")
     }
 
+    /// `localhost` is a name, not an address: it is resolved through
+    /// `/etc/hosts` and the system resolver, neither of which this type
+    /// controls and neither of which guarantees loopback. Accepting the
+    /// spelling but storing the address it stands for means `host` can never
+    /// be redirected after construction — the destination is decided here, not
+    /// by whatever the resolver says later.
+    @Test("localhost is stored as the address it stands for", arguments: [
+        "localhost", "LOCALHOST", " localhost ",
+    ])
+    func localhostNormalizesToLoopbackAddress(host: String) throws {
+        let endpoint = try #require(OllamaEndpoint(host: host))
+        #expect(endpoint.host == "127.0.0.1")
+        #expect(endpoint.baseURL.absoluteString == "http://127.0.0.1:11434")
+    }
+
     @Test("rejects out-of-range ports", arguments: [0, -1, 65_536, 99_999])
     func rejectsInvalidPorts(port: Int) {
         #expect(OllamaEndpoint(host: "127.0.0.1", port: port) == nil)

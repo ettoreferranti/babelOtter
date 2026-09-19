@@ -51,6 +51,11 @@ struct NoUIImportsTests {
         (line: "import AppKit.NSWindow", expected: "AppKit"),
         (line: "import AppKit // temporary", expected: "AppKit"),
         (line: "import struct AppKit.NSView", expected: "AppKit"),
+        // Objective-C muscle memory: valid Swift, and missed entirely before
+        // the trailing `;` was trimmed from the module token.
+        (line: "import AppKit;", expected: "AppKit"),
+        (line: "import AppKit.NSWindow;", expected: "AppKit"),
+        (line: "@preconcurrency import AppKit;", expected: "AppKit"),
         // Look-alikes: none of these import a banned module and must NOT be caught.
         (line: "import Foundation", expected: nil),
         (line: "import FoundationNetworking", expected: nil),
@@ -107,11 +112,18 @@ enum ImportLineMatcher {
             tokens.removeFirst()
         }
 
-        // 5. Whatever remains is the module path. Compare only its root
-        //    component (`AppKit.NSWindow` → `AppKit`), and only by exact
-        //    match, so `AppKitExtras` does not match banned `AppKit`.
+        // 5. Whatever remains is the module path. A trailing `;` is valid
+        //    Swift and plain Objective-C muscle memory — `import AppKit;` —
+        //    so it is a realistic non-adversarial spelling, and without this
+        //    trim the root component would be `AppKit;`, which matches no
+        //    banned module and sails through. Trim it before splitting.
         guard let modulePath = tokens.first else { return nil }
-        let rootModule = modulePath.split(separator: ".", maxSplits: 1).first.map(String.init) ?? modulePath
+        let moduleToken = modulePath.trimmingCharacters(in: CharacterSet(charactersIn: ";"))
+
+        //    Compare only the root component (`AppKit.NSWindow` → `AppKit`),
+        //    and only by exact match, so `AppKitExtras` does not match banned
+        //    `AppKit`.
+        let rootModule = moduleToken.split(separator: ".", maxSplits: 1).first.map(String.init) ?? moduleToken
 
         return bannedModules.contains(rootModule) ? rootModule : nil
     }
