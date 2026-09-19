@@ -71,6 +71,15 @@ jobs:
         # first thing a CI run of this job should tell us is exactly what
         # versions it ran against, since muter has never been run on this
         # image before (Task 3's spike used Swift 6.4 / Xcode 27).
+        #
+        # The codesign/PATH block is diagnostic residue from Fix round 1
+        # (Refs #19, CI run 35426258237): muter's own child-process spawning
+        # replaces the environment with a single key, no PATH, which broke a
+        # debug-only SwiftPM codesign step. The real fix is building in
+        # release configuration (see muter.conf.yml's "FIX ROUND 1" comment),
+        # which sidesteps that step rather than depending on PATH — but these
+        # lines stay so the next CI run keeps showing this environment
+        # plainly, in case a related issue resurfaces.
         run: |
           echo "muter version:"
           muter --version
@@ -78,6 +87,16 @@ jobs:
           swift --version
           echo "xcodebuild -version:"
           xcodebuild -version
+          echo "which codesign:"
+          which codesign || echo "codesign not found on PATH"
+          echo "ls -la /usr/bin/codesign:"
+          ls -la /usr/bin/codesign || echo "no /usr/bin/codesign"
+          echo "PATH:"
+          echo "$PATH"
+          echo "xcode-select -p:"
+          xcode-select -p
+          echo "xcrun --find codesign:"
+          xcrun --find codesign || echo "xcrun could not find codesign"
 
       - name: Run mutation testing — pass 1 (OllamaEndpoint, BabelOtterKit, UserText)
         # Exact invocation verified in the Task 3 spike report. These three
