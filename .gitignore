@@ -23,6 +23,10 @@ xcuserdata/
 .muter/
 muter-report/
 mutation-report.*
+muter-report-*.json
+muter-pass-*-files.txt
+# muter clones the package to ../babelOtter_mutated while it runs; it lives
+# outside this repo, but delete it if a run is interrupted before cleanup.
 
 # ─── macOS ─────────────────────────────────────────────────────────
 .DS_Store
