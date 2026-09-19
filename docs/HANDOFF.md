@@ -4,21 +4,22 @@ Read this first if you are picking babelOtter up in a new session.
 
 ## Where things stand
 
-**M0 Foundations is complete: 11 of 11 tasks.** Everything lives on the branch
-`feat/m0-foundations`, which is **not merged to `main`** — that decision is the
-user's and has not been made.
+**M0 Foundations is complete: 11 of 11 tasks, and merged to `main`.** The
+27 commits landed as a single `--no-ff` merge, so the milestone reads as one
+unit in history with every commit intact.
 
 | | |
 |---|---|
-| Branch | `feat/m0-foundations`, 26 commits ahead of `main` |
+| Branch | `feat/m0-foundations`, merged to `main` 2026-09-19 |
 | Tests | 65 in 8 suites, green from a clean build |
 | Mutation | 7/7 = 100%, gating CI at ≥80% |
 | CI | green (`macos-15` / Xcode 16.4 / Swift 6.1.2) |
 | Dependencies | zero, enforced by test |
 | Local toolchain | Xcode 27 / Swift 6.4 — **two majors ahead of CI**, so CI is the binding check |
 
-Issues #16–#25 and #30 are closed. Milestones: M0 done, then M1a Pipeline (27),
-M1b Translate UX (13), M2 (5), M3 (17), M4 (9).
+Issues #16–#25 and #30 are closed, and the M0 milestone is closed. Epics #1 and
+#2 stay open — both span past M0. Milestones: M1a Pipeline (28), M1b Translate
+UX (13), M2 (5), M3 (17), M4 (8).
 
 ## Documents that matter
 
@@ -60,17 +61,20 @@ issue #30.
    replacement into web content, which makes the Universal Clipboard risk
    accepted in `PRIVACY.md` more load-bearing than that document assumes.
 
+## Decisions taken 2026-09-19
+
+- **M0 merged to `main`** as a `--no-ff` merge commit; `ci.yml` no longer
+  carries `feat/m0-foundations` in its `push` branch filter.
+- **#77 (strict AX-only mode) pulled forward from M4 into M1a.** Spike #30
+  showed the clipboard path is common, not rare, so the strict mode now lands
+  in the same milestone as the clipboard fallback it guards (#32) — the gap
+  never ships unguarded.
+
 ## Open decisions for the user
 
-- **Merge M0 to `main`?** Not done. Branch is green and reviewed.
-- **Pull #77 (strict AX-only mode) forward from M4 into v1?** Spike #30 showed
-  the clipboard path is common, not rare, so the accepted v1 privacy risk is
-  wider than it looked when accepted.
 - **Mutation threshold at M1a.** At 7 mutants a single survivor still passes
   80%; a small-population rule currently compensates. Revisit once M1a grows the
   surface roughly tenfold.
-- **`ci.yml` trigger** carries `feat/m0-foundations` in its `push` branches
-  list, with an inline note to remove it at merge.
 
 ## Not yet measured
 
