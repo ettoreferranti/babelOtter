@@ -158,7 +158,10 @@ public enum TokenProtector {
         guard text[index...].hasPrefix(prefix) else { return nil }
         var cursor = text.index(index, offsetBy: prefix.count)
         var digits = ""
-        while cursor < text.endIndex, text[cursor].isNumber {
+        // Nested guard rather than a comma-conjunction while-condition: see the
+        // note in StructureExtractor.markerLength, and muter.conf.yml.
+        while cursor < text.endIndex {
+            guard text[cursor].isNumber else { break }
             digits.append(text[cursor])
             cursor = text.index(after: cursor)
         }

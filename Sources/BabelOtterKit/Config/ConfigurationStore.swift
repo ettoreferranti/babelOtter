@@ -58,7 +58,18 @@ public struct ConfigurationStore: Sendable {
 
     /// Defaults plus a list of what could not be read. Never throws, never traps.
     public func load() -> LoadedConfiguration {
-        guard let data = try? Data(contentsOf: fileURL) else {
+        // Read by path rather than through Data's URL-taking initialiser. That
+        // initialiser accepts any URL, including an http one, which is why
+        // NFR-P4's guard refuses it outside the single reviewed networking call
+        // site. Reading a path has no such reach, so the stricter API is also
+        // the correct one here.
+        //
+        // The guard matches on spelling alone and does not exempt comments,
+        // which is why this note describes the initialiser instead of naming
+        // it. That is the conservative direction on purpose: a scanner that
+        // parsed context is a scanner a real call site could hide behind.
+        guard let data = FileManager.default.contents(atPath: fileURL.path(percentEncoded: false))
+        else {
             // No file is not a problem: it is what a first launch looks like.
             return LoadedConfiguration(configuration: .default, problems: [])
         }

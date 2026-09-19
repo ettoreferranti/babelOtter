@@ -189,7 +189,16 @@ public enum StructureExtractor {
 
         if first.isNumber {
             var index = 0
-            while index < characters.count, characters[index].isNumber { index += 1 }
+            // Written as a nested guard rather than `while a < b, predicate`:
+            // muter's RelationalOperatorReplacement mis-parses a comma-
+            // conjunction while-condition and emits invalid Swift, which
+            // poisons the whole file's mutation run. See muter.conf.yml. This
+            // file is a named high-value mutation target, so it is worth one
+            // extra line to keep it measurable under every operator.
+            while index < characters.count {
+                guard characters[index].isNumber else { break }
+                index += 1
+            }
             guard index < characters.count, characters[index] == "." || characters[index] == ")"
             else { return 0 }
             let afterPunctuation = index + 1

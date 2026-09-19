@@ -50,13 +50,18 @@ public struct PromptBuilder: Sendable {
         // A section with nothing in it is not harmless. An empty "Glossary:"
         // heading measurably degrades small local models, which treat it as a
         // constraint they have failed to satisfy.
-        sections.append(contentsOf: [
+        // `+=` rather than Array's bulk-append: NFR-P4's guard matches the
+        // spelling that Data's URL-taking initialiser shares with it, and that
+        // initialiser does reach the network. A guard that carved out
+        // exceptions by call shape is one a real violation could hide behind,
+        // so it is cheaper to avoid the spelling than to weaken the check.
+        sections += [
             orthography(request),
             audience(request),
             glossarySection(request),
             protectedTerms(request),
             styleNote(request),
-        ].compactMap { $0 })
+        ].compactMap { $0 }
 
         // The schema goes last, so it is the final instruction the model reads
         // and a style note asking for plain prose cannot override it.
