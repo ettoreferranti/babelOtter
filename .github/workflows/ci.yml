@@ -226,6 +226,41 @@ jobs:
             exit 1
           fi
 
+          # Per-mutant outcomes, read from the reports rather than inferred by
+          # subtracting the two aggregate totals. `numberOfKilledMutants`
+          # counts muter's `failed` and `runtimeError`;
+          # `totalAppliedMutationOperators` also counts mutants that never
+          # ran at all. `total - killed` therefore blurs two different faults
+          # together: a mutant the suite did not catch (`passed` — a real
+          # survivor) and a mutant that failed to compile, so nothing was
+          # learned about it either way (`buildError` — unmeasured). Both
+          # must fail this gate; conflating them makes the log accuse the
+          # test suite of a hole it may not have.
+          outcome_count() {
+            jq -r --arg outcome "$1" \
+              '[.fileReports[]?.appliedOperators[]? | select(.testSuiteOutcome == $outcome)] | length' "$2"
+          }
+          survived=$(( $(outcome_count passed muter-report-1.json) + $(outcome_count passed muter-report-2.json) ))
+          unmeasured=$(( $(outcome_count buildError muter-report-1.json) + $(outcome_count buildError muter-report-2.json) ))
+          echo "Outcomes: ${killed} killed, ${survived} survived, ${unmeasured} never built, ${total} applied"
+
+          # If those three do not account for every applied mutant, muter
+          # reported an outcome this gate does not understand — and a gate
+          # that cannot read its own input has not cleared anything. Same
+          # ruling as ResolvedDependenciesDecoder's unrecognised schema.
+          if [ $((killed + survived + unmeasured)) -ne "$total" ]; then
+            echo "::error::Mutant accounting does not add up: ${killed} killed + ${survived} survived + ${unmeasured} never built != ${total} applied. muter reported an outcome this gate does not recognise, so it cannot say whether the suite caught anything. Teach it that outcome before trusting the number again."
+            exit 1
+          fi
+
+          # An unmeasured mutant is not a killed one. It is also not a
+          # survivor, and saying so would blame the tests for a toolchain
+          # failure — so it gets its own message and its own exit.
+          if [ "$unmeasured" -gt 0 ]; then
+            echo "::error::${unmeasured} of ${total} mutants failed to build and were therefore never evaluated. Nothing was learned about them, so this run cannot show the suite catching them. See the uploaded mutation-report artifact for which mutants did not build."
+            exit 1
+          fi
+
           # Combining the two passes: sum killed/total mutant counts across
           # both, then take one percentage of the combined pool. NOT an
           # average of the two passes' percentages — the passes measure
@@ -242,8 +277,8 @@ jobs:
           # enough for one mutant not to be worth 17 points, so below 20
           # mutants the rule is simply that nothing may survive; above it, the
           # 80% threshold takes over.
-          if [ "$total" -lt 20 ] && [ $((total - killed)) -gt 0 ]; then
-            echo "::error::${killed}/${total} — with a population this small the percentage is not informative; no surviving mutant is acceptable. See the uploaded mutation-report artifact for which mutants survived."
+          if [ "$total" -lt 20 ] && [ "$survived" -gt 0 ]; then
+            echo "::error::${killed}/${total}, with ${survived} surviving — at a population this small the percentage is not informative; no surviving mutant is acceptable. See the uploaded mutation-report artifact for which mutants survived."
             exit 1
           fi
 
@@ -255,6 +290,29 @@ jobs:
             echo "::error::Mutation score ${score}% is below the required 80%. Surviving mutants indicate tests that do not actually catch regressions. See the uploaded mutation-report artifact for which mutants survived."
             exit 1
           }
+
+      - name: Show muter's own logs when a mutant did not build
+        if: failure()
+        # muter copies the package to ../babelOtter_mutated and leaves the
+        # build/test output for each mutant there. When a mutant is reported
+        # as `buildError` the report itself says only that — the compiler
+        # diagnostic that would explain it never reaches the job log. Without
+        # this, a mutant that cannot be measured on this toolchain looks
+        # identical to one the tests failed to catch.
+        run: |
+          set -uo pipefail
+          root="$(cd .. && pwd)/babelOtter_mutated"
+          echo "Looking for muter logs under: $root"
+          if [ ! -d "$root" ]; then
+            echo "No mutated project directory — muter did not get as far as copying the package."
+            exit 0
+          fi
+          find "$root" -maxdepth 3 -name '*.log' -print0 2>/dev/null | while IFS= read -r -d '' log; do
+            echo "──────── $log ────────"
+            grep -nE "error:|warning:|fatal|cannot|Compiling|Build" "$log" | tail -60 || tail -60 "$log"
+          done
+          echo "──────── any muter_logs directory ────────"
+          find "$root" -maxdepth 3 -type d -name '*muter*' -print 2>/dev/null || true
 
       - name: Upload mutation report
         if: always()
