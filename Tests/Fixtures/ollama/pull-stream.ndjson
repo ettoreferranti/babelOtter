@@ -1,0 +1,7 @@
+{"status":"pulling manifest"}
+{"status":"pulling 8eeb52dfb3bb","digest":"sha256:8eeb52dfb3bb","total":15000000000,"completed":0}
+{"status":"pulling 8eeb52dfb3bb","digest":"sha256:8eeb52dfb3bb","total":15000000000,"completed":7500000000}
+{"status":"pulling 8eeb52dfb3bb","digest":"sha256:8eeb52dfb3bb","total":15000000000,"completed":15000000000}
+{"status":"verifying sha256 digest"}
+{"status":"writing manifest"}
+{"status":"success"}

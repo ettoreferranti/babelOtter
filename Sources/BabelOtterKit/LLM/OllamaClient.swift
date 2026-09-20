@@ -27,12 +27,10 @@ public struct OllamaClient: Sendable {
     /// transport handing over a half-finished line is handled by
     /// ``NDJSONFramer`` -- code with tests -- instead of by whatever the URL
     /// loading system does that day.
-    public func chat(model: String, messages: [ChatMessage]) -> AsyncThrowingStream<
-        StreamEvent, any Error
-    > {
+    public func chat(model: String, messages: [ChatMessage]) -> LazyStream<StreamEvent> {
         let endpoint = endpoint
         let transport = transport
-        return AsyncThrowingStream { continuation in
+        return LazyStream { AsyncThrowingStream { continuation in
             Task {
                 do {
                     let body = try JSONEncoder().encode(
@@ -55,7 +53,7 @@ public struct OllamaClient: Sendable {
                     continuation.finish(throwing: error)
                 }
             }
-        }
+        } }
     }
 
     /// What is installed locally, for `FR-OLL-03`'s missing-model check.
@@ -64,6 +62,67 @@ public struct OllamaClient: Sendable {
         return try JSONDecoder.responseContract
             .decode(TagsResponse.self, from: Data(text.utf8))
             .models
+    }
+
+    /// Streams progress while the daemon downloads a model (`FR-OLL-03`).
+    ///
+    /// **This does not weaken NFR-P2.** babelOtter posts to
+    /// `127.0.0.1/api/pull`; the *Ollama daemon* makes the outbound
+    /// connection. babelOtter's own egress stays loopback-only, which is why
+    /// #46's last acceptance criterion is that the architecture test still
+    /// reports exactly one call site afterwards.
+    ///
+    /// Nothing is requested until the returned stream is iterated, so a user
+    /// who declines the confirmation causes no download -- the decline is the
+    /// absence of a call, not a cancellation of one.
+    public func pull(model: String) -> LazyStream<PullProgress> {
+        let endpoint = endpoint
+        let transport = transport
+        return LazyStream { AsyncThrowingStream { continuation in
+            Task {
+                do {
+                    let body = try JSONEncoder().encode(PullRequest(name: model, stream: true))
+                    let stream = try await transport.chunks(
+                        from: endpoint.url(path: "api/pull"), body: body)
+
+                    var framer = NDJSONFramer()
+                    var emitted = 0
+                    for try await chunk in stream {
+                        emitted += yieldProgress(framer.consume(chunk), to: continuation)
+                    }
+                    emitted += yieldProgress(framer.finish(), to: continuation)
+
+                    // A pull that reported nothing at all is not a success.
+                    // Finishing quietly here would leave the UI showing a
+                    // progress bar that never moved and never ended.
+                    guard emitted > 0 else {
+                        continuation.finish(throwing: OllamaTransportError.undecodableBody)
+                        return
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+        } }
+    }
+
+    /// Decodes progress lines, skipping any the daemon words differently than
+    /// expected. A pull is long and noisy, and abandoning a 15GB download over
+    /// one unrecognised status line would be a poor trade.
+    private func yieldProgress(
+        _ lines: [String], to continuation: AsyncThrowingStream<PullProgress, any Error>.Continuation
+    ) -> Int {
+        var count = 0
+        for line in lines {
+            guard
+                let progress = try? JSONDecoder.responseContract.decode(
+                    PullProgress.self, from: Data(line.utf8))
+            else { continue }
+            continuation.yield(progress)
+            count += 1
+        }
+        return count
     }
 
     /// Whether the daemon is up and holds the model this action needs.

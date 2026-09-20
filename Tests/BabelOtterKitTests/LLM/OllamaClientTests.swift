@@ -168,6 +168,22 @@ struct OllamaClientTests {
         #expect(await client.health(configuredModel: "m").readiness == .blocked)
     }
 
+    /// NFR-P1: a chat request carries the user's selected text. Building a
+    /// value must not transmit it -- a stream created and then dropped during
+    /// a UI rebuild, an error path or a test has to send nothing.
+    @Test("building a chat stream transmits nothing until it is iterated")
+    func chatIsLazy() async throws {
+        let transport = FakeTransport(chunks: try Self.fixtureChunks())
+        let client = OllamaClient(endpoint: .loopback, transport: transport)
+
+        _ = client.chat(model: "m", messages: [.init(role: "user", content: "secret")])
+        try await Task.sleep(nanoseconds: 50_000_000)
+        #expect(transport.requestedURLs.isEmpty)
+
+        for try await _ in client.chat(model: "m", messages: []) {}
+        #expect(transport.requestedURLs.count == 1)
+    }
+
     @Test("installed models are read from the tags endpoint")
     func installedModels() async throws {
         let transport = FakeTransport(chunks: [

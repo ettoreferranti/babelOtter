@@ -56,6 +56,9 @@ public struct PullProgress: Sendable, Codable, Equatable {
         self.total = total
     }
 
+    /// Ollama's terminating line for a pull.
+    public var isComplete: Bool { status == "success" }
+
     /// Progress from 0 to 1, or `nil` when it cannot honestly be computed.
     ///
     /// Ollama emits status lines with no byte counts at all -- "verifying
@@ -65,6 +68,17 @@ public struct PullProgress: Sendable, Codable, Equatable {
     public var fraction: Double? {
         guard let completed, let total, total > 0 else { return nil }
         return Double(completed) / Double(total)
+    }
+}
+
+/// A `POST /api/pull` body.
+public struct PullRequest: Sendable, Codable, Equatable {
+    public let name: String
+    public let stream: Bool
+
+    public init(name: String, stream: Bool = true) {
+        self.name = name
+        self.stream = stream
     }
 }
 
