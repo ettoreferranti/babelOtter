@@ -53,17 +53,26 @@ public enum TokenProtector {
         let ordered = orderedTerms(terms)
         guard !ordered.isEmpty else { return ProtectedText(text: text, terms: ordered) }
 
+        // Walked as a shrinking Substring rather than an index compared against
+        // endIndex. `first` is nil exactly when the comparison would have
+        // ended the loop, so nothing is lost -- and muter mis-parses a
+        // relational operator in a while condition, more so with a label on it.
+        // That kept making this file unmeasurable on CI while building clean
+        // locally. Substring shares its parent's indices, so `matches` still
+        // sees positions in `text`.
         var result = ""
-        var index = text.startIndex
-        scan: while index < text.endIndex {
-            for (termIndex, term) in ordered.enumerated()
-            where matches(term, in: text, at: index) {
-                result += sentinel(termIndex)
-                index = text.index(index, offsetBy: term.count)
-                continue scan
+        var remainder = Substring(text)
+        while let character = remainder.first {
+            let match = ordered.enumerated().first { _, term in
+                matches(term, in: text, at: remainder.startIndex)
             }
-            result.append(text[index])
-            index = text.index(after: index)
+            guard let match else {
+                result.append(character)
+                remainder = remainder.dropFirst()
+                continue
+            }
+            result += sentinel(match.offset)
+            remainder = remainder.dropFirst(match.element.count)
         }
         return ProtectedText(text: result, terms: ordered)
     }
@@ -75,11 +84,13 @@ public enum TokenProtector {
         var problems: [ProtectionProblem] = []
         var seen: Set<Int> = []
 
-        var index = text.startIndex
-        while index < text.endIndex {
+        // Same shrinking-Substring walk as `mask`, and for the same reason.
+        var remainder = Substring(text)
+        while let character = remainder.first {
+            let index = remainder.startIndex
             guard let parsed = parseSentinel(in: text, at: index) else {
-                result.append(text[index])
-                index = text.index(after: index)
+                result.append(character)
+                remainder = remainder.dropFirst()
                 continue
             }
             // `indices.contains` rather than a bounds comparison: it says what
@@ -94,7 +105,7 @@ public enum TokenProtector {
                 problems.append(.sentinelDebris(literal))
                 result += literal
             }
-            index = parsed.end
+            remainder = text[parsed.end...]
         }
 
         // Only terms that actually went into the prompt can come back, so a term
@@ -147,11 +158,13 @@ public enum TokenProtector {
     /// word; an ASCII-only test would treat the umlaut as a boundary and corrupt it.
     private static func matches(_ term: String, in text: String, at index: String.Index) -> Bool {
         guard text[index...].hasPrefix(term) else { return false }
-        if index > text.startIndex, isWordCharacter(text[text.index(before: index)]) {
-            return false
-        }
+        // `last` and `first` on the slices either side, rather than comparing
+        // the index against startIndex and endIndex: nil means "no character
+        // there", which is the same answer the comparison gave, and it leaves
+        // muter nothing to mis-splice.
+        if let before = text[..<index].last, isWordCharacter(before) { return false }
         let end = text.index(index, offsetBy: term.count)
-        if end < text.endIndex, isWordCharacter(text[end]) { return false }
+        if let after = text[end...].first, isWordCharacter(after) { return false }
         return true
     }
 

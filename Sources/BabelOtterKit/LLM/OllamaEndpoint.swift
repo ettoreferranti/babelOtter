@@ -43,8 +43,13 @@ public struct OllamaEndpoint: Sendable, Equatable, Hashable {
 
     private static func normalize(_ host: String) -> String {
         var value = host.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        if value.hasPrefix("["), value.hasSuffix("]"), value.count > 2 {
-            value = String(value.dropFirst().dropLast())
+        // `!inner.isEmpty` rather than `value.count > 2`: it states the thing
+        // being guarded against -- a bare "[]" unwrapping to nothing -- instead
+        // of encoding it as a length, and it keeps a relational operator out of
+        // a comma-conjunction condition, which muter mis-splices.
+        if value.hasPrefix("["), value.hasSuffix("]") {
+            let inner = value.dropFirst().dropLast()
+            if !inner.isEmpty { value = String(inner) }
         }
         // The one name this type accepts becomes the address it stands for, so
         // `host` is never something the resolver could send elsewhere. See
