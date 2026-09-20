@@ -24,22 +24,27 @@ public struct ProtectedText: Sendable, Equatable {
 public struct RestoredText: Sendable, Equatable {
     public let text: String
     /// Ranges of the restored terms, in `text`'s own coordinates. These exist
-    /// only after restoration, which is why spec §8 fixes that order.
+    /// only after restoration, which is why spec section 8 fixes that order.
     public let protectedRanges: [Range<String.Index>]
     public let problems: [ProtectionProblem]
 }
 
 /// Masks do-not-translate terms to sentinels and restores them verbatim.
 ///
-/// `FR-GLO-02`. The sentinel is `⟦DNT0⟧` — corner brackets (U+27E6/U+27E7)
+/// `FR-GLO-02`. The sentinel is [[DNT0]] with U+27E6/U+27E7 corner brackets,
 /// because they are not reachable from a German or English keyboard, so they
 /// cannot collide with the user's own writing, and because a model is far less
 /// likely to "helpfully" translate them than it is a word in angle brackets.
 public enum TokenProtector {
 
-    private static let opening = "⟦"
-    private static let closing = "⟧"
-    private static let prefix = "⟦DNT"
+    // Written as escapes rather than literal glyphs because every source file
+    // under BabelOtterKit is ASCII-only -- see AsciiSourceTests for why. The
+    // characters are U+27E6 MATHEMATICAL LEFT WHITE SQUARE BRACKET and its
+    // right-hand partner U+27E7, so a sentinel reads as an unmistakable
+    // non-keyboard token both to a human and to a model.
+    private static let opening = "\u{27E6}"
+    private static let closing = "\u{27E7}"
+    private static let prefix = "\u{27E6}DNT"
 
     static func sentinel(_ index: Int) -> String { "\(prefix)\(index)\(closing)" }
 
@@ -136,8 +141,8 @@ public enum TokenProtector {
     /// True when `term` sits at `index` bounded by non-word characters.
     ///
     /// The boundary check is what stops `"IT"` turning the user's `"Item"` into
-    /// a sentinel. `isLetter`/`isNumber` are Unicode-aware, so `"ITär"` is one
-    /// word — an ASCII-only test would treat `ä` as a boundary and corrupt it.
+    /// a sentinel. `isLetter`/`isNumber` are Unicode-aware, so IT followed by an umlaut is one
+    /// word; an ASCII-only test would treat the umlaut as a boundary and corrupt it.
     private static func matches(_ term: String, in text: String, at index: String.Index) -> Bool {
         guard text[index...].hasPrefix(term) else { return false }
         if index > text.startIndex, isWordCharacter(text[text.index(before: index)]) {
@@ -154,7 +159,7 @@ public enum TokenProtector {
 
     // MARK: - Sentinel parsing
 
-    /// Parses `⟦DNT<digits>⟧` at `index`, or returns `nil`.
+    /// Parses a U+27E6 DNT <digits> U+27E7 sentinel at `index`, or returns `nil`.
     private static func parseSentinel(
         in text: String, at index: String.Index
     ) -> (index: Int, end: String.Index)? {

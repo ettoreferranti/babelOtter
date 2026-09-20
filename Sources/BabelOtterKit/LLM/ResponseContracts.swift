@@ -32,7 +32,7 @@ public struct CorrectionError: Sendable, Equatable, Codable {
     public let severity: Severity
 }
 
-/// The translate and re-pitch contract (spec §7).
+/// The translate and re-pitch contract (spec section 7).
 public struct TranslateResponse: Sendable, Equatable, Codable {
     /// Optional: a model that omits its own language guess must not fail the
     /// whole parse, since ``LanguageDetector`` already has an answer.
@@ -43,7 +43,7 @@ public struct TranslateResponse: Sendable, Equatable, Codable {
     public let blocks: [String]
 }
 
-/// The correct contract (spec §7).
+/// The correct contract (spec section 7).
 public struct CorrectResponse: Sendable, Equatable, Codable {
     public let correctedBlocks: [String]
     public let errors: [CorrectionError]
@@ -54,14 +54,14 @@ public struct ExplainNote: Sendable, Equatable, Codable {
     public let explanationEn: String
 }
 
-/// The explain contract (spec §7).
+/// The explain contract (spec section 7).
 public struct ExplainResponse: Sendable, Equatable, Codable {
     public let summaryEn: String
     public let notes: [ExplainNote]
 }
 
 extension JSONDecoder {
-    /// Wire keys are snake_case per spec §7; Swift properties are camelCase.
+    /// Wire keys are snake_case per spec section 7; Swift properties are camelCase.
     ///
     /// Bridged by strategy rather than hand-written `CodingKeys`, so adding a
     /// field cannot be forgotten in a second place.

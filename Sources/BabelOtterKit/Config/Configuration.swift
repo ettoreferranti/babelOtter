@@ -12,7 +12,7 @@ public enum Action: String, Sendable, Codable, CaseIterable {
     case repitch
 }
 
-/// Everything the user can configure, as one value (spec §6).
+/// Everything the user can configure, as one value (spec section 6).
 ///
 /// `FR-CFG-03` stores this as a human-readable file, which shapes the type: no
 /// UUIDs, no opaque blobs, and every field a person could reasonably want to
@@ -33,7 +33,7 @@ public struct Configuration: Sendable, Equatable, Codable {
     /// guessed at (`FR-TRN-03`).
     public var detectionConfidenceFloor: Double
     /// Selections shorter than this are never guessed at (`FR-TRN-03`).
-    /// Measured in non-whitespace characters — see ``LanguageDetector``.
+    /// Measured in non-whitespace characters -- see ``LanguageDetector``.
     public var minimumLengthForDetection: Int
 
     public init(

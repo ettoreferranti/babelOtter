@@ -20,7 +20,7 @@ public struct StorageLocator: Sendable {
     public let home: URL
     public let iCloudRoots: [URL]
 
-    /// Resolves a path as far as the filesystem currently allows — see
+    /// Resolves a path as far as the filesystem currently allows -- see
     /// ``resolveAsFarAsExists(_:exists:resolveSymlinks:)``. Injectable so the
     /// path-boundary comparison in ``validate(_:)`` stays a pure string
     /// operation, testable without touching disk; production code gets the
@@ -37,7 +37,7 @@ public struct StorageLocator: Sendable {
         self.resolve = resolve
     }
 
-    /// `~/Library/Application Support/ch.babelotter` — never validated here;
+    /// `~/Library/Application Support/ch.babelotter` -- never validated here;
     /// callers pass the result to ``validate(_:)`` or ``prepare(_:)``.
     ///
     /// Deliberately non-throwing: the body is pure URL appending and has no
@@ -63,11 +63,11 @@ public struct StorageLocator: Sendable {
     ///   case-insensitive (case-preserving) by default, so `~/documents` and
     ///   `~/Documents` name the same directory on disk even though they are
     ///   different `String`s. On a case-*sensitive* volume this can refuse a
-    ///   path that is genuinely distinct from any synced root — accepted
+    ///   path that is genuinely distinct from any synced root -- accepted
     ///   deliberately, in this direction, on purpose.
-    /// - Both `candidate` and every root are run through ``resolve`` — which
+    /// - Both `candidate` and every root are run through ``resolve`` -- which
     ///   walks up to the deepest existing ancestor and resolves symlinks
-    ///   there — before comparing. Without this, a symlink planted at or
+    ///   there -- before comparing. Without this, a symlink planted at or
     ///   above the candidate (e.g. `~/Library/Application
     ///   Support/ch.babelotter` replaced with a symlink into `~/Documents`,
     ///   or `~/Documents` itself being a symlink into `~/Library/Mobile
@@ -120,7 +120,7 @@ public struct StorageLocator: Sendable {
     }
 
     /// Case-folds for comparison only. Never used for display, for a
-    /// filesystem call, or for anything in `StorageLocationError` — those
+    /// filesystem call, or for anything in `StorageLocationError` -- those
     /// keep the original, case-preserved URL.
     private static func caseFolded(_ path: String) -> String {
         path.lowercased()
@@ -129,7 +129,7 @@ public struct StorageLocator: Sendable {
     /// The real-filesystem wiring for ``resolve``, and the default for
     /// ``init(home:iCloudRoots:resolve:)``. `public` only because a default
     /// argument value on a `public` initializer must be at least as visible
-    /// as the initializer itself — this is not meant to be called directly.
+    /// as the initializer itself -- this is not meant to be called directly.
     public static func resolveUsingRealFilesystem(_ url: URL) -> URL {
         resolveAsFarAsExists(
             url,
@@ -140,14 +140,14 @@ public struct StorageLocator: Sendable {
 
     /// Walks `url` from its full path upward to the deepest ancestor that
     /// `exists` reports as present right now, resolves symlinks on that one
-    /// ancestor with `resolveSymlinks`, then re-appends the remaining —
-    /// necessarily non-existent — components underneath the resolved
+    /// ancestor with `resolveSymlinks`, then re-appends the remaining --
+    /// necessarily non-existent -- components underneath the resolved
     /// ancestor.
     ///
     /// This exists because the real `resolveSymlinks`
     /// (`URL.resolvingSymlinksInPath()`) is a no-op on anything that does not
     /// exist yet, and `validate()`/`prepare()` are always called before the
-    /// path they check exists — that ordering is the entire point of
+    /// path they check exists -- that ordering is the entire point of
     /// `prepare()` (validate, then create). Calling `resolveSymlinks` on the
     /// full candidate directly is therefore a no-op in exactly the situation
     /// that matters: a symlinked ancestor with a not-yet-created leaf
@@ -155,7 +155,7 @@ public struct StorageLocator: Sendable {
     ///
     /// Given `exists`/`resolveSymlinks` as parameters (rather than reaching
     /// for `FileManager`/`URL` directly) so this algorithm is unit-testable
-    /// against fake filesystem state, with no real disk involved — see
+    /// against fake filesystem state, with no real disk involved -- see
     /// `internal` visibility, used by the test target via `@testable import`.
     static func resolveAsFarAsExists(
         _ url: URL,
@@ -164,7 +164,7 @@ public struct StorageLocator: Sendable {
     ) -> URL {
         // Built from pathComponents, not repeated `deletingLastPathComponent()`,
         // because that method infers a directory hint and leaves a trailing
-        // slash on every intermediate ancestor's `.path` — harmless for real
+        // slash on every intermediate ancestor's `.path` -- harmless for real
         // FileManager calls, but it would make `exists`/`resolveSymlinks` see
         // an inconsistent path shape depending on how deep the walk goes.
         var components = url.standardizedFileURL.pathComponents

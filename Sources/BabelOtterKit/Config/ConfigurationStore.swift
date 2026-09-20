@@ -101,7 +101,7 @@ public struct ConfigurationStore: Sendable {
     /// Turns a `DecodingError` into the field name the user has to go and fix.
     ///
     /// The `codingPath` is the only place that name exists, and it is empty for
-    /// syntax errors — which is the honest answer there, since a file that is
+    /// syntax errors -- which is the honest answer there, since a file that is
     /// not JSON at all has no field to blame.
     private static func problem(from error: DecodingError) -> ConfigurationProblem {
         switch error {

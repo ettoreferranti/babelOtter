@@ -32,7 +32,7 @@ public struct AudienceProfile: Sendable, Equatable, Codable, Identifiable {
     /// into the prompt by ``PromptBuilder``.
     public var toneGuidance: String
     /// Terms this audience prefers, nudging the model without a full glossary
-    /// entry. Optional — an empty array emits no prompt section.
+    /// entry. Optional -- an empty array emits no prompt section.
     public var glossaryBias: [String]
 
     public init(

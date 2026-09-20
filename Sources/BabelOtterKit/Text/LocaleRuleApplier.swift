@@ -3,7 +3,7 @@ import Foundation
 /// Applies a language's locale rules to everything except the protected spans.
 ///
 /// `FR-GLO-03`: locale rules must never rewrite the interior of a restored
-/// do-not-translate term. A product name spelled with `ß` is spelled with `ß`,
+/// do-not-translate term. A product name spelled with an eszett keeps its eszett,
 /// whatever Swiss orthography says about the prose around it.
 ///
 /// Implemented as a single left-to-right walk that copies protected spans

@@ -23,7 +23,7 @@ public enum ResponseParser {
     ///
     /// Brace matching is **string-aware**: it tracks whether the cursor is
     /// inside a JSON string literal and honours backslash escapes. The naive
-    /// version — first `{` to last `}` — is nearly right and fails on exactly
+    /// version -- first `{` to last `}` -- is nearly right and fails on exactly
     /// the responses this project produces most, because a correction's
     /// `explanation_en` can quite reasonably contain a brace.
     public static func extractJSONObject(from raw: String) -> String? {
@@ -83,7 +83,7 @@ public enum ResponseParser {
     /// structure; a correction's does not, because an itemised error list cannot
     /// be recovered from prose, and showing the raw output as though it were a
     /// verified correction would be inventing changes the model never itemised
-    /// — exactly what `FR-COR-06` forbids.
+    /// -- exactly what `FR-COR-06` forbids.
     public static func parseCorrect(_ raw: String) throws -> CorrectResponse {
         guard let json = extractJSONObject(from: raw) else {
             throw ParseFailure(raw: raw, detail: "no JSON object found in the response")

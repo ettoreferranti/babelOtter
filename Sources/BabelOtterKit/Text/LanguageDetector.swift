@@ -6,7 +6,7 @@ import NaturalLanguage
 /// The seam exists so the *policy* below can be tested deterministically.
 /// `NLLanguageRecognizer` is a system ML model whose exact confidences move
 /// between OS versions, and this project builds on Swift 6.4 / macOS 27 locally
-/// while CI runs macOS 15 — asserting `0.83 >= floor` against the live model
+/// while CI runs macOS 15 -- asserting `0.83 >= floor` against the live model
 /// would produce a test that passes on one machine and fails on the other.
 public protocol LanguageRecognizing: Sendable {
     func hypotheses(for text: String) -> [LanguageCode: Double]
@@ -27,7 +27,7 @@ public enum Detection: Sendable, Equatable {
     case confident(LanguageCode, confidence: Double)
     case ambiguous(AmbiguityReason)
 
-    /// The language this detection points at, confident or not — `nil` only when
+    /// The language this detection points at, confident or not -- `nil` only when
     /// there is no guess to be had.
     public var languageCode: LanguageCode? {
         switch self {
@@ -41,7 +41,7 @@ public enum Detection: Sendable, Equatable {
 /// On-device language detection with an explicit confidence floor.
 ///
 /// `FR-TRN-01` and `FR-TRN-03`. Detection runs through `NaturalLanguage`, which
-/// is on-device and opens no connection — the same reason the rest of this
+/// is on-device and opens no connection -- the same reason the rest of this
 /// package can promise NFR-P1.
 public struct LanguageDetector: Sendable {
 
@@ -77,7 +77,7 @@ public struct LanguageDetector: Sendable {
         let hypotheses = recognizer.hypotheses(for: text)
         // Sorted with an explicit tie-break rather than `max(by:)`. A dictionary
         // has no order, so on equal confidences `max` returns whichever the hash
-        // order happened to put last — a different answer between runs, for the
+        // order happened to put last -- a different answer between runs, for the
         // one input where the answer matters most. Ties break on the language
         // code so the same selection always resolves the same way.
         guard

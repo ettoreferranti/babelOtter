@@ -1,9 +1,9 @@
 import Foundation
 
-/// A directed translation direction. `en → de-ch` is not `de-ch → en`.
+/// A directed translation direction. `en -> de-ch` is not `de-ch -> en`.
 ///
 /// Direction is part of the key because `FR-GLO-01`'s glossary is bidirectional
-/// but not symmetric: "module" → "Modul" is a rendering choice that says nothing
+/// but not symmetric: "module" -> "Modul" is a rendering choice that says nothing
 /// about how "Modul" should come back.
 public struct LanguagePair: Sendable, Hashable, Codable {
 
@@ -33,7 +33,7 @@ public struct GlossaryEntry: Sendable, Equatable, Codable {
 /// The user's terminology, filtered at the model rather than at the prompt.
 ///
 /// `FR-GLO-01`. Filtering lives here so ``PromptBuilder`` cannot accidentally
-/// include the other direction's entries — a prompt carrying both directions of
+/// include the other direction's entries -- a prompt carrying both directions of
 /// every term is how a small local model gets talked into translating a word it
 /// was told to leave alone.
 public struct Glossary: Sendable, Equatable, Codable {

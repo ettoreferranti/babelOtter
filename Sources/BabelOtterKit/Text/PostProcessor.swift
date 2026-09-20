@@ -1,13 +1,13 @@
 import Foundation
 
-/// The post-processing chain, in the one order spec §8 permits.
+/// The post-processing chain, in the one order spec section 8 permits.
 ///
 /// **Restore sentinels first, then apply locale rules to everything except the
 /// restored spans.**
 ///
 /// The order is load-bearing, and it is worth stating exactly why, because it is
 /// easy to talk yourself out of. Applying rules to the *masked* text and
-/// restoring afterwards would also leave a DNT term's `ß` intact — the two
+/// restoring afterwards would also leave a DNT term's eszett intact -- the two
 /// orders agree on that case, so it is not the thing that distinguishes them.
 /// What distinguishes them is that a rule pass over masked text cannot protect
 /// anything at all: the spans do not exist yet. ``TokenProtector/restore(_:from:)``

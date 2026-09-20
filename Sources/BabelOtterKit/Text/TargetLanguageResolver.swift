@@ -7,7 +7,7 @@ public enum Resolution: Sendable, Equatable {
     case resolved(source: LanguageCode, target: LanguageCode)
     /// Detected something real, but the user has not enabled it.
     case notEnabled(LanguageCode)
-    /// More than one plausible other side — or none. Carries the candidates so a
+    /// More than one plausible other side -- or none. Carries the candidates so a
     /// picker can offer them.
     case ambiguousPairing(candidates: [LanguageCode])
     /// Detection itself declined to commit; ask the user (`FR-TRN-03`).

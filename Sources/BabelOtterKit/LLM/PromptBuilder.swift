@@ -112,7 +112,7 @@ public struct PromptBuilder: Sendable {
     private func orthography(_ request: PromptRequest) -> String? {
         let rules = request.target.localeRules
         guard !rules.isEmpty else { return nil }
-        let lines = rules.map { "- Never write “\($0.replace)”. Always write “\($0.with)”." }
+        let lines = rules.map { #"- Never write "\#($0.replace)". Always write "\#($0.with)"."# }
         return (["Orthography for \(request.target.displayName):"] + lines)
             .joined(separator: "\n")
     }
@@ -121,7 +121,7 @@ public struct PromptBuilder: Sendable {
         let profile = request.profile
         var lines = [
             "Audience: \(profile.name).",
-            "Address the reader as “\(profile.register.rawValue)”.",
+            #"Address the reader as "\#(profile.register.rawValue)"."#,
             "Tone: \(profile.toneGuidance)",
         ]
         if !profile.glossaryBias.isEmpty {
@@ -132,14 +132,15 @@ public struct PromptBuilder: Sendable {
 
     private func glossarySection(_ request: PromptRequest) -> String? {
         guard !request.glossary.isEmpty else { return nil }
-        let lines = request.glossary.map { "- “\($0.source)” → “\($0.target)”" }
+        let lines = request.glossary.map { #"- "\#($0.source)" -> "\#($0.target)""# }
         return (["Use these renderings exactly:"] + lines).joined(separator: "\n")
     }
 
     private func protectedTerms(_ request: PromptRequest) -> String? {
         guard !request.doNotTranslate.isEmpty else { return nil }
         return """
-            Some words are replaced by placeholders of the form ⟦DNT0⟧. Copy every \
+            Some words are replaced by placeholders of the form \(TokenProtector.sentinel(0)). \
+            Copy every \
             placeholder into your output exactly as it appears. Never translate, \
             reword, space out or renumber them.
             """
@@ -156,15 +157,15 @@ public struct PromptBuilder: Sendable {
         let shape: String
         switch action {
         case .translate, .repitch:
-            shape = #"{"detected_source": "…", "detected_audience": "…", "blocks": ["…"]}"#
+            shape = #"{"detected_source": "...", "detected_audience": "...", "blocks": ["..."]}"#
         case .correct:
             shape = """
-                {"corrected_blocks": ["…"], "errors": [{"original": "…", "corrected": "…", \
+                {"corrected_blocks": ["..."], "errors": [{"original": "...", "corrected": "...", \
                 "category": "case|word order|gender|agreement|false friend|spelling|register|\
-                preposition|other", "explanation_en": "…", "severity": "error|suggestion"}]}
+                preposition|other", "explanation_en": "...", "severity": "error|suggestion"}]}
                 """
         case .explain:
-            shape = #"{"summary_en": "…", "notes": [{"phrase": "…", "explanation_en": "…"}]}"#
+            shape = #"{"summary_en": "...", "notes": [{"phrase": "...", "explanation_en": "..."}]}"#
         }
         return """
             Reply with one JSON object and nothing else, in exactly this shape:

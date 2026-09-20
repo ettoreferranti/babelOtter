@@ -2,7 +2,7 @@ import Foundation
 
 public enum StructureError: Error, Equatable {
     /// The model returned a different number of blocks than it was given.
-    /// Never repaired by padding or truncating — see ``BlockCountPolicy``.
+    /// Never repaired by padding or truncating -- see ``BlockCountPolicy``.
     case blockCountMismatch(expected: Int, received: Int)
 }
 
@@ -51,7 +51,7 @@ public struct ExtractedText: Sendable, Equatable {
 ///
 /// `FR-TRN-04`: line breaks, blank lines, list markers and indentation survive
 /// the round trip. The spec names this file first among mutation targets,
-/// because wrong block-index arithmetic does not crash — it silently returns the
+/// because wrong block-index arithmetic does not crash -- it silently returns the
 /// user's paragraphs in the wrong order.
 public enum StructureExtractor {
 
@@ -178,7 +178,7 @@ public enum StructureExtractor {
     ///
     /// A marker is only a marker when whitespace follows it. Without that rule
     /// `-5 degrees` loses its minus sign and `1.5 metres` becomes a numbered
-    /// list — both silent corruptions of the user's own text.
+    /// list -- both silent corruptions of the user's own text.
     private static func markerLength(in remainder: Substring) -> Int {
         let characters = Array(remainder)
         guard let first = characters.first else { return 0 }
