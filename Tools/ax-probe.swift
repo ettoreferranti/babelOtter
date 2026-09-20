@@ -144,6 +144,28 @@ func focusedElement(pid: pid_t) -> (AXUIElement?, String) {
     return (nil, "system-wide \(name(systemError)); per-application \(name(appError))")
 }
 
+/// Switches on Chromium's accessibility tree before reading.
+///
+/// Electron apps keep it off until an assistive tool asks. Setting
+/// AXManualAccessibility returns success immediately, but the tree is built
+/// asynchronously, so the first read afterwards is expected to fail -- which is
+/// why architecture.md section 7 says this must be set when an app is first
+/// seen frontmost, not at capture time.
+///
+/// Without it, an Electron app reports `noValue` for the focused element and
+/// looks permanently unreachable. That is what the 2026-09-20 run measured for
+/// VS Code and Teams, and it is exactly the conclusion the first prototype drew
+/// before the spike corrected it.
+///
+/// Note this switches on accessibility work inside applications we do not own.
+/// That is ordinary behaviour for assistive software -- it is what VoiceOver
+/// does -- but it is a side effect worth stating rather than burying.
+func enableManualAccessibility(pid: pid_t) -> String {
+    let error = AXUIElementSetAttributeValue(
+        AXUIElementCreateApplication(pid), "AXManualAccessibility" as CFString, kCFBooleanTrue)
+    return name(error)
+}
+
 /// Blocks until an app other than the launching terminal is frontmost and has
 /// settled, printing what it can see while it waits.
 ///
@@ -218,11 +240,21 @@ for round in 1...rounds {
         break
     }
 
-    let (element, route) = focusedElement(pid: app.pid)
     print("  app:    \(app.label)")
+
+    var (element, route) = focusedElement(pid: app.pid)
+    if element == nil {
+        // Second chance for Electron: arm the tree, then let it build.
+        let armed = enableManualAccessibility(pid: app.pid)
+        print("  nothing yet; AXManualAccessibility -> \(armed), waiting 3s for the tree")
+        Thread.sleep(forTimeInterval: 3.0)
+        (element, route) = focusedElement(pid: app.pid)
+        if element != nil { print("  -> appeared after arming (Electron, tier 1 or 2 may work)") }
+    }
+
     guard let element else {
         print("  focused element: NONE (\(route))")
-        print("  -> tier 3 only: this app exposes no focused element at all")
+        print("  -> tier 3 only: nothing readable even after arming the tree")
         print("  ...switch back to the terminal for the next round")
         waitForReturnHome()
         continue

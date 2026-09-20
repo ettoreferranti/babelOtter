@@ -354,6 +354,38 @@ closed. Two caveats worth keeping: local admin was required to make the grant,
 and a policy refresh could in principle re-apply and revoke it, so #71
 (re-present setup when a permission is revoked) is not hypothetical.
 
+### Per-app tiers, measured on the managed machine
+
+Measured 2026-09-20 with `Tools/ax-probe.sh`, selections made by hand.
+
+| App | Role | Tier 1 | Tier 2 | Verdict |
+|---|---|---|---|---|
+| TextEdit | `AXTextArea` | OK, 77 chars | `attributeUnsupported` | **Tier 1**, as expected |
+| VS Code | no focused element | `noValue` | `noValue` | **Tier 3** |
+| Microsoft Teams | no focused element | `noValue` | `noValue` | **Tier 3** |
+| Safari | `AXTextField` | EMPTY | `attributeUnsupported` | **inconclusive** -- see below |
+
+**TextEdit confirms the whole chain works** on a managed machine with the grant
+in place: system-wide focused element, `kAXSelectedTextAttribute`, real text.
+
+**VS Code and Teams returned `noValue` for the focused element itself**, on both
+the system-wide and the per-application route. Not an empty selection -- no
+element at all. This is a sharper result than the spike's, which found VS Code
+advertising every selection attribute and returning empty; here there was
+nothing to ask. Both are Electron, and the probe was not setting
+`AXManualAccessibility` first, so this is the failure mode item 4 predicts:
+without arming, an Electron app looks permanently unreachable. The probe now
+arms and retries, so the next run distinguishes "Electron needs arming" from
+"genuinely tier 3".
+
+**The Safari reading does not test WebKit.** The focused element was an
+`AXTextField`, which is browser chrome -- an address or search field -- not page
+content. Tier 2 exists for selections inside a `AXWebArea`, and this never
+reached one. Safari is still unmeasured; a re-test needs a selection in the body
+of a page.
+
+**Still unmeasured:** Outlook, Word, Chrome, and Safari page content.
+
 ### A terminal cannot measure itself
 
 The same run also produced six readings of the terminal the probe was
@@ -370,6 +402,7 @@ never by asking what is supported.
 
 ### Not yet measured
 
-Teams; the focus-taking panel variant (#52); Chrome; Word; Outlook; Safari and
-TextEdit on the managed machine. The probe now waits for the reader, so
-covering these is a single run of `Tools/ax-probe.sh`.
+Outlook; Word; Chrome; Safari page content as opposed to browser chrome; the
+focus-taking panel variant (#52); and whether VS Code and Teams become readable
+once `AXManualAccessibility` is armed. All of it is one run of
+`Tools/ax-probe.sh`.
