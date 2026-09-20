@@ -75,10 +75,27 @@ extension Configuration {
 
     /// The model a fresh install points every action at.
     ///
-    /// A starting point, not a recommendation: `FR-ONB-01` walks the user
+    /// A starting point, not a settled answer: `FR-ONB-01` walks the user
     /// through choosing one, and `FR-EVL-01`'s harness exists to decide which is
     /// actually good. Named here so the first run has something to try.
-    public static let defaultModel = "llama3.1:8b"
+    ///
+    /// Mistral Small 3.2 rather than a small Llama, for three reasons that
+    /// matter to this pipeline specifically:
+    ///
+    /// - It is trained with real European-language coverage, which is the whole
+    ///   job here. A 24B model also has room for German case and word order
+    ///   that an 8B one spends on English.
+    /// - Apache 2.0, so nothing about it blocks signing and distribution
+    ///   (issue #82). Several strong multilingual models -- Command R, Aya --
+    ///   are non-commercial licences, which would.
+    /// - The 3.2 release specifically improved instruction-following and
+    ///   repetition. That is not incidental: this pipeline demands one JSON
+    ///   object in a fixed shape, an exact block count, and DNT sentinels
+    ///   copied through untouched. Format adherence is where a local model
+    ///   actually fails us, more often than translation quality is.
+    ///
+    /// 15GB at the default Q4_K_M quantisation, 128K context.
+    public static let defaultModel = "mistral-small3.2:24b"
 
     public static let `default` = Configuration(
         languages: LanguageConfig.shippedDefaults,

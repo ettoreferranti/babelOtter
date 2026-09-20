@@ -104,12 +104,15 @@ Worth reporting all of this upstream before M1b leans on it further.
    #42, #43, #44, #53, #55, #56, #57 are done on the branch. They were left open
    deliberately, because M0's precedent was that merging is what closes them.
 
-3. **Confirm the defaults I picked.** All live in `Configuration.default`, and
-   all are values something had to have rather than researched positions:
-   - `defaultModel = "llama3.1:8b"` — a starting point; #74–#76's eval harness is
-     what should actually decide this.
-   - `detectionConfidenceFloor = 0.65`, `minimumLengthForDetection = 12`
-     (non-whitespace characters), `timeoutSeconds = 60`, `retentionDays = 90`.
+3. **Defaults are settled for now.** `defaultModel` is
+   `mistral-small3.2:24b` — European-language coverage, Apache 2.0 so it does
+   not block distribution (#82), and 3.2's instruction-following matters because
+   this pipeline demands strict JSON, exact block counts and untouched DNT
+   sentinels. 15GB at Q4_K_M, comfortable on the 48GB M4 Pro. #74–#76's eval
+   harness is still what should decide this properly.
+   `detectionConfidenceFloor = 0.65`, `minimumLengthForDetection = 12`
+   (non-whitespace characters), `timeoutSeconds = 60`, `retentionDays = 90` are
+   to be revisited once there are manual tests behind them.
 
 4. **DNT matching is case-sensitive.** A term is a proper noun, so `zhaw` does
    not match `ZHAW`. Defensible either way; say if you want it case-insensitive.
@@ -123,10 +126,9 @@ Worth reporting all of this upstream before M1b leans on it further.
    mutants the small-population rule (`total < 20`) no longer applies, so the
    plain 80% gate is doing the work now.
 
-7. **`PRIVACY.md` still understates the clipboard risk.** It accepts the
-   Universal Clipboard exposure on the stated assumption that the clipboard is a
-   rare fallback; spike #30 measured that as false. The shell plan corrects it as
-   part of #77, but the document is wrong in the meantime.
+7. **`PRIVACY.md` is corrected.** It no longer describes the clipboard as a
+   rare fallback, and the section is now an *open* risk closing in M1a under
+   #77 rather than one accepted for the whole of v1.
 
 ## What is next
 
