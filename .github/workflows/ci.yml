@@ -152,6 +152,8 @@ jobs:
           Sources/BabelOtterKit/LLM/GenerationTimeout.swift
           Sources/BabelOtterKit/LLM/DaemonStatus.swift
           Sources/BabelOtterKit/LLM/LazyStream.swift
+          Sources/BabelOtterKit/Capture/CaptureTier.swift
+          Sources/BabelOtterKit/Capture/SelectionSnapshot.swift
           Sources/BabelOtterKit/Config/AudienceProfile.swift
           Sources/BabelOtterKit/Config/Configuration.swift
           Sources/BabelOtterKit/Config/ConfigurationStore.swift
