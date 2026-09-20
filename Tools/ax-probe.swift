@@ -12,6 +12,16 @@ import AppKit
 import ApplicationServices
 import Foundation
 
+// Unbuffered stdout. This probe spends most of its life blocked waiting for
+// the reader to switch apps, and its output goes through `tee`, so stdout is a
+// pipe rather than a terminal. C stdio block-buffers a pipe, which meant every
+// prompt sat in a 4KB buffer until the process exited -- the script looked like
+// it had hung after step 2, when in fact it was waiting and saying so into a
+// buffer nobody could see. The shell's own `echo`s appeared throughout,
+// because bash writes those straight out, which made it look like the Swift
+// half had never started.
+setvbuf(stdout, nil, _IONBF, 0)
+
 let rounds = Int(CommandLine.arguments.dropFirst().first ?? "6") ?? 6
 
 /// The terminal this was launched from. Readings are taken in *other* apps, so
