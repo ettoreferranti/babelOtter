@@ -336,8 +336,40 @@ path for Electron, and the only path for replacement into web content. The M4
 strict-mode work (#77) is therefore more load-bearing than its milestone suggests
 and is worth reconsidering for v1.
 
+### MDM does not block the grant
+
+Measured on 2026-09-20 with `Tools/ax-probe.sh`, on a managed work Mac:
+DEP-enrolled, MDM enrolment user-approved, several vendor PPPC payloads
+present (including ones that pre-authorise Accessibility for management and
+remote-support tools), and the user holding local admin.
+
+`AXIsProcessTrusted()` returned **YES** after granting Accessibility to a
+terminal through System Settings. **So M1b's premise holds.** The PPPC
+payloads on that machine pre-authorise specific vendor tools; they do not
+prevent the user granting Accessibility to something of their own.
+
+This was section 7's largest open risk -- if the grant had been blocked, no
+capture tier would work and M1b would have had no premise at all. It is
+closed. Two caveats worth keeping: local admin was required to make the grant,
+and a policy refresh could in principle re-apply and revoke it, so #71
+(re-present setup when a permission is revoked) is not hypothetical.
+
+### A terminal cannot measure itself
+
+The same run also produced six readings of the terminal the probe was
+launched from, all `cannotComplete`. That is not a finding about capture; it
+is the probe's own design fault, since a fixed countdown assumed the reader
+would switch apps on its schedule. The probe now waits for a foreign app to
+settle before reading.
+
+Worth keeping anyway: a GPU-rendered terminal answered `cannotComplete`
+(-25204) rather than `attributeUnsupported` or `noValue`. The tier ladder has
+to treat "the app never answered" as tier 3, the same as an empty result --
+another case of #31's rule that capability is decided by attempting a capture,
+never by asking what is supported.
+
 ### Not yet measured
 
-Teams; the focus-taking panel variant (#52); Chrome; Word; and whether a
-managed work Mac permits the Accessibility grant at all — if MDM blocks it,
-no tier works.
+Teams; the focus-taking panel variant (#52); Chrome; Word; Outlook; Safari and
+TextEdit on the managed machine. The probe now waits for the reader, so
+covering these is a single run of `Tools/ax-probe.sh`.

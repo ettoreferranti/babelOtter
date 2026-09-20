@@ -142,12 +142,18 @@ Worth reporting all of this upstream before M1b leans on it further.
 Ollama client, in 15 tasks. It is built on `docs/architecture.md` §7, which is
 measured reality and supersedes §2–3.
 
-**Do this early, before anything is built on M1b's premise:** find out whether a
-managed work Mac permits the Accessibility grant at all. If MDM blocks it, no
-capture tier works and M1b's premise fails. §7 lists it as unmeasured, and it is
-cheap to answer.
+**M1b's premise is confirmed.** Measured 2026-09-20 on the managed work Mac:
+`AXIsProcessTrusted()` returns YES after granting Accessibility through System
+Settings, despite DEP enrolment and several vendor PPPC payloads. Those
+payloads pre-authorise specific vendor tools; they do not stop the user
+granting Accessibility to something of their own. Local admin was needed, and a
+policy refresh could revoke it, which makes #71 real rather than hypothetical.
+Full detail in `docs/architecture.md` §7.
 
-Also still unmeasured: Teams, the focus-taking panel variant (#52), Chrome, Word.
+Still unmeasured: Teams, the focus-taking panel variant (#52), Chrome, Word,
+Outlook, and Safari and TextEdit on the managed machine. The probe now waits
+for the reader rather than counting down, so covering those is a single run of
+`Tools/ax-probe.sh`.
 
 ## What M1a must carry from spike #30
 
