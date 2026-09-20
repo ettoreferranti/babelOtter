@@ -208,13 +208,14 @@ jobs:
           # nothing was learned about it -- while a one-off tool defect costs a
           # minute instead of a red main. A red main nobody believes is worse
           # than no gate at all.
+          # jq rather than an inline python script: a multi-line `python3 -c`
+          # has to start its lines at column 0, and a line at column 0 ends the
+          # YAML block scalar this `run:` is written in. That produced a
+          # workflow GitHub could not parse at all -- a run with no jobs, which
+          # reads as a failure with nothing to look at.
           buildErrors() {
-            python3 -c "
-import json,sys
-d=json.load(open(sys.argv[1]))
-print(sum(1 for r in d['fileReports'] for o in r['appliedOperators']
-          if o['testSuiteOutcome'] == 'buildError'))
-" "$1"
+            jq '[.fileReports[].appliedOperators[]
+                 | select(.testSuiteOutcome == "buildError")] | length' "$1"
           }
 
           muter run "${args[@]}" --format json -o muter-report-1.json
@@ -257,13 +258,14 @@ print(sum(1 for r in d['fileReports'] for o in r['appliedOperators']
           # nothing was learned about it -- while a one-off tool defect costs a
           # minute instead of a red main. A red main nobody believes is worse
           # than no gate at all.
+          # jq rather than an inline python script: a multi-line `python3 -c`
+          # has to start its lines at column 0, and a line at column 0 ends the
+          # YAML block scalar this `run:` is written in. That produced a
+          # workflow GitHub could not parse at all -- a run with no jobs, which
+          # reads as a failure with nothing to look at.
           buildErrors() {
-            python3 -c "
-import json,sys
-d=json.load(open(sys.argv[1]))
-print(sum(1 for r in d['fileReports'] for o in r['appliedOperators']
-          if o['testSuiteOutcome'] == 'buildError'))
-" "$1"
+            jq '[.fileReports[].appliedOperators[]
+                 | select(.testSuiteOutcome == "buildError")] | length' "$1"
           }
 
           run_pass_2() {
