@@ -160,10 +160,26 @@ path. #77's strict mode would make babelOtter refuse to operate in Teams, Word
 and OneNote entirely, which makes its default a product decision rather than a
 detail.
 
-Still unmeasured: Chrome, the focus-taking panel variant (#52), and
-**replacement** -- every reading so far is a read. Section 7 item 2 warns that
-`AXUIElementSetAttributeValue` returns success for writes that do nothing, and
-that has not been re-confirmed on this machine.
+**Replacement is measured, and it is worse than reading.** AX write works in
+TextEdit and nowhere else tried. Four web surfaces accepted a write, returned
+`.success`, and changed nothing -- including a plain editable `<textarea>` in
+Safari that reads 129 characters cleanly on tier 1. A TextEdit control passed
+in the same run, so this is the surfaces, not the probe.
+
+Two consequences worth carrying into M1a's shell work:
+
+- **Read and write have different tier maps.** An app can be tier 1 for reading
+  and tier 3 for writing. The ladder must be evaluated per direction, and a
+  capability probe done during capture says nothing about replacement.
+- **The clipboard is the only way to put a result back** into any web surface or
+  Electron app. That is a wider set than reading needs, and it makes #77's
+  strict mode more expensive again: strict mode would leave babelOtter able to
+  *read* in Safari, Mail and Outlook but unable to *replace* anywhere except
+  native AppKit text.
+
+Still unmeasured: Chrome, the focus-taking panel variant (#52), and writes into
+Outlook's message body -- the one work-critical surface that reads as a native
+`AXTextArea` and might therefore accept an AX write.
 
 ## What M1a must carry from spike #30
 

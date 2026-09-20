@@ -97,9 +97,17 @@ exposes no selection at all, and a walk of their accessibility trees found
 nothing selectable underneath. For those four, the clipboard is not the
 fallback. It is the only path.
 
+**Replacement is worse than reading.** Measured 2026-09-20: the Accessibility
+API accepts a write and reports success while changing nothing, on every web
+surface tried -- including a plain editable `<textarea>` in Safari that reads
+perfectly. AX write is confirmed working only in native AppKit text such as
+TextEdit. So putting a result *back* needs the clipboard for all web content as
+well as all Electron apps, which is a wider set than reading needs.
+
 Anyone whose working day is mostly Teams, Word and OneNote should read the risk
 below as applying to most of what they do, not to an occasional edge case. The
-full per-application table is in `docs/architecture.md` section 7.
+full per-application table, for reading and for writing, is in
+`docs/architecture.md` section 7.
 
 **The risk:** if Handoff / Universal Clipboard is active, macOS may sync
 general pasteboard contents to your other Apple devices via iCloud. That is

@@ -399,26 +399,41 @@ only thing that changed.
 ### Write-back, measured
 
 Spike #30 measured writes on the private machine: verified in TextEdit, a
-silent no-op on Mail's **read-only** HTML view. It explicitly left editable web
-content untested -- tier 2 read proven, tier 2 write not.
-
-Added 2026-09-20, same machine:
+silent no-op on Mail's read-only HTML view. It left editable web content
+untested -- tier 2 read proven, tier 2 write not. Measured 2026-09-20, same
+machine, with `Tools/ax-probe.sh --write`:
 
 | Surface | Focused role | Read | Write |
 |---|---|---|---|
-| Safari smart search field | `AXComboBox` | tier 1 and 2, 21 chars | **success returned, value unchanged -- silent no-op** |
+| TextEdit | `AXTextArea` | tier 1, 11 chars | **WRITE OK** (control) |
+| Safari `<textarea>` | `AXTextArea` | tier 1, 129 chars | **success returned, value unchanged** |
+| Mail message body | `AXWebArea` | tier 2, 16 chars | **success returned, value unchanged** |
+| Safari smart search field | `AXComboBox` | tier 1 and 2, 21 chars | **success returned, value unchanged** |
 
-So item 2 is not a quirk of one read-only view. A surface that reads cleanly on
-*both* tiers still accepted a write, reported `success`, and changed nothing.
-That is the second independent surface to lie in the same way, which moves
-"read back and compare" from a precaution to a requirement.
+**WebKit does not honour selection writes, even where it reads perfectly.** A
+plain `<textarea>` in Safari reads 129 characters through `kAXSelectedText`,
+accepts a write, returns `.success`, and changes nothing. That is the case
+spike #30 flagged as untested, and the answer is no.
 
-**Editable web content is still untested.** The run that was meant to cover it
-skipped the write on every `AXWebArea`, because the probe took its source text
-from a tier-1 read and tier 1 returns `noValue` there. It measured nothing on
-the exact surface it existed for, three times in one run. Fixed: the write now
-takes its source from whichever tier can see the selection, and verifies
-through whichever of `AXValue` or the marker read is available on that surface.
+Four web surfaces have now lied the same way -- read-only Mail, editable Mail,
+a Safari textarea, and Safari's search field -- against a TextEdit control that
+passed in the same run. This is not a property of read-only content, and it is
+not the probe.
+
+**Read and write have different tier maps, and this is the design consequence.**
+An app can be tier 1 for reading and tier 3 for writing; Safari's textarea is
+exactly that. The ladder in #31 and #33 must therefore be evaluated separately
+per direction. A capability probe that establishes "tier 1 works here" during
+capture says nothing about replacement, and assuming otherwise is how the user
+gets told "Replaced" over untouched text.
+
+So `FR-CAP-04`'s clipboard fallback for writes is not an edge case: **for every
+web surface and every Electron app, the clipboard is the only way to put a
+result back.** AX write is confirmed working only in native AppKit text.
+
+**Still untested for writes:** Outlook's message body, which reads as a native
+`AXTextArea` and is the one work-critical surface that might accept an AX
+write; Notes; Pages. One round each, whenever convenient.
 
 ### What this means for the clipboard
 
