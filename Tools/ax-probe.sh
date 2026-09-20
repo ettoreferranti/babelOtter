@@ -34,11 +34,23 @@ run_checks() {
 
     echo "=== 2. MDM and privacy policy payloads ==="
     profiles status -type enrollment 2>/dev/null
-    echo "--- profiles mentioning Accessibility / TCC / Privacy (empty = none) ---"
+    echo "--- TCC / privacy payloads: names and keys only ---"
     echo "    (system_profiler can take 10-30s on a managed Mac; it is not stuck)"
+    echo "    NOTE: this describes your employer's management profiles. Read it"
+    echo "    before sharing the transcript anywhere public."
+    #
+    # Patterns are ANCHORED to the start of a line, and every line is truncated.
+    # An earlier version grepped case-insensitively for "TCC" anywhere on a
+    # line. Base64 contains the substring "tcc" readily, so that matched the
+    # middle of a Microsoft Defender onboarding blob and dumped an org GUID, a
+    # signature and a full certificate chain into the transcript. Short tokens
+    # matched against unanchored output containing encoded data is a good way
+    # to leak a secret you did not know was there.
     system_profiler SPConfigurationProfileDataType 2>/dev/null \
-        | grep -iE "accessibility|TCC|Privacy Preferences|PolicyControl" \
-        | sed 's/^/  /'
+        | grep -aE "^[[:space:]]*(Name|Identifier|Description):|^[[:space:]]*com\.apple\.TCC\.configuration-profile-policy:|^[[:space:]]*Accessibility =" \
+        | cut -c1-140 \
+        | sed 's/^/  /' \
+        | head -60
     echo "--- end ---"
     echo
 
