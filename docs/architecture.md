@@ -396,6 +396,44 @@ built from. An element did appear on the retry after that failed arming, and an
 earlier version of the probe credited the arming for it; the extra wait was the
 only thing that changed.
 
+### Decision: Accessibility reads, the clipboard writes
+
+**Decided 2026-09-20**, on the measurements below.
+
+| Direction | Mechanism |
+|---|---|
+| **Capture** | Accessibility ladder — tier 1, then tier 2, then clipboard |
+| **Replacement** | Clipboard, always |
+
+The asymmetry is the design rather than an inconsistency, and it follows the
+evidence in each direction. Reading through Accessibility works in TextEdit,
+Preview, Outlook, Safari and Mail — and those include both mail clients, which
+carry the most privacy-sensitive text most people handle. Since Universal
+Clipboard exposure is bounded by pasteboard dwell time, an Accessibility read
+means *no* exposure for those apps rather than a small one. That is worth
+keeping a ladder for.
+
+Writing through Accessibility works in one app of those tested. Keeping a write
+path would have bought TextEdit and Preview and cost a second ladder evaluated
+per direction, a read-back-and-compare verifier existing solely because
+`AXUIElementSetAttributeValue` returns success for writes that do nothing, and
+a class of defects where the user is told "Replaced" over untouched text —
+which is the failure #34 exists to prevent.
+
+**Dropped with it:** `AXManualAccessibility` arming. It returns
+`attributeUnsupported` on Outlook and Teams, and VS Code stayed unreadable, so
+the planned task bought nothing. Electron goes through the clipboard, which is
+measured to work there.
+
+**#77 changed shape.** Strict Accessibility-only mode assumed the clipboard was
+avoidable. With replacement always using it, strict AX-only would mean "can read
+in Safari, Mail and Outlook, can replace nowhere". What the measurements permit
+is **capture-only strict**: refuse the clipboard for reading, accept it for
+writing. That asymmetry is defensible — reading puts the user's *existing* text
+on the pasteboard, an email they received or a document they did not write,
+while writing puts babelOtter's own output there, which they have just seen and
+approved.
+
 ### Write-back, measured
 
 Spike #30 measured writes on the private machine: verified in TextEdit, a

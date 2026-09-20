@@ -143,10 +143,9 @@ Worth reporting all of this upstream before M1b leans on it further.
    replace anywhere except native AppKit text. Restated in the spec
    (`NFR-P1`, `NFR-P1a`, `NFR-P9`), `PRIVACY.md` and `README.md`.
 
-   **#77 needs rewriting.** "Strict Accessibility-only mode" now means "cannot
-   replace anywhere except TextEdit", which is not a product. It is still worth
-   having as an opt-in for someone who wants the guarantee absolute, but its
-   cost is now known and its description is out of date.
+   **#77 is rewritten** as capture-only strict mode: refuse the clipboard for
+   reading, accept it for writing. Its spike is fully answered and recorded in
+   the issue.
 
 ## What is next
 
@@ -171,6 +170,18 @@ edge cases -- for the apps a working day is actually spent in, it is the only
 path. #77's strict mode would make babelOtter refuse to operate in Teams, Word
 and OneNote entirely, which makes its default a product decision rather than a
 detail.
+
+**Architecture, decided 2026-09-20: Accessibility reads, the clipboard
+writes.** Capture uses the tier ladder; replacement always uses the clipboard.
+The asymmetry follows the evidence in each direction, and it removed three
+planned tasks: the Accessibility write path, the read-back verifier that
+existed only because the write API lies, and `AXManualAccessibility` arming,
+which measured as `attributeUnsupported` on the apps it was meant to help.
+
+Reading through Accessibility is kept because it is worth keeping: it works in
+Outlook and Mail, and since exposure is bounded by pasteboard dwell time, an
+Accessibility read means *no* exposure for the most sensitive text rather than
+a small one.
 
 **Replacement is measured, and it is worse than reading.** AX write works in
 TextEdit and nowhere else tried. Four web surfaces accepted a write, returned

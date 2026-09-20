@@ -61,7 +61,7 @@ rather than merely producing correct output for them.
 - **FR-CAP-01** Capture the current selection from the frontmost application via the Accessibility API, recording text, `AXUIElement`, selected range, PID and bundle identifier at trigger time.
 - **FR-CAP-02** Where the Accessibility API cannot supply the selection, fall back to simulating ⌘C, saving and restoring the prior clipboard contents around the operation.
 - **FR-CAP-03** Replace the original selection with the result on explicit user action, re-activating the source application first.
-- **FR-CAP-04** Where AX write is unsupported, fall back to ⌘V with clipboard save/restore.
+- **FR-CAP-04** Replacement always goes through the clipboard: write, ⌘V, restore. There is no Accessibility write path. Measured 2026-09-20 — every web surface accepts `AXUIElementSetAttributeValue`, returns `.success` and changes nothing, so an AX write path would buy two native apps at the cost of a second capability ladder and a verifier whose only job is to catch the API lying.
 - **FR-CAP-05** Never discard a generated result: if replacement fails for any reason, surface the failure and offer Copy.
 - **FR-CAP-06** Operate on an empty selection by reporting it clearly rather than invoking the model.
 
