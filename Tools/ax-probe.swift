@@ -1,7 +1,7 @@
 // Does this Mac permit the Accessibility grant, and does the grant yield text?
 //
 // A diagnostic, not shipped code. It answers the question docs/architecture.md
-// section 7 lists as unmeasured -- "whether a managed ZHAW Mac permits the
+// section 7 lists as unmeasured -- "whether a managed work Mac permits the
 // Accessibility grant at all" -- and, for each app tried, which of the three
 // capture tiers actually works there.
 //

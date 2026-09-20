@@ -150,7 +150,7 @@ added later, notarization uploads the app binary (not user data) to Apple.
 ## This repository is public
 
 The eval golden set, test fixtures, default glossary entries, screenshots and
-issue examples must be **synthetic**. No real correspondence, no internal ZHAW
+issue examples must be **synthetic**. No real correspondence, no internal work
 material, no personal data may enter this repo. CI enforces a fixture content
 guard, and integration tests that touch real text run **locally only** — never
 on GitHub-hosted runners.

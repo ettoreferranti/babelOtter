@@ -120,8 +120,8 @@ Worth reporting all of this upstream before M1b leans on it further.
    (non-whitespace characters), `timeoutSeconds = 60`, `retentionDays = 90` are
    to be revisited once there are manual tests behind them.
 
-2. **DNT matching is case-sensitive.** A term is a proper noun, so `zhaw` does
-   not match `ZHAW`. Defensible either way; say if you want it case-insensitive.
+2. **DNT matching is case-sensitive.** A term is a proper noun, so `otterbach` does
+   not match `Otterbach`. Defensible either way; say if you want it case-insensitive.
 
 3. **Seven surviving mutants, all in sort comparators**, look like equivalent
    mutants — `>` replaced by `>=` in a comparator that still orders the same list
@@ -143,7 +143,7 @@ Ollama client, in 15 tasks. It is built on `docs/architecture.md` §7, which is
 measured reality and supersedes §2–3.
 
 **Do this early, before anything is built on M1b's premise:** find out whether a
-managed ZHAW Mac permits the Accessibility grant at all. If MDM blocks it, no
+managed work Mac permits the Accessibility grant at all. If MDM blocks it, no
 capture tier works and M1b's premise fails. §7 lists it as unmeasured, and it is
 cheap to answer.
 

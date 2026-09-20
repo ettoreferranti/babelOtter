@@ -339,5 +339,5 @@ and is worth reconsidering for v1.
 ### Not yet measured
 
 Teams; the focus-taking panel variant (#52); Chrome; Word; and whether a
-managed ZHAW Mac permits the Accessibility grant at all — if MDM blocks it,
+managed work Mac permits the Accessibility grant at all — if MDM blocks it,
 no tier works.

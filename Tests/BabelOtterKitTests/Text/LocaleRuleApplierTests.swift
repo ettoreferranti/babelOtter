@@ -39,10 +39,10 @@ struct LocaleRuleApplierTests {
 
     @Test("text on both sides of a protected span is still rewritten")
     func rewritesAroundProtection() {
-        let text = "groß ZHAW groß"
-        let range = text.range(of: "ZHAW")!
+        let text = "groß Otterbach groß"
+        let range = text.range(of: "Otterbach")!
         #expect(
-            LocaleRuleApplier.apply(swiss, to: text, protecting: [range]) == "gross ZHAW gross")
+            LocaleRuleApplier.apply(swiss, to: text, protecting: [range]) == "gross Otterbach gross")
     }
 
     @Test("several protected spans are all honoured")

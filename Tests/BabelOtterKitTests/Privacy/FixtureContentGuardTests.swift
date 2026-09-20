@@ -31,7 +31,7 @@ import Foundation
 /// header says: a person read the file and confirmed it is synthetic.
 ///
 /// **It does NOT detect names, street addresses, matriculation/student
-/// numbers, dates of birth, `zhaw.ch` URLs, or any other free-text personal
+/// numbers, dates of birth, institutional email domains, or any other free-text personal
 /// detail.** None of these are reliably expressible as a regex without
 /// either missing real instances or false-positiving on every ordinary
 /// sentence a fixture contains (German prose is made of names). No marker
@@ -238,7 +238,7 @@ struct FixtureContentGuardTests {
 
     @Test("marker scanner: fires on a realistic instance of each marker", arguments: [
         (marker: "email address", sample: "Bitte antworten Sie an vorname.nachname@example.org."),
-        (marker: "email address", sample: "Kontakt: j.mueller+kurs@stud.zhaw.ch"),
+        (marker: "email address", sample: "Kontakt: j.mueller+kurs@stud.example.ch"),
         // Swiss phone number: every spelling a person actually writes, per
         // Fix round 1 — international with each separator, international
         // with none, local with each separator, local with none.

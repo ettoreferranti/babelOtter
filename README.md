@@ -54,7 +54,7 @@ own locale rules.
 ### Terminology control
 
 - **Glossary** — force consistent renderings (`degree programme` → `Studiengang`).
-- **Do-not-translate list** — protect names, acronyms, module codes, `ZHAW`.
+- **Do-not-translate list** — protect names, acronyms, module codes and product names.
 
 ---
 

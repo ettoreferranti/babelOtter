@@ -17,14 +17,14 @@ struct PipelineTests {
 
     @Test("a German bullet list survives translation with its structure, terms and orthography")
     func translateABulletList() throws {
-        let input = "- Die Straße ist groß\n- ZHAW ist eine Schule"
+        let input = "- Die Straße ist groß\n- Otterbach ist eine Schule"
 
         // 1. Structure out.
         let extracted = StructureExtractor.extract(input)
-        #expect(extracted.blocks == ["Die Straße ist groß", "ZHAW ist eine Schule"])
+        #expect(extracted.blocks == ["Die Straße ist groß", "Otterbach ist eine Schule"])
 
         // 2. Protected terms masked.
-        let masked = extracted.blocks.map { TokenProtector.mask($0, terms: ["ZHAW"]) }
+        let masked = extracted.blocks.map { TokenProtector.mask($0, terms: ["Otterbach"]) }
         #expect(masked[1].text == "⟦DNT0⟧ ist eine Schule")
 
         // 3. A prompt that names the count it expects.
@@ -34,7 +34,7 @@ struct PipelineTests {
                 source: .swissGerman,
                 target: .swissGerman,
                 profile: .colleagues,
-                doNotTranslate: ["ZHAW"],
+                doNotTranslate: ["Otterbach"],
                 blocks: masked.map(\.text)
             ))
         #expect(prompt.contains("exactly 2 block"))
@@ -69,9 +69,9 @@ struct PipelineTests {
         let output = try StructureExtractor.reapply(
             finished.map(\.text), to: extracted.skeleton)
 
-        #expect(output == "- Die Strasse ist gross\n- ZHAW ist eine grosse Schule")
+        #expect(output == "- Die Strasse ist gross\n- Otterbach ist eine grosse Schule")
         #expect(!output.contains("ß"), "FR-TRN-05: ß must never survive to a de-CH output")
-        #expect(output.contains("ZHAW"), "FR-GLO-02: the protected term must come back verbatim")
+        #expect(output.contains("Otterbach"), "FR-GLO-02: the protected term must come back verbatim")
         #expect(output.hasPrefix("- "), "FR-TRN-04: the list marker must survive")
     }
 
@@ -112,10 +112,10 @@ struct PipelineTests {
 
     @Test("a mangled sentinel is surfaced rather than pasted into the user's text")
     func mangledSentinelSurfaces() {
-        let masked = TokenProtector.mask("ZHAW ist gut", terms: ["ZHAW"])
+        let masked = TokenProtector.mask("Otterbach ist gut", terms: ["Otterbach"])
         let finished = PostProcessor(target: .swissGerman)
             .finish("Die Schule ist gut", protected: masked)
-        #expect(finished.problems == [.sentinelMissing(index: 0, term: "ZHAW")])
+        #expect(finished.problems == [.sentinelMissing(index: 0, term: "Otterbach")])
     }
 
     @Test("configuration written and reloaded drives the same pipeline decisions")

@@ -126,9 +126,9 @@ public enum TokenProtector {
 
     /// Non-empty, de-duplicated, longest first.
     ///
-    /// Longest-first is what makes `"ZHAW School of Engineering"` mask as one
+    /// Longest-first is what makes `"Otterbach School of Engineering"` mask as one
     /// unit instead of leaving `" School of Engineering"` exposed after
-    /// `"ZHAW"` matched its prefix. Ties break on the configured order so the
+    /// `"Otterbach"` matched its prefix. Ties break on the configured order so the
     /// result is deterministic, which `sorted(by:)` alone does not guarantee.
     private static func orderedTerms(_ terms: [String]) -> [String] {
         var unique: [String] = []

@@ -23,7 +23,7 @@ These apply to every task. Do not restate them per task; do not violate them.
 - **Exactly one networking call site** may exist in `Sources/`, and it must go through `OllamaEndpoint`. Enforced by Task 6.
 - **`OLLAMA_HOST` is deliberately ignored.** Never read it to configure a connection.
 - **No user content in logs.** User text reaches logging only via the redacted representation from Task 8.
-- **This repository is PUBLIC.** Every fixture, eval case and example must be synthetic. No real correspondence, no ZHAW internal material, no personal data. Enforced by Task 10.
+- **This repository is PUBLIC.** Every fixture, eval case and example must be synthetic. No real correspondence, no internal work material, no personal data. Enforced by Task 10.
 - **TDD, without exception.** Write the failing test, watch it fail for the right reason, then implement. A step that says "run it to verify it fails" is not ceremony — a test that passes before implementation is testing nothing.
 - **Mutation score ≥80%** on `BabelOtterKit`, gating CI (Task 11).
 - **Commit messages** end with:
@@ -1387,7 +1387,7 @@ MSG
 This repository is **public**, and CI runs on GitHub-hosted runners.
 
 Every fixture, eval case, glossary default and example in this tree must be
-invented. No real correspondence, no ZHAW internal material, no real names,
+invented. No real correspondence, no internal work material, no real names,
 addresses, phone numbers or account details — not even lightly edited.
 
 Write German and English that exercises the behaviour you need (case errors,

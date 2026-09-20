@@ -13,8 +13,8 @@
 ## 1. Purpose
 
 A macOS agent that translates and tutors between English and Swiss Standard
-German while working at ZHAW, driven from anywhere in the OS, running entirely
-on a local LLM. It exists to remove the friction of switching to a browser
+German at work, driven from anywhere in the OS, running entirely on a local
+LLM. It exists to remove the friction of switching to a browser
 translator, and — for German — to make the user measurably better at writing it
 rather than merely producing correct output for them.
 

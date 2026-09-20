@@ -31,16 +31,16 @@ struct PostProcessorTests {
 
     @Test("a sentinel the model destroyed is reported, not silently pasted")
     func damageIsReported() {
-        let protected = TokenProtector.mask("ZHAW rules", terms: ["ZHAW"])
+        let protected = TokenProtector.mask("Otterbach rules", terms: ["Otterbach"])
         let finished = processor.finish("the model rewrote everything", protected: protected)
-        #expect(finished.problems == [.sentinelMissing(index: 0, term: "ZHAW")])
+        #expect(finished.problems == [.sentinelMissing(index: 0, term: "Otterbach")])
     }
 
     @Test("the model's own ß in translated prose is still corrected")
     func modelOutputIsPostProcessed() {
-        let protected = TokenProtector.mask("ZHAW", terms: ["ZHAW"])
+        let protected = TokenProtector.mask("Otterbach", terms: ["Otterbach"])
         let finished = processor.finish("⟦DNT0⟧ ist eine große Schule", protected: protected)
-        #expect(finished.text == "ZHAW ist eine grosse Schule")
+        #expect(finished.text == "Otterbach ist eine grosse Schule")
     }
 
     @Test("several protected terms are each shielded from the rules")
@@ -69,9 +69,9 @@ struct PostProcessorTests {
     @Test("a rule matching the sentinel proves rules run after restoration")
     func rulesRunAfterRestoration() {
         let processor = PostProcessor(rules: [LocaleRule(replace: "NT", with: "nt")])
-        let protected = TokenProtector.mask("ZHAW matters", terms: ["ZHAW"])
+        let protected = TokenProtector.mask("Otterbach matters", terms: ["Otterbach"])
         let finished = processor.finish(protected.text, protected: protected)
-        #expect(finished.text == "ZHAW matters")
+        #expect(finished.text == "Otterbach matters")
         #expect(finished.problems.isEmpty, "restoring after the rules would have lost the term")
     }
 

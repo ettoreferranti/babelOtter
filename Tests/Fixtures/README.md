@@ -3,7 +3,7 @@
 This repository is **public**, and CI runs on GitHub-hosted runners.
 
 Every fixture, eval case, glossary default and example in this tree must be
-invented. No real correspondence, no ZHAW internal material, no real names,
+invented. No real correspondence, no internal work material, no real names,
 addresses, phone numbers or account details — not even lightly edited.
 
 Write German and English that exercises the behaviour you need (case errors,

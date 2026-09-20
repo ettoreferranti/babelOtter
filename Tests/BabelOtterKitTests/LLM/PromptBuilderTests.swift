@@ -128,7 +128,7 @@ struct PromptBuilderTests {
 
     @Test("DNT instructions appear only when there are protected terms")
     func protectedTermInstructions() {
-        #expect(builder.build(request(doNotTranslate: ["ZHAW"])).contains("⟦DNT0⟧"))
+        #expect(builder.build(request(doNotTranslate: ["Otterbach"])).contains("⟦DNT0⟧"))
         #expect(!builder.build(request()).contains("⟦DNT0⟧"))
     }
 
