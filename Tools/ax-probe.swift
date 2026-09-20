@@ -204,6 +204,48 @@ func waitForReturnHome(timeout: TimeInterval = 180) {
     }
 }
 
+/// Looks for a descendant that does expose a selection.
+///
+/// Measured 2026-09-20: in Outlook, Teams, Word and OneNote the *focused*
+/// element is a container -- AXWindow, AXSplitGroup, AXScrollArea -- which
+/// supports neither selection attribute. That does not prove the text is
+/// unreachable; it proves the focused element is not the text. Walking down
+/// tells us which of those it is, and that is the difference between "needs a
+/// smarter tier 1" and "genuinely clipboard-only".
+///
+/// Breadth-first and budgeted, because an accessibility tree can be large and
+/// this runs while the reader waits.
+func descendantWithSelection(
+    _ root: AXUIElement, budget: Int = 400
+) -> (role: String, tier1: String, tier2: String, depth: Int)? {
+    var queue: [(element: AXUIElement, depth: Int)] = [(root, 0)]
+    var visited = 0
+
+    while queue.isEmpty == false, visited < budget {
+        let (element, depth) = queue.removeFirst()
+        visited += 1
+
+        if depth > 0 {
+            let first = tier1(element)
+            let second = tier2(element)
+            if first.hasPrefix("OK") || second.hasPrefix("OK") {
+                return (
+                    role: string(element, kAXRoleAttribute as String) ?? "?",
+                    tier1: first, tier2: second, depth: depth
+                )
+            }
+        }
+
+        var children: AnyObject?
+        if AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &children)
+            == .success, let kids = children as? [AXUIElement]
+        {
+            queue.append(contentsOf: kids.map { ($0, depth + 1) })
+        }
+    }
+    return nil
+}
+
 print("=== 3. Accessibility grant, live ===")
 print("AXIsProcessTrusted: \(AXIsProcessTrusted() ? "YES" : "NO")")
 
@@ -244,12 +286,24 @@ for round in 1...rounds {
 
     var (element, route) = focusedElement(pid: app.pid)
     if element == nil {
-        // Second chance for Electron: arm the tree, then let it build.
+        // Arm Chromium's tree, then retry. Report the two separately: on
+        // 2026-09-20 an element appeared in Outlook and Teams *after* an
+        // arming that had returned attributeUnsupported, and the first version
+        // of this message credited the arming for it. It had not done
+        // anything -- the retry's extra wait had. Saying "appeared after
+        // arming" there is the same class of mistake as a test that passes for
+        // the wrong reason.
         let armed = enableManualAccessibility(pid: app.pid)
-        print("  nothing yet; AXManualAccessibility -> \(armed), waiting 3s for the tree")
+        print("  nothing yet; AXManualAccessibility -> \(armed); retrying in 3s")
         Thread.sleep(forTimeInterval: 3.0)
         (element, route) = focusedElement(pid: app.pid)
-        if element != nil { print("  -> appeared after arming (Electron, tier 1 or 2 may work)") }
+        if element != nil {
+            let cause =
+                armed == "success"
+                ? "arming worked, or the extra wait did - cannot tell which"
+                : "the extra wait, not the arming: that returned \(armed)"
+            print("  -> an element appeared. Cause: \(cause)")
+        }
     }
 
     guard let element else {
@@ -262,8 +316,23 @@ for round in 1...rounds {
 
     print("  route:  \(route)")
     print("  role:   \(string(element, kAXRoleAttribute as String) ?? "?")")
-    print("  tier 1: \(tier1(element))")
-    print("  tier 2: \(tier2(element))")
+    let first = tier1(element)
+    let second = tier2(element)
+    print("  tier 1: \(first)")
+    print("  tier 2: \(second)")
+
+    if first.hasPrefix("OK") == false, second.hasPrefix("OK") == false {
+        if let found = descendantWithSelection(element) {
+            print("  descendant search: FOUND at depth \(found.depth), role \(found.role)")
+            print("    tier 1: \(found.tier1)")
+            print("    tier 2: \(found.tier2)")
+            print("  -> the text is reachable; the focused element just is not it")
+        } else {
+            print("  descendant search: nothing selectable below the focused element")
+            print("  -> tier 3, clipboard-only")
+        }
+    }
+
     print("  ...switch back to the terminal for the next round")
     waitForReturnHome()
 }

@@ -358,33 +358,43 @@ and a policy refresh could in principle re-apply and revoke it, so #71
 
 Measured 2026-09-20 with `Tools/ax-probe.sh`, selections made by hand.
 
-| App | Role | Tier 1 | Tier 2 | Verdict |
+| App | Focused role | Tier 1 | Tier 2 | Verdict |
 |---|---|---|---|---|
-| TextEdit | `AXTextArea` | OK, 77 chars | `attributeUnsupported` | **Tier 1**, as expected |
-| VS Code | no focused element | `noValue` | `noValue` | **Tier 3** |
-| Microsoft Teams | no focused element | `noValue` | `noValue` | **Tier 3** |
-| Safari | `AXTextField` | EMPTY | `attributeUnsupported` | **inconclusive** -- see below |
+| TextEdit | `AXTextArea` | OK, 77 chars | unsupported | **Tier 1** |
+| Preview | `AXGroup` | OK, 31 chars | unsupported | **Tier 1** |
+| Safari (page body) | `AXWebArea` | `noValue` | **OK, 213 chars** | **Tier 2** |
+| Safari (address bar) | `AXTextField` | EMPTY | unsupported | chrome, not content |
+| Microsoft Outlook | `AXWindow` | unsupported | unsupported | container, see below |
+| Microsoft Teams | `AXWindow` | unsupported | unsupported | container, see below |
+| Microsoft Word | `AXSplitGroup` | unsupported | unsupported | container, see below |
+| Microsoft OneNote | `AXScrollArea` | unsupported | unsupported | container, see below |
+| VS Code | no element | `noValue` | `noValue` | **Tier 3** |
 
-**TextEdit confirms the whole chain works** on a managed machine with the grant
-in place: system-wide focused element, `kAXSelectedTextAttribute`, real text.
+**Tier 2 is confirmed.** Safari with a selection in the body of a page returns
+`noValue` for `kAXSelectedTextAttribute` and 213 characters through
+`AXSelectedTextMarkerRange` → `AXStringForTextMarkerRange`. This is the case
+that justifies the tier existing, and without it Safari would be clipboard-only.
+The earlier inconclusive reading was of the address bar.
 
-**VS Code and Teams returned `noValue` for the focused element itself**, on both
-the system-wide and the per-application route. Not an empty selection -- no
-element at all. This is a sharper result than the spike's, which found VS Code
-advertising every selection attribute and returning empty; here there was
-nothing to ask. Both are Electron, and the probe was not setting
-`AXManualAccessibility` first, so this is the failure mode item 4 predicts:
-without arming, an Electron app looks permanently unreachable. The probe now
-arms and retries, so the next run distinguishes "Electron needs arming" from
-"genuinely tier 3".
+**In Outlook, Teams, Word and OneNote the focused element is a container** --
+`AXWindow`, `AXSplitGroup`, `AXScrollArea` -- which supports neither selection
+attribute. That is not the same as the text being unreachable: it says the
+focused element is not the text. `kAXFocusedUIElementAttribute` is documented as
+the focused element, but these apps answer with an ancestor of it.
 
-**The Safari reading does not test WebKit.** The focused element was an
-`AXTextField`, which is browser chrome -- an address or search field -- not page
-content. Tier 2 exists for selections inside a `AXWebArea`, and this never
-reached one. Safari is still unmeasured; a re-test needs a selection in the body
-of a page.
+This is an open question, not a result, and it matters: four of the apps most
+likely to be used at work land here. The probe now walks the tree below the
+focused element looking for a descendant that does expose a selection, which
+separates "tier 1 needs to search downward" from "genuinely tier 3". **Until
+that is measured, do not assume either.**
 
-**Still unmeasured:** Outlook, Word, Chrome, and Safari page content.
+**`AXManualAccessibility` returned `attributeUnsupported` on Outlook and
+Teams**, so whatever they are, the Chromium arming path in item 4 does not
+apply to them. An element *did* appear on the retry after that failed arming,
+and the probe's first version credited the arming for it -- wrongly. The extra
+wait was the only thing that changed. The message now attributes it honestly,
+because a diagnostic that misattributes its own cause is worse than one that
+says nothing.
 
 ### A terminal cannot measure itself
 
@@ -402,7 +412,7 @@ never by asking what is supported.
 
 ### Not yet measured
 
-Outlook; Word; Chrome; Safari page content as opposed to browser chrome; the
-focus-taking panel variant (#52); and whether VS Code and Teams become readable
-once `AXManualAccessibility` is armed. All of it is one run of
-`Tools/ax-probe.sh`.
+Whether the text in Outlook, Teams, Word and OneNote is reachable below their
+focused container -- the single most valuable outstanding measurement, since it
+decides whether four everyday apps are tier 1 or tier 3. Also Chrome, and the
+focus-taking panel variant (#52).
