@@ -166,19 +166,20 @@ public enum TokenProtector {
         in text: String, at index: String.Index
     ) -> (index: Int, end: String.Index)? {
         guard text[index...].hasPrefix(prefix) else { return nil }
-        var cursor = text.index(index, offsetBy: prefix.count)
-        var digits = ""
-        // Nested guard rather than a comma-conjunction while-condition: see the
-        // note in StructureExtractor.markerLength, and muter.conf.yml.
-        while cursor < text.endIndex {
-            guard text[cursor].isNumber else { break }
-            digits.append(text[cursor])
-            cursor = text.index(after: cursor)
-        }
-        guard !digits.isEmpty, cursor < text.endIndex, text[cursor] == Character(closing),
-            let parsed = Int(digits)
-        else { return nil }
-        return (index: parsed, end: text.index(after: cursor))
+        let afterPrefix = text.index(index, offsetBy: prefix.count)
+
+        // prefix/first rather than an index walk guarded by bounds comparisons.
+        // Those comparisons carried no information -- `first` is nil at the end
+        // of the string, which is the same answer -- and muter mis-parses a
+        // relational operator sitting inside a multi-clause guard, which made
+        // this whole file intermittently unmeasurable. It built clean locally
+        // and failed on CI, which is the worst way to find out.
+        let digits = text[afterPrefix...].prefix { $0.isNumber }
+        guard let parsed = Int(digits) else { return nil }
+
+        let afterDigits = text.index(afterPrefix, offsetBy: digits.count)
+        guard text[afterDigits...].first == Character(closing) else { return nil }
+        return (index: parsed, end: text.index(after: afterDigits))
     }
 
     private static func ranges(in text: String, from start: Int, to end: Int)
