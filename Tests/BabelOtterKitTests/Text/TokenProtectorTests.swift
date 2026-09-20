@@ -141,6 +141,52 @@ struct TokenProtectorTests {
         #expect(restored.problems.isEmpty)
     }
 
+    // The term ordering is observable through `terms`, and it has to be: the
+    // sentinel index is a position in this array, so a different order is a
+    // different meaning for every sentinel already in flight.
+
+    @Test("terms are ordered longest first, with ties in configured order")
+    func termOrdering() {
+        let masked = TokenProtector.mask("nothing", terms: ["bb", "a", "cc", "dddd"])
+        #expect(masked.terms == ["dddd", "bb", "cc", "a"])
+    }
+
+    @Test("a duplicate term appears once")
+    func duplicatesCollapse() {
+        #expect(TokenProtector.mask("nothing", terms: ["ZHAW", "ZHAW"]).terms == ["ZHAW"])
+    }
+
+    @Test("an empty term is dropped even when it is not a duplicate")
+    func emptyTermDropped() {
+        #expect(TokenProtector.mask("nothing", terms: [""]).terms.isEmpty)
+        #expect(TokenProtector.mask("nothing", terms: ["", "ZHAW"]).terms == ["ZHAW"])
+        #expect(TokenProtector.mask("nothing", terms: ["  ", "ZHAW"]).terms == ["ZHAW"])
+    }
+
+    @Test("a sentinel index exactly at the term count is debris, not a term")
+    func sentinelIndexAtBoundary() {
+        let masked = TokenProtector.mask("ZHAW", terms: ["ZHAW"])
+        let restored = TokenProtector.restore("⟦DNT1⟧", from: masked)
+        #expect(restored.text == "⟦DNT1⟧")
+        #expect(restored.problems.contains(.sentinelDebris("⟦DNT1⟧")))
+        #expect(restored.protectedRanges.isEmpty)
+    }
+
+    @Test("sentinel index zero is a term, not debris")
+    func sentinelIndexZeroIsATerm() {
+        let masked = TokenProtector.mask("ZHAW", terms: ["ZHAW"])
+        let restored = TokenProtector.restore("⟦DNT0⟧", from: masked)
+        #expect(restored.text == "ZHAW")
+        #expect(restored.problems.isEmpty)
+    }
+
+    @Test("a sentinel with no digits is left alone rather than parsed as index zero")
+    func sentinelWithoutDigits() {
+        let masked = TokenProtector.mask("ZHAW", terms: ["ZHAW"])
+        let restored = TokenProtector.restore("⟦DNT⟧", from: masked)
+        #expect(restored.text == "⟦DNT⟧")
+    }
+
     @Test("empty and whitespace-only terms are ignored rather than matching everywhere")
     func emptyTermsIgnored() {
         let masked = TokenProtector.mask("hello", terms: ["", "   "])

@@ -37,6 +37,17 @@ struct TargetLanguageResolverTests {
                 == .resolved(source: LanguageCode("de-ch"), target: LanguageCode("en")))
     }
 
+    @Test("the target is the other enabled language, never the source itself")
+    func targetIsNeverTheSource() {
+        for code in ["en", "de"] {
+            guard case .resolved(let source, let target) = standard.resolve(confident(code)) else {
+                Issue.record("\(code) should resolve")
+                return
+            }
+            #expect(source != target, "\(code) resolved to itself")
+        }
+    }
+
     @Test("a detected language that is not enabled is reported, not mistranslated")
     func notEnabled() {
         #expect(standard.resolve(confident("fr")) == .notEnabled(LanguageCode("fr")))

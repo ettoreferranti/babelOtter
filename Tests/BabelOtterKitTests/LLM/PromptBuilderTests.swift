@@ -37,6 +37,18 @@ struct PromptBuilderTests {
         #expect(prompt.contains("Swiss Standard German"))
     }
 
+    @Test("translate names source and target; other actions name one language")
+    func languageLineDiffersByAction() {
+        let translate = builder.build(request(action: .translate))
+        #expect(translate.contains("Source language: English."))
+        #expect(translate.contains("Target language: Swiss Standard German."))
+
+        let correct = builder.build(request(action: .correct))
+        #expect(correct.contains("Language: English."))
+        #expect(!correct.contains("Source language:"))
+        #expect(!correct.contains("Target language:"))
+    }
+
     @Test("the required output schema appears")
     func statesTheSchema() {
         #expect(builder.build(request()).contains("blocks"))

@@ -68,6 +68,27 @@ struct LanguageDetectorTests {
                 == .confident(LanguageCode("de"), confidence: 0.95))
     }
 
+    /// A dictionary has no order, so on equal confidences `max(by:)` returns
+    /// whichever the hash order happened to put last — a different answer
+    /// between runs, for the one input where it matters most.
+    @Test("a tie breaks deterministically by language code, not by hash order")
+    func tieBreaksDeterministically() {
+        let recognizer = StubRecognizer([LanguageCode("en"): 0.8, LanguageCode("de"): 0.8])
+        #expect(
+            detector(recognizer).detect("a selection long enough to try")
+                == .confident(LanguageCode("de"), confidence: 0.8))
+    }
+
+    @Test("the tie-break is stable across repeated detections")
+    func tieBreakIsStable() {
+        let recognizer = StubRecognizer([
+            LanguageCode("en"): 0.8, LanguageCode("de"): 0.8, LanguageCode("fr"): 0.8,
+        ])
+        let subject = detector(recognizer)
+        let results = (0..<20).map { _ in subject.detect("a selection long enough to try") }
+        #expect(Set(results.map(\.languageCode?.rawValue)).count == 1)
+    }
+
     @Test("text shorter than the minimum is ambiguous without guessing")
     func tooShort() {
         let result = detector(StubRecognizer([LanguageCode("en"): 0.99])).detect("hallo")

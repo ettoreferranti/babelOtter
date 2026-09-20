@@ -75,7 +75,17 @@ public struct LanguageDetector: Sendable {
         }
 
         let hypotheses = recognizer.hypotheses(for: text)
-        guard let best = hypotheses.max(by: { $0.value < $1.value }) else {
+        // Sorted with an explicit tie-break rather than `max(by:)`. A dictionary
+        // has no order, so on equal confidences `max` returns whichever the hash
+        // order happened to put last — a different answer between runs, for the
+        // one input where the answer matters most. Ties break on the language
+        // code so the same selection always resolves the same way.
+        guard
+            let best = hypotheses.sorted(by: { left, right in
+                if left.value != right.value { return left.value > right.value }
+                return left.key.rawValue < right.key.rawValue
+            }).first
+        else {
             return .ambiguous(.noHypothesis)
         }
 

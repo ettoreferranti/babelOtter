@@ -131,6 +131,49 @@ struct StructureExtractorTests {
         #expect(extracted.skeleton.blockCount == 3)
     }
 
+    // The marker scanner's boundary conditions. Each of these is a line where
+    // the scanner runs off the end of the characters it is inspecting, and each
+    // one survived mutation testing until it had a case of its own.
+
+    @Test("a lone bullet character with nothing after it is prose, not a marker")
+    func loneBulletIsProse() {
+        #expect(StructureExtractor.extract("-").blocks == ["-"])
+        #expect(StructureExtractor.extract("*").blocks == ["*"])
+    }
+
+    @Test("digits running to the end of the line are prose")
+    func digitsToEndOfLine() {
+        #expect(StructureExtractor.extract("12").blocks == ["12"])
+    }
+
+    @Test("a digit followed by something other than . or ) is prose")
+    func digitThenLetterIsProse() {
+        #expect(StructureExtractor.extract("1x hello").blocks == ["1x hello"])
+    }
+
+    @Test("a numbered marker with no space after its punctuation is prose")
+    func numberedWithoutTrailingSpace() {
+        #expect(StructureExtractor.extract("1.").blocks == ["1."])
+        #expect(StructureExtractor.extract("1)").blocks == ["1)"])
+        #expect(StructureExtractor.extract("1.x").blocks == ["1.x"])
+    }
+
+    @Test("a numbered marker followed by ) and a space is a marker")
+    func numberedWithParenthesis() {
+        #expect(StructureExtractor.extract("1) one").blocks == ["one"])
+    }
+
+    @Test("a lettered marker with nothing after it is prose")
+    func letteredWithoutSpace() {
+        #expect(StructureExtractor.extract("a)").blocks == ["a)"])
+        #expect(StructureExtractor.extract("a").blocks == ["a"])
+    }
+
+    @Test("a letter followed by something other than ) is prose")
+    func letterThenOther() {
+        #expect(StructureExtractor.extract("a. alpha").blocks == ["a. alpha"])
+    }
+
     @Test("text with no prose at all yields no blocks and still round-trips")
     func noProse() throws {
         let extracted = StructureExtractor.extract("\n\n")

@@ -184,7 +184,10 @@ public enum StructureExtractor {
         guard let first = characters.first else { return 0 }
 
         if bulletMarkers.contains(first) {
-            return characters.count > 1 && characters[1].isWhitespace ? 1 : 0
+            // if/else rather than a ternary, for the reason given in
+            // PromptBuilder.languages.
+            if characters.count > 1 && characters[1].isWhitespace { return 1 }
+            return 0
         }
 
         if first.isNumber {

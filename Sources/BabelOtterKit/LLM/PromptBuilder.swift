@@ -92,10 +92,19 @@ public struct PromptBuilder: Sendable {
         }
     }
 
+    /// Written as a guard rather than a ternary: muter's ternary operator
+    /// mis-parses a condition ending in an enum member and emits
+    /// `... == .translate?`, which does not compile. Mutant schemata put every
+    /// mutant for a file in one binary, so that single bad mutant makes the
+    /// whole file unmeasurable. Same class of bug as the comma-conjunction
+    /// `while` noted in muter.conf.yml.
     private func languages(_ request: PromptRequest) -> String {
-        request.action == .translate
-            ? "Source language: \(request.source.displayName). Target language: \(request.target.displayName)."
-            : "Language: \(request.source.displayName)."
+        guard request.action == .translate else {
+            return "Language: \(request.source.displayName)."
+        }
+        return
+            "Source language: \(request.source.displayName). "
+            + "Target language: \(request.target.displayName)."
     }
 
     /// Derived from the target's locale rules rather than from its code, so a

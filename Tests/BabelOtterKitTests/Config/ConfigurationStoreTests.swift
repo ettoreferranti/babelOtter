@@ -120,6 +120,27 @@ struct ConfigurationStoreTests {
         }
     }
 
+    @Test("language(for:) finds a configured language and refuses an unknown one")
+    func languageLookup() {
+        #expect(Configuration.default.language(for: LanguageCode("de-ch")) == .swissGerman)
+        #expect(Configuration.default.language(for: LanguageCode("en")) == .english)
+        #expect(Configuration.default.language(for: LanguageCode("fr")) == nil)
+    }
+
+    @Test("profile(id:) finds a configured profile and refuses an unknown one")
+    func profileLookup() {
+        #expect(Configuration.default.profile(id: "students") == .students)
+        #expect(Configuration.default.profile(id: "administration") == .administration)
+        #expect(Configuration.default.profile(id: "nobody") == nil)
+    }
+
+    @Test("enabledLanguages reflects the enabled flag rather than the whole list")
+    func enabledLanguagesFilters() {
+        var configuration = Configuration.default
+        configuration.languages[1].enabled = false
+        #expect(configuration.enabledLanguages.map(\.code) == [LanguageCode("en")])
+    }
+
     @Test("the application-support factory refuses a synced location")
     func refusesSyncedLocation() throws {
         let home = URL(fileURLWithPath: "/Users/someone")

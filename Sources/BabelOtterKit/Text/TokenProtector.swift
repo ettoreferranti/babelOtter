@@ -121,9 +121,12 @@ public enum TokenProtector {
         }
         return unique.enumerated()
             .sorted { left, right in
-                left.element.count != right.element.count
-                    ? left.element.count > right.element.count
-                    : left.offset < right.offset
+                // if/else rather than a ternary, for the reason given in
+                // PromptBuilder.languages.
+                if left.element.count != right.element.count {
+                    return left.element.count > right.element.count
+                }
+                return left.offset < right.offset
             }
             .map(\.element)
     }
