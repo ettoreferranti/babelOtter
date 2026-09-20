@@ -184,11 +184,30 @@ for round in 1...rounds {
     let before = NSPasteboard.general.changeCount
 
     sendCommand(keyC)
-    let moved = waitForPasteboardChange(from: before)
+    var moved = waitForPasteboardChange(from: before)
+
+    // One retry, with a longer window, when the first Command-C produces
+    // nothing. Three of seven captures across the first two runs came back
+    // empty -- including TextEdit, which should be the easy case -- and the
+    // two candidate causes need telling apart: nothing was selected, or the
+    // pasteboard had not caught up inside two seconds. A retry that succeeds
+    // means timing, and #32 needs to retry too. A retry that also fails means
+    // there was no selection, which is #35's case and not an error at all.
+    if !moved {
+        print("  capture: nothing after 2s; retrying once with a longer window")
+        Thread.sleep(forTimeInterval: 0.5)
+        sendCommand(keyC)
+        moved = waitForPasteboardChange(from: before, timeout: 4.0)
+        print(
+            moved
+                ? "  capture: the RETRY worked -> timing, not an empty selection"
+                : "  capture: retry also produced nothing -> most likely no selection")
+    }
+
     let captured = NSPasteboard.general.string(forType: .string)
 
     if !moved {
-        print("  capture: changeCount did not move -> Command-C PRODUCED NOTHING")
+        print("  capture: FAILED - changeCount never moved")
     } else if let text = captured, !text.isEmpty {
         print("  capture: OK - \(text.count) chars")
     } else {

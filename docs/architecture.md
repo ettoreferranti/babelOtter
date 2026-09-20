@@ -435,40 +435,47 @@ result back.** AX write is confirmed working only in native AppKit text.
 `AXTextArea` and is the one work-critical surface that might accept an AX
 write; Notes; Pages. One round each, whenever convenient.
 
-### The clipboard conduit works
+### The clipboard conduit works, including where Accessibility cannot
 
 Measured 2026-09-20 with `Tools/clipboard-probe.sh --paste`, private machine.
 
-| App | Command-C capture | Pasteboard restore |
-|---|---|---|
-| Safari | OK, 129 chars | OK |
-| Safari | OK, 79 chars | OK |
-| Mail | **changeCount did not move** | OK |
-| Mail | OK, 47 chars | OK |
+| App | Command-C capture | Command-V | Restore |
+|---|---|---|---|
+| **VS Code** | **OK, 11 chars** | **replaced the text** | OK |
+| Safari | OK, 129 chars | sent | OK |
+| Safari | OK, 79 chars | sent | OK |
+| Mail | OK, 47 chars | sent | OK |
+| Mail | nothing captured | correctly skipped | OK |
+| NetNewsWire | nothing captured | correctly skipped | OK |
+| TextEdit | nothing captured | correctly skipped | OK |
 
-**Synthetic Command-C works, and full-fidelity save/restore works.** Every
-round returned the previous clipboard contents intact, including the round
-where the capture itself failed. That is the part the product depends on most,
-because it runs on every action whether or not anything else succeeds.
+**The VS Code row is the one that matters.** Accessibility returns no focused
+element there at all, and the clipboard captured and replaced text cleanly. The
+conduit works precisely where the alternative does not, which is what the whole
+architecture now rests on.
 
-**One capture failed with no error.** Mail returned an unmoved `changeCount`
-inside a two-second window, and the next Mail round succeeded. So the
-clipboard path is not reliable-by-construction: a capture can simply produce
-nothing, and `changeCount` is the only signal that it did. Capture must treat
-"the count did not move" as a failure and say so, never fall through to
-whatever the pasteboard already held.
+**Full-fidelity save/restore worked on all seven rounds**, including every
+failed capture. That is the property the product leans on hardest, since it
+runs on every action whether or not anything else succeeds.
 
-That is not hypothetical. The probe's first version read the pasteboard
-regardless of whether the count moved, so on that failed round it pasted 36
-characters of unrelated older clipboard content into the user's message. A
-real implementation making the same mistake would silently corrupt a document
-with text from a previous copy.
+**Three of seven captures produced nothing**, with no error and no distinction
+between causes. TextEdit failing is the suspicious one, since it is the easiest
+surface there is. Two candidates, not yet separated: nothing was selected at
+the moment of capture, or the pasteboard had not caught up inside the
+two-second window. The probe now retries once with a longer window, which tells
+them apart -- a retry that succeeds means timing and #32 must retry too; a
+retry that also fails means there was no selection, which is #35's case and not
+an error.
 
-**Still unmeasured: the apps that actually need this.** Teams, Word, OneNote
-and VS Code are the surfaces Accessibility cannot reach, and none of them were
-covered -- the rounds hit Safari and Mail, which Accessibility already reads.
-The conduit is proven to work; it is not yet proven to work *where it is the
-only option*.
+**Capture must treat an unmoved `changeCount` as failure.** It is the only
+signal available, and the consequence of ignoring it is not abstract: the
+probe's first version read the pasteboard regardless and pasted 36 characters
+of unrelated older clipboard content into a live Mail message. A real
+implementation with that bug corrupts a document with text from a previous
+copy.
+
+**Still unmeasured:** Teams, Word and OneNote, which are work-machine only.
+VS Code standing in for Electron is reasonable evidence but not proof for them.
 
 ### Handoff state is not readable, and the clipboard conduit is untested
 
