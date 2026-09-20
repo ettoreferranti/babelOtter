@@ -477,6 +477,35 @@ copy.
 **Still unmeasured:** Teams, Word and OneNote, which are work-machine only.
 VS Code standing in for Electron is reasonable evidence but not proof for them.
 
+### Concealment does not stop Universal Clipboard
+
+Measured 2026-09-20, across two Macs on one account. A pasteboard item marked
+`org.nspasteboard.ConcealedType` **and** `com.apple.is-sensitive` was copied on
+one machine and pasted verbatim on the other.
+
+`PRIVACY.md` had carried that as the one outstanding mitigation, and it is
+gone. The markers stay, because clipboard managers honour them and keeping
+user text out of a clipboard history app has value, but they are not a defence
+against Handoff.
+
+**The advertise blob is not a usable local signal.** `useractivityd` stages the
+shared pasteboard at the path in `kLocalPasteboardBlobName`. Its contents are
+TCC-protected, but size and mtime are readable, and the first concealed marker
+-- 34 characters -- produced a 34-byte blob, which looked like a way to detect
+exposure locally without a second machine.
+
+It is not. A 217-byte marker held for eight seconds never changed the blob at
+all, while the 34-byte blob's timestamp matched the moment the *other* Mac
+pasted. So the blob is written when a peer pulls, not when the clipboard
+changes: its size is evidence of a completed transfer, not of an offer. Worth
+recording because the inference was tempting and wrong, and because it hints
+the transfer is pull-based -- which, if true, would make a short-lived
+clipboard item much less exposed than a long-lived one.
+
+That is the open question, and only a second Mac can answer it:
+`Tools/clipboard-probe.sh --flash 250` places a marker, restores after 250ms,
+and asks what the other machine sees.
+
 ### Handoff state is not readable, and the clipboard conduit is untested
 
 Two measured negatives, 2026-09-20, both of which constrain what can be built.

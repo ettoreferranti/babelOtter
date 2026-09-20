@@ -127,10 +127,16 @@ risk is live; it has to assume it always might be.
 - Restores your previous clipboard contents around every operation, including
   on the failure paths.
 - Marks its pasteboard items `org.nspasteboard.ConcealedType` and
-  `com.apple.is-sensitive`. These are community conventions respected by
-  clipboard managers. **Whether they suppress Universal Clipboard sync is
-  unverified**, and is being measured — if they do, this section gets much
-  shorter.
+  `com.apple.is-sensitive`. **Measured 2026-09-20: these do not stop Universal
+  Clipboard.** A concealed item copied on one Mac pasted verbatim on another,
+  signed in to the same account. The markers are still set, because clipboard
+  managers do respect them and keeping your text out of a clipboard history
+  app is worth something — but they are not a defence against Handoff, and
+  this document previously recorded that as unverified rather than as known.
+
+There is no other mitigation available. The only reliable way to keep the
+clipboard path off your other devices is to turn Handoff off:
+`System Settings → General → AirDrop & Handoff → Handoff: off`.
 
 **If this matters to you today**, disable Handoff:
 `System Settings → General → AirDrop & Handoff → Handoff: off`.

@@ -21,12 +21,36 @@ import Foundation
 
 setvbuf(stdout, nil, _IONBF, 0)
 
-let arguments = Array(CommandLine.arguments.dropFirst())
-let pasteMode = arguments.contains("--paste")
-let concealMode = arguments.contains("--conceal")
-// max(1,) because `for round in 1...0` is a fatal range error, and "run zero
-// rounds" is a request a diagnostic should decline rather than crash on.
-let rounds = max(1, Int(arguments.first { Int($0) != nil } ?? "4") ?? 4)
+// Parsed by walking, not by scanning for the first number. `--flash 250` has
+// a numeric argument of its own, and a scan would have read 250 as the round
+// count and then waited for two hundred and fifty app switches.
+var pasteMode = false
+var concealMode = false
+var flashMode = false
+var flashMilliseconds = 250
+var explicitRounds: Int?
+
+var remaining = Array(CommandLine.arguments.dropFirst())[...]
+while let argument = remaining.first {
+    remaining = remaining.dropFirst()
+    switch argument {
+    case "--paste": pasteMode = true
+    case "--conceal": concealMode = true
+    case "--flash":
+        flashMode = true
+        if let next = remaining.first, let value = Int(next) {
+            flashMilliseconds = value
+            remaining = remaining.dropFirst()
+        }
+    default:
+        if let value = Int(argument) { explicitRounds = value }
+    }
+}
+
+// --flash and --conceal are standalone measurements; they do not need capture
+// rounds, and requiring an app switch first only gets in the way. `1...0` is a
+// fatal range error, so zero rounds is expressed by skipping the loop.
+let rounds = explicitRounds ?? ((flashMode || concealMode) ? 0 : 4)
 
 let concealedType = NSPasteboard.PasteboardType("org.nspasteboard.ConcealedType")
 let sensitiveType = NSPasteboard.PasteboardType("com.apple.is-sensitive")
@@ -141,6 +165,52 @@ func sendCommand(_ key: CGKeyCode) {
     up.post(tap: .cghidEventTap)
 }
 
+// MARK: - Short-lived clipboard exposure
+
+/// Places a marker, restores after `milliseconds`, and stops so the other Mac
+/// can be checked.
+///
+/// The question: is a clipboard item that exists only briefly still exposed to
+/// Universal Clipboard? It decides whether restoring quickly is a real
+/// mitigation or theatre, and PRIVACY.md is materially different either way.
+///
+/// An earlier version tried to answer this locally by watching the size of
+/// useractivityd's advertise blob. That does not work, and the failure is
+/// worth recording: the blob did not change for a 217-byte marker held for
+/// eight seconds, while a 34-byte marker left in place did produce a 34-byte
+/// blob -- timestamped to the moment the *other* Mac pasted. So the blob is
+/// written when a peer pulls, not when the clipboard changes, and its size is
+/// evidence of a completed transfer rather than of an offer. Only the second
+/// Mac can answer this.
+func runFlash(milliseconds: Int) {
+    let marker = "babelotter-flash-\(Int(Date().timeIntervalSince1970))"
+    let saved = savePasteboard()
+
+    let pasteboard = NSPasteboard.general
+    pasteboard.clearContents()
+    let item = NSPasteboardItem()
+    item.setString(marker, forType: .string)
+    item.setString("", forType: concealedType)
+    item.setString("", forType: sensitiveType)
+    pasteboard.writeObjects([item])
+
+    print("  placed: \(marker)")
+    print("  holding it for \(milliseconds)ms, then restoring your clipboard")
+    Thread.sleep(forTimeInterval: Double(milliseconds) / 1000.0)
+    restorePasteboard(saved)
+
+    let restored = NSPasteboard.general.string(forType: .string)
+    print("  restored: \(restored?.prefix(40) ?? "<empty>")")
+    print("")
+    print("  Now press Command-V on your OTHER Mac and report what appears:")
+    print("")
+    print("    the marker above        -> a brief exposure still transfers.")
+    print("                               Restoring quickly is NOT a mitigation.")
+    print("    your restored clipboard -> the transfer happens when the peer")
+    print("                               pastes, so a short window is a real")
+    print("                               mitigation and PRIVACY.md softens.")
+}
+
 // MARK: - The rounds
 
 print("=== clipboard conduit probe ===")
@@ -170,7 +240,7 @@ print("")
 print("Switch to an app, SELECT SOME TEXT, and wait. Then come back here.")
 print("Worth covering: Teams, Word, VS Code, Safari - the ones Accessibility cannot reach.")
 
-for round in 1...rounds {
+for round in stride(from: 1, through: rounds, by: 1) {
     print("")
     print("--- round \(round)/\(rounds): switch to an app and select text ---")
     guard let app = waitForForeignApp() else {
@@ -275,6 +345,12 @@ if concealMode {
     print("  - nothing appears     -> concealment suppresses the sync")
     print("")
     print("Your previous clipboard has NOT been restored, so the test item survives.")
+}
+
+if flashMode {
+    print("")
+    print("=== short-lived clipboard test ===")
+    runFlash(milliseconds: flashMilliseconds)
 }
 
 print("")
