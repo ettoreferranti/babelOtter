@@ -1,0 +1,30 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>babelOtter write-back scratch</title>
+<body style="font:16px/1.5 system-ui;max-width:42rem;margin:2rem auto;padding:0 1rem">
+
+<h1>Write-back scratch</h1>
+<p>Scratch targets for <code>Tools/ax-probe.sh --write</code>. Nothing here
+matters, so it is safe to have its text replaced.</p>
+
+<h2>1. contenteditable</h2>
+<p>Expect <code>AXWebArea</code>, tier 2 only. This is the case spike #30 left
+untested: tier 2 read is proven, tier 2 write is not.</p>
+<div contenteditable
+     style="border:1px solid #999;border-radius:6px;padding:1rem;min-height:4rem">
+Click into this box first so focus is genuinely here, then select a few of
+these mixed-case words and let the probe replace them.
+</div>
+
+<h2>2. textarea</h2>
+<p>Expect <code>AXTextArea</code> and tier 1 — a different code path from the
+box above, which is why it is worth measuring separately.</p>
+<textarea rows="4" style="width:100%;font:inherit;padding:.75rem">
+A plain textarea. Select some of this mixed-case text for the probe to replace.
+</textarea>
+
+<h2>3. read-only paragraph</h2>
+<p>A control. Selecting here should read on tier 2 and refuse to write, the
+same way Mail's received-message view does.</p>
+
+</body>

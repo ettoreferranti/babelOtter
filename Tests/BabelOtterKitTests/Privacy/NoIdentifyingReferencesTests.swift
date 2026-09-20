@@ -41,7 +41,7 @@ struct NoIdentifyingReferencesTests {
 
     /// Extensions worth scanning. Anything human-readable that ships.
     private static let scannedExtensions: Set<String> = [
-        "swift", "md", "yml", "yaml", "txt", "json", "sh", "resolved", "",
+        "swift", "md", "yml", "yaml", "txt", "json", "sh", "html", "resolved", "",
     ]
 
     private static let skippedDirectories: Set<String> = [
