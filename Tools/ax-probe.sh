@@ -8,12 +8,21 @@
 #
 # Reads only. Writes a scratch build to a temp dir and one transcript in ~.
 #
-# Usage:  Tools/ax-probe.sh [rounds]     (default 6)
+# Usage:  Tools/ax-probe.sh [--write] [rounds]     (rounds default 6)
+#
+# --write additionally REPLACES each selection with an uppercase version of
+# itself and checks whether anything actually changed. Use a scratch document.
+# Section 7 item 2: the write API returns success for writes that do nothing,
+# so the return code is reported and then ignored in favour of a read-back.
 
 set -uo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-ROUNDS="${1:-6}"
+# Passed straight through to the probe binary. Given a default because macOS
+# ships bash 3.2, where expanding an empty array under `set -u` is an unbound
+# variable error rather than nothing -- which broke the no-argument case, the
+# one everybody runs first.
+PROBE_ARGS=("${@:-6}")
 BUILD="$(mktemp -d /tmp/babelotter-probe.XXXXXX)"
 LOG="$HOME/babelotter-ax-probe-$(date +%Y%m%d-%H%M%S).txt"
 trap 'rm -rf "$BUILD"' EXIT
@@ -66,7 +75,7 @@ run_checks() {
         return 1
     fi
 
-    "$BUILD/ax-probe" "$ROUNDS"
+    "$BUILD/ax-probe" "${PROBE_ARGS[@]}"
 }
 
 run_checks 2>&1 | tee "$LOG"

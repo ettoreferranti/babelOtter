@@ -23,7 +23,9 @@ import Foundation
 // half had never started.
 setvbuf(stdout, nil, _IONBF, 0)
 
-let rounds = Int(CommandLine.arguments.dropFirst().first ?? "6") ?? 6
+let arguments = Array(CommandLine.arguments.dropFirst())
+let writeMode = arguments.contains("--write")
+let rounds = Int(arguments.first { Int($0) != nil } ?? "6") ?? 6
 
 /// Which application currently owns the frontmost window.
 ///
@@ -246,6 +248,67 @@ func descendantWithSelection(
     return nil
 }
 
+/// Writes the selection back uppercased, then checks whether anything moved.
+///
+/// Section 7 item 2: `AXUIElementSetAttributeValue` returns `.success` for
+/// writes that do nothing. Spike #30 measured that directly on Mail's
+/// read-only HTML view. So the return code is reported, and then ignored in
+/// favour of comparing the element's value before and after.
+///
+/// What #30 did *not* establish is whether the same holds for *editable* web
+/// content -- a compose field rather than a received message. Tier 2 read is
+/// proven; tier 2 write is not.
+func attemptWrite(_ element: AXUIElement) -> [String] {
+    var lines: [String] = []
+
+    var selected: AnyObject?
+    let readError = AXUIElementCopyAttributeValue(
+        element, kAXSelectedTextAttribute as CFString, &selected)
+    guard readError == .success, let original = selected as? String, !original.isEmpty else {
+        return ["  write: skipped - nothing readable to write back (\(name(readError)))"]
+    }
+
+    let replacement = original.uppercased()
+    if replacement == original {
+        return ["  write: skipped - selection is already uppercase, pick mixed-case text"]
+    }
+
+    // The whole value, so a no-op is detectable even if the selection moves.
+    let valueBefore = string(element, kAXValueAttribute as String)
+
+    let writeError = AXUIElementSetAttributeValue(
+        element, kAXSelectedTextAttribute as CFString, replacement as CFString)
+    lines.append("  write: API returned \(name(writeError))")
+
+    Thread.sleep(forTimeInterval: 0.6)
+    let valueAfter = string(element, kAXValueAttribute as String)
+
+    if let before = valueBefore, let after = valueAfter {
+        if before == after {
+            lines.append("  verify: value UNCHANGED -> SILENT NO-OP, whatever the API said")
+        } else if after.contains(replacement) {
+            lines.append("  verify: value changed and contains the replacement -> WRITE OK")
+        } else {
+            lines.append("  verify: value changed but does not contain the replacement -> SUSPECT")
+        }
+        return lines
+    }
+
+    // No AXValue to compare: fall back to re-reading the selection.
+    var after: AnyObject?
+    let backError = AXUIElementCopyAttributeValue(
+        element, kAXSelectedTextAttribute as CFString, &after)
+    guard backError == .success, let text = after as? String else {
+        lines.append("  verify: could not read back (\(name(backError))) -> UNVERIFIED")
+        return lines
+    }
+    lines.append(
+        text == replacement
+            ? "  verify: selection reads back as the replacement -> WRITE OK"
+            : "  verify: selection still reads \"\(text.prefix(40))\" -> SILENT NO-OP")
+    return lines
+}
+
 print("=== 3. Accessibility grant, live ===")
 print("AXIsProcessTrusted: \(AXIsProcessTrusted() ? "YES" : "NO")")
 
@@ -269,6 +332,13 @@ print("  1. Switch to an app and SELECT SOME TEXT.")
 print("  2. It reads ~2s after the switch settles, then asks you to come back.")
 print("  3. Switch back here, and it sets up the next round.")
 print("")
+if writeMode {
+    print("")
+    print("*** WRITE MODE. This REPLACES the text you select with an uppercase")
+    print("*** version of itself. Use a scratch document, not anything you care")
+    print("*** about. Press Return to continue, or Ctrl-C to stop.")
+    _ = readLine()
+}
 print("Worth covering: TextEdit, Safari, Outlook, Teams, Word, VS Code.")
 print("A terminal cannot be measured this way - it is the one app that is never")
 print("in front when a reading is taken.")
@@ -331,6 +401,10 @@ for round in 1...rounds {
             print("  descendant search: nothing selectable below the focused element")
             print("  -> tier 3, clipboard-only")
         }
+    }
+
+    if writeMode {
+        for line in attemptWrite(element) { print(line) }
     }
 
     print("  ...switch back to the terminal for the next round")
