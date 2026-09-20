@@ -9,6 +9,9 @@ on:
   push:
     branches:
       - main
+      # This milestone's own branch, so its pre-merge runs keep working before
+      # a pull request exists for it. REMOVE THIS LINE when the branch merges.
+      - feat/m1a-shell
 
 # BABELOTTER_INTEGRATION is deliberately unset: integration tests are local-only.
 jobs:
@@ -142,6 +145,7 @@ jobs:
           # are named high-value targets and are worth keeping fully measured.
           PASS2="Sources/BabelOtterKit/Privacy/StorageLocator.swift"
           PASS1="Sources/BabelOtterKit/BabelOtterKit.swift
+          Sources/BabelOtterKit/LLM/NDJSONFramer.swift
           Sources/BabelOtterKit/Config/AudienceProfile.swift
           Sources/BabelOtterKit/Config/Configuration.swift
           Sources/BabelOtterKit/Config/ConfigurationStore.swift
