@@ -156,6 +156,7 @@ jobs:
           Sources/BabelOtterKit/Capture/SelectionSnapshot.swift
           Sources/BabelOtterKit/Capture/ClipboardPolicy.swift
           Sources/BabelOtterKit/Capture/ReplacementOutcome.swift
+          Sources/BabelOtterKit/Capture/CapturePolicy.swift
           Sources/BabelOtterKit/Config/AudienceProfile.swift
           Sources/BabelOtterKit/Config/Configuration.swift
           Sources/BabelOtterKit/Config/ConfigurationStore.swift
