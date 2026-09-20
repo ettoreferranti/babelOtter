@@ -435,6 +435,32 @@ result back.** AX write is confirmed working only in native AppKit text.
 `AXTextArea` and is the one work-critical surface that might accept an AX
 write; Notes; Pages. One round each, whenever convenient.
 
+### Handoff state is not readable, and the clipboard conduit is untested
+
+Two measured negatives, 2026-09-20, both of which constrain what can be built.
+
+**babelOtter cannot tell whether Universal Clipboard is on.**
+`com.apple.coreservices.useractivityd` holds no `ActivityAdvertisingAllowed` or
+`ActivityReceivingAllowed` key, and the per-host domain does not exist at all.
+So the app cannot check whether the risk the clipboard path carries is live for
+this user, and any design that depends on warning them only when it matters is
+out. The only observable hint is that the domain names a
+`kRemotePasteboardBlobName`, which suggests the feature is configured but is
+inference, not a state read.
+
+**The clipboard tier has never actually been exercised.** Spike #30 named it as
+tier 3 and reached it by elimination -- "whatever neither reaches" -- but never
+simulated a Command-C or a Command-V, and its table records no clipboard row.
+Every tier-3 verdict in this document therefore means "Accessibility cannot do
+it", not "the clipboard can". Those are different claims, and the second one is
+still an assumption.
+
+That matters because the assumptions this document has made about the
+Accessibility layer have been wrong three times: two tiers rather than three,
+capability by attribute rather than by attempt, and writes that report success
+while doing nothing. The clipboard conduit deserves the same treatment before
+anything is designed on top of it.
+
 ### What this means for the clipboard
 
 The spike said the clipboard is common rather than rare. These measurements say
