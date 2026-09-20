@@ -2,13 +2,24 @@
 
 babelOtter is built around one inviolable rule. This document states that
 rule, the threat model behind it, how the rule is *enforced* rather than
-merely promised, and — honestly — where v1 knowingly falls short.
+merely promised, and — honestly — the one place where macOS can undo it.
 
 ---
 
 ## NFR-P1 — The inviolable rule
 
-> **No user content ever leaves this machine.**
+> **babelOtter never transmits your content. The clipboard path can expose it
+> to Universal Clipboard if Handoff is enabled.**
+
+The first sentence is the rule, and it is absolute: babelOtter opens exactly
+one socket, to loopback, and an architecture test fails the build if a second
+call site appears.
+
+The second sentence is not a loophole in that rule — it is macOS doing
+something babelOtter neither asks for nor can observe. It is stated up front
+rather than buried, because the alternative wording, "no user content ever
+leaves this machine", would have been a promise this program is not in a
+position to keep on its own.
 
 "User content" means all of it: source text, translations, corrections,
 explanations, glossary entries, do-not-translate terms, audience profiles,
@@ -79,54 +90,47 @@ Nothing babelOtter writes ever lands inside the repository. See `.gitignore`.
 
 Stated plainly rather than buried.
 
-### ⚠️ OPEN RISK — Clipboard fallback and Universal Clipboard (closing in M1a, #77)
+### The clipboard is a conduit, by decision
 
-When the Accessibility API cannot read or write the selection in a given app,
-babelOtter falls back to simulating ⌘C / ⌘V through the general pasteboard.
-Your previous clipboard contents are saved and restored around the operation.
+**Decided 2026-09-20.** Earlier versions of this document carried the clipboard
+as a *risk accepted for v1*, on the assumption it was a fallback for occasional
+apps. Measurement removed that assumption twice over.
 
-**This path is not rare. On measurement, it is the majority path.** An earlier
-version of this document called it a fallback for "some Electron apps and web
-content", which implied an edge case. Two rounds of measurement against real
-applications, on 2026-09-19 and 2026-09-20, say otherwise.
+Reading: the Accessibility API reaches TextEdit, Preview, Outlook, Safari and
+Mail. It does not reach Microsoft Teams, Word, OneNote or VS Code.
 
-Of the applications measured, the Accessibility API can read the selection in
-TextEdit, Preview, Outlook and Safari. It cannot in **Microsoft Teams,
-Microsoft Word, Microsoft OneNote or VS Code** -- those focus a container that
-exposes no selection at all, and a walk of their accessibility trees found
-nothing selectable underneath. For those four, the clipboard is not the
-fallback. It is the only path.
+Writing: worse. Every web surface tested accepts a write, reports success, and
+changes nothing — including a plain editable `<textarea>` in Safari that reads
+perfectly. Accessibility writes are confirmed working only in native AppKit
+text.
 
-**Replacement is worse than reading.** Measured 2026-09-20: the Accessibility
-API accepts a write and reports success while changing nothing, on every web
-surface tried -- including a plain editable `<textarea>` in Safari that reads
-perfectly. AX write is confirmed working only in native AppKit text such as
-TextEdit. So putting a result *back* needs the clipboard for all web content as
-well as all Electron apps, which is a wider set than reading needs.
+So the clipboard is not a fallback. It is the only capture path for Electron
+apps, and the only replacement path for everything except native AppKit text.
+A product that refused to use it would not work in most of the places people
+write.
 
-Anyone whose working day is mostly Teams, Word and OneNote should read the risk
-below as applying to most of what they do, not to an occasional edge case. The
-full per-application table, for reading and for writing, is in
-`docs/architecture.md` section 7.
+**The exposure.** When babelOtter uses the clipboard it places your text on the
+general pasteboard and restores what was there before. If Handoff is enabled,
+macOS may sync the general pasteboard to your other Apple devices. That is
+macOS, not babelOtter — but the effect on your content is the same, so it is
+stated here rather than explained away.
 
-**The risk:** if Handoff / Universal Clipboard is active, macOS may sync
-general pasteboard contents to your other Apple devices via iCloud. That is
-user content leaving the machine, and it would violate NFR-P1.
+**babelOtter cannot tell whether Handoff is on.**
+`com.apple.coreservices.useractivityd` exposes no readable setting for it, and
+the per-host domain does not exist. So the app cannot warn you only when the
+risk is live; it has to assume it always might be.
 
-The usual mitigation is marking the pasteboard item `org.nspasteboard.ConcealedType`
-and `com.apple.is-sensitive`. Those are a *community convention respected by
-clipboard managers*; Apple does not document any supported way to exclude an
-item from Universal Clipboard, and it is unverified whether concealment
-suppresses the sync at all.
+**What babelOtter does about it**
 
-**Decision:** this risk is **knowingly accepted for the moment**, and is being
-closed rather than carried. It was originally accepted for the whole of v1 on
-the assumption that the clipboard was a rare fallback. Once spike #30 showed
-that assumption was false, the strict Accessibility-only mode that closes the
-gap was pulled forward out of post-v1 into M1a (issue #77), so that it ships in
-the same milestone as the fallback it guards rather than after it.
-
-Until #77 lands, the exposure described above is real and unmitigated.
+- Tells you, per action, when the clipboard path was used, so exposure is never
+  silent (`FR-CAP`, `NFR-P9`).
+- Restores your previous clipboard contents around every operation, including
+  on the failure paths.
+- Marks its pasteboard items `org.nspasteboard.ConcealedType` and
+  `com.apple.is-sensitive`. These are community conventions respected by
+  clipboard managers. **Whether they suppress Universal Clipboard sync is
+  unverified**, and is being measured — if they do, this section gets much
+  shorter.
 
 **If this matters to you today**, disable Handoff:
 `System Settings → General → AirDrop & Handoff → Handoff: off`.

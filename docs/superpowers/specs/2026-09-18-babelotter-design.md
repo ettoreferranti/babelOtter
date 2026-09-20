@@ -159,7 +159,8 @@ rather than merely producing correct output for them.
 
 ### 5.1 Privacy — `NFR-P`
 
-- **NFR-P1** No user content leaves the machine, under any circumstance. No telemetry, analytics, crash reporting, remote configuration or update checks exist. *Inviolable.*
+- **NFR-P1** babelOtter never transmits user content. No telemetry, analytics, crash reporting, remote configuration or update checks exist, and the only socket it opens is loopback. *Inviolable, and enforced by test.*
+- **NFR-P1a** The clipboard path can expose content to Universal Clipboard if Handoff is enabled. macOS does that, not babelOtter, and babelOtter cannot detect whether it is on. Accepted as the cost of working in applications the Accessibility API cannot reach or cannot write to.
 - **NFR-P2** babelOtter opens no non-loopback connections. Model downloads are delegated to the local Ollama daemon after explicit confirmation.
 - **NFR-P3** The endpoint type accepts loopback hosts only and deliberately ignores `OLLAMA_HOST`.
 - **NFR-P4** Exactly one file in the codebase may reference networking APIs; asserted by an architecture test.
@@ -167,7 +168,7 @@ rather than merely producing correct output for them.
 - **NFR-P6** All runtime dependencies appear on a reviewed allowlist checked in CI; none may perform networking.
 - **NFR-P7** Local storage is `0600`, excluded from backup, and outside any iCloud-synced tree; the path resolver refuses otherwise.
 - **NFR-P8** This repository is public: fixtures, eval cases, glossary defaults and screenshots must be synthetic, enforced by a CI content guard. Integration tests run locally only.
-- **NFR-P9** The clipboard fallback's interaction with Universal Clipboard is a **knowingly accepted risk for v1**, documented in `PRIVACY.md`. Investigation deferred to M4.
+- **NFR-P9** The clipboard is an accepted conduit, not a deferred risk. It is the only capture path for Electron apps and the only replacement path for everything except native AppKit text, so it is load-bearing rather than a fallback. Its exposure is stated in `PRIVACY.md` and the user is told, per action, when it was used.
 
 ### 5.2 Quality — `NFR-Q`
 

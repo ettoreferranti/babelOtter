@@ -132,9 +132,21 @@ Worth reporting all of this upstream before M1b leans on it further.
    mutants the small-population rule (`total < 20`) no longer applies, so the
    plain 80% gate is doing the work now.
 
-5. **`PRIVACY.md` is corrected.** It no longer describes the clipboard as a
-   rare fallback, and the section is now an *open* risk closing in M1a under
-   #77 rather than one accepted for the whole of v1.
+5. **The clipboard is an accepted conduit, decided 2026-09-20.** NFR-P1 now
+   reads: *"babelOtter never transmits your content. The clipboard path can
+   expose it to Universal Clipboard if Handoff is enabled."* The first sentence
+   is absolute and enforced by test; the second is macOS doing something
+   babelOtter neither asks for nor can observe.
+
+   The alternative was a product that does not work where people write:
+   Accessibility cannot capture in Teams, Word, OneNote or VS Code, and cannot
+   replace anywhere except native AppKit text. Restated in the spec
+   (`NFR-P1`, `NFR-P1a`, `NFR-P9`), `PRIVACY.md` and `README.md`.
+
+   **#77 needs rewriting.** "Strict Accessibility-only mode" now means "cannot
+   replace anywhere except TextEdit", which is not a product. It is still worth
+   having as an opt-in for someone who wants the guarantee absolute, but its
+   cost is now known and its description is out of date.
 
 ## What is next
 

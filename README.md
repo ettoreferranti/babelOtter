@@ -62,7 +62,8 @@ own locale rules.
 
 babelOtter is built around one inviolable rule:
 
-> **No user content ever leaves this machine.**
+> **babelOtter never transmits your content. The clipboard path can expose it
+> to Universal Clipboard if Handoff is enabled.**
 
 No telemetry. No analytics. No crash reporting. No remote config. The app opens
 **no non-loopback connections** — even model downloads are delegated to your
