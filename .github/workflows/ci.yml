@@ -147,6 +147,8 @@ jobs:
           PASS1="Sources/BabelOtterKit/BabelOtterKit.swift
           Sources/BabelOtterKit/LLM/NDJSONFramer.swift
           Sources/BabelOtterKit/LLM/OllamaWire.swift
+          Sources/BabelOtterKit/LLM/OllamaTransport.swift
+          Sources/BabelOtterKit/LLM/OllamaClient.swift
           Sources/BabelOtterKit/Config/AudienceProfile.swift
           Sources/BabelOtterKit/Config/Configuration.swift
           Sources/BabelOtterKit/Config/ConfigurationStore.swift
