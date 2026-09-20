@@ -8,15 +8,15 @@ Read this first if you are picking babelOtter up in a new session.
 single `--no-ff` merge, so the milestone reads as one unit with every commit
 intact. `main` is green.
 
-**M1a's pure core is complete on `feat/m1a-core`, not merged.** It is the whole
-translation pipeline except the parts that touch the outside world: no
-Accessibility, no clipboard, no network, no UI. All of it runs in CI.
+**M1a's pure core is merged to `main`.** It is the whole translation pipeline
+except the parts that touch the outside world: no Accessibility, no clipboard,
+no network, no UI. All of it runs in CI.
 
 | | |
 |---|---|
-| Branch | `feat/m1a-core`, 18 commits ahead of `main`, **not merged** |
+| Branch | `feat/m1a-core`, merged to `main` 2026-09-20 |
 | Tests | 255 in 25 suites, green from a clean build |
-| Mutation | 44/51 = **86.3%**, gating CI at ≥80%, no unmeasured mutants |
+| Mutation | 42/49 = **85.7%**, gating CI at ≥80%, no unmeasured mutants |
 | CI | green — build+test and the mutation job both pass |
 | Dependencies | still zero, enforced by test |
 | Local toolchain | Xcode 27 / Swift 6.4 — two majors ahead of CI, so CI is the binding check |
@@ -26,7 +26,7 @@ in it. Epic #1 is closed as fully delivered. Epic #2 moved to M1a, where its one
 remaining child #77 now lives. Milestones: M1a Pipeline (29), M1b Translate UX
 (13), M2 (5), M3 (17), M4 (8).
 
-## What is on `feat/m1a-core`
+## What M1a Core delivered
 
 Fifteen new source files under `Sources/BabelOtterKit`, each with its own suite.
 Implements #36, #37, #38, #39, #42, #43, #44, #53, #55, #56, #57, and the model
@@ -93,18 +93,9 @@ workspace is always fresh.
 
 Worth reporting all of this upstream before M1b leans on it further.
 
-## Decisions for the morning
+## Settled, and worth not re-litigating
 
-1. **Merge `feat/m1a-core` to `main`?** Branch is green, the mutation gate
-   passes, and nothing in it touches the outside world. Same shape of decision
-   as M0. Remember to drop `feat/m1a-core` from `ci.yml`'s push filter at merge
-   — the file says so inline.
-
-2. **Close the eleven implemented issues now, or at merge?** #36, #37, #38, #39,
-   #42, #43, #44, #53, #55, #56, #57 are done on the branch. They were left open
-   deliberately, because M0's precedent was that merging is what closes them.
-
-3. **Defaults are settled for now.** `defaultModel` is
+1. **Defaults are settled for now.** `defaultModel` is
    `mistral-small3.2:24b` — European-language coverage, Apache 2.0 so it does
    not block distribution (#82), and 3.2's instruction-following matters because
    this pipeline demands strict JSON, exact block counts and untouched DNT
@@ -114,19 +105,19 @@ Worth reporting all of this upstream before M1b leans on it further.
    (non-whitespace characters), `timeoutSeconds = 60`, `retentionDays = 90` are
    to be revisited once there are manual tests behind them.
 
-4. **DNT matching is case-sensitive.** A term is a proper noun, so `zhaw` does
+2. **DNT matching is case-sensitive.** A term is a proper noun, so `zhaw` does
    not match `ZHAW`. Defensible either way; say if you want it case-insensitive.
 
-5. **Seven surviving mutants, all in sort comparators**, look like equivalent
+3. **Seven surviving mutants, all in sort comparators**, look like equivalent
    mutants — `>` replaced by `>=` in a comparator that still orders the same list
    identically. The gate passes at 86.3% with them. Killing them means
    restructuring comparators to suit the tool, so they are left alone.
 
-6. **The mutation threshold question is resolved by growth.** At 51 measured
+4. **The mutation threshold question is resolved by growth.** At 51 measured
    mutants the small-population rule (`total < 20`) no longer applies, so the
    plain 80% gate is doing the work now.
 
-7. **`PRIVACY.md` is corrected.** It no longer describes the clipboard as a
+5. **`PRIVACY.md` is corrected.** It no longer describes the clipboard as a
    rare fallback, and the section is now an *open* risk closing in M1a under
    #77 rather than one accepted for the whole of v1.
 

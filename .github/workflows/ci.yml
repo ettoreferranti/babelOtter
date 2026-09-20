@@ -9,11 +9,6 @@ on:
   push:
     branches:
       - main
-      # This milestone's own branch, so its pre-merge runs keep working before
-      # a pull request exists for it. REMOVE THIS LINE when the branch merges:
-      # while both this entry and `pull_request` are live, a PR on this branch
-      # is the one case still double-running.
-      - feat/m1a-core
 
 # BABELOTTER_INTEGRATION is deliberately unset: integration tests are local-only.
 jobs:
