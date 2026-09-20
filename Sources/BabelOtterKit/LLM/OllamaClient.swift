@@ -66,6 +66,32 @@ public struct OllamaClient: Sendable {
             .models
     }
 
+    /// Whether the daemon is up and holds the model this action needs.
+    ///
+    /// Deliberately non-throwing. #45 wants a health check that never blocks
+    /// and never fails loudly -- it exists to tell the menu bar what to show,
+    /// and a health check that can itself error just moves the problem. Every
+    /// failure becomes a status the UI already knows how to render.
+    public func health(configuredModel: String) async -> DaemonStatus {
+        let probe: DaemonProbe
+        do {
+            probe = .reachable(models: try await installedModels().map(\.name))
+        } catch let error as OllamaTransportError {
+            probe = .unreachable(detail: Self.describe(error))
+        } catch {
+            probe = .unreachable(detail: error.localizedDescription)
+        }
+        return DaemonStatusPolicy().status(probe: probe, configuredModel: configuredModel)
+    }
+
+    private static func describe(_ error: OllamaTransportError) -> String {
+        switch error {
+        case .unreachable(let detail): return detail
+        case .httpStatus(let code): return "the daemon answered with HTTP \(code)"
+        case .undecodableBody: return "the daemon's reply was not text"
+        }
+    }
+
     /// Drains a non-streaming response into one string.
     private func collect(from url: URL, body: Data?) async throws -> String {
         var text = ""

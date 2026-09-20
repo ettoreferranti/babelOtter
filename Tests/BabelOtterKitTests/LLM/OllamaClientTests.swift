@@ -125,6 +125,49 @@ struct OllamaClientTests {
         #expect(events == [.delta("only")])
     }
 
+    @Test("health reports ready when the daemon holds the configured model")
+    func healthReady() async {
+        let transport = FakeTransport(chunks: [
+            #"{"models":[{"name":"m","size":1}]}"#
+        ])
+        let client = OllamaClient(endpoint: .loopback, transport: transport)
+        #expect(await client.health(configuredModel: "m") == .ready)
+    }
+
+    @Test("health reports the missing model rather than failing")
+    func healthModelMissing() async {
+        let transport = FakeTransport(chunks: [#"{"models":[]}"#])
+        let client = OllamaClient(endpoint: .loopback, transport: transport)
+        #expect(await client.health(configuredModel: "m") == .modelMissing("m"))
+    }
+
+    /// #45: a health check never fails loudly. Every failure has to become a
+    /// status the menu bar can render, or the caller needs its own error
+    /// handling for the thing whose job is reporting errors.
+    @Test("health turns an unreachable daemon into a status, not a thrown error")
+    func healthNeverThrows() async {
+        let transport = FakeTransport(
+            chunks: [], failure: OllamaTransportError.unreachable(detail: "refused"))
+        let client = OllamaClient(endpoint: .loopback, transport: transport)
+        let status = await client.health(configuredModel: "m")
+        #expect(status.readiness == .blocked)
+        #expect(status.detail.contains("refused"))
+    }
+
+    @Test("health turns a bad HTTP status into a readable explanation")
+    func healthExplainsHTTPFailures() async {
+        let transport = FakeTransport(chunks: [], failure: OllamaTransportError.httpStatus(503))
+        let client = OllamaClient(endpoint: .loopback, transport: transport)
+        #expect(await client.health(configuredModel: "m").detail.contains("503"))
+    }
+
+    @Test("health on an unparseable catalogue is blocked, not silently ready")
+    func healthOnGarbage() async {
+        let transport = FakeTransport(chunks: ["this is not json"])
+        let client = OllamaClient(endpoint: .loopback, transport: transport)
+        #expect(await client.health(configuredModel: "m").readiness == .blocked)
+    }
+
     @Test("installed models are read from the tags endpoint")
     func installedModels() async throws {
         let transport = FakeTransport(chunks: [

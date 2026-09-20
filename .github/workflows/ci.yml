@@ -149,6 +149,8 @@ jobs:
           Sources/BabelOtterKit/LLM/OllamaWire.swift
           Sources/BabelOtterKit/LLM/OllamaTransport.swift
           Sources/BabelOtterKit/LLM/OllamaClient.swift
+          Sources/BabelOtterKit/LLM/GenerationTimeout.swift
+          Sources/BabelOtterKit/LLM/DaemonStatus.swift
           Sources/BabelOtterKit/Config/AudienceProfile.swift
           Sources/BabelOtterKit/Config/Configuration.swift
           Sources/BabelOtterKit/Config/ConfigurationStore.swift
