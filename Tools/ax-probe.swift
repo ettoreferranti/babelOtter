@@ -109,18 +109,30 @@ func tier1(_ element: AXUIElement) -> String {
 
 /// Tier 2: WebKit's text markers. Safari and Mail's HTML view return noValue
 /// for tier 1 and expose the selection only through these.
+/// The selected text through WebKit's marker pair, or nil.
+func markerSelection(_ element: AXUIElement) -> String? {
+    var range: AnyObject?
+    guard
+        AXUIElementCopyAttributeValue(
+            element, "AXSelectedTextMarkerRange" as CFString, &range) == .success,
+        let markerRange = range
+    else { return nil }
+
+    var text: AnyObject?
+    guard
+        AXUIElementCopyParameterizedAttributeValue(
+            element, "AXStringForTextMarkerRange" as CFString, markerRange, &text) == .success
+    else { return nil }
+    return text as? String
+}
+
 func tier2(_ element: AXUIElement) -> String {
     var range: AnyObject?
     let rangeError = AXUIElementCopyAttributeValue(
         element, "AXSelectedTextMarkerRange" as CFString, &range)
-    guard rangeError == .success, let markerRange = range else {
-        return "unavailable - \(name(rangeError))"
-    }
-    var text: AnyObject?
-    let textError = AXUIElementCopyParameterizedAttributeValue(
-        element, "AXStringForTextMarkerRange" as CFString, markerRange, &text)
-    guard textError == .success else { return "range, but no string - \(name(textError))" }
-    guard let string = text as? String, !string.isEmpty else { return "EMPTY" }
+    guard rangeError == .success else { return "unavailable - \(name(rangeError))" }
+    guard let string = markerSelection(element) else { return "range, but no string" }
+    guard !string.isEmpty else { return "EMPTY" }
     return "OK - \(string.count) chars"
 }
 
@@ -259,54 +271,65 @@ func descendantWithSelection(
 /// content -- a compose field rather than a received message. Tier 2 read is
 /// proven; tier 2 write is not.
 func attemptWrite(_ element: AXUIElement) -> [String] {
-    var lines: [String] = []
-
+    // Source text from whichever tier can see the selection. The first version
+    // read only tier 1, so on a WebArea -- where tier 1 returns noValue and
+    // tier 2 reads fine -- it skipped the write entirely and reported "nothing
+    // readable". That is precisely the surface this mode exists to test, and it
+    // measured nothing on it three times in one run.
     var selected: AnyObject?
-    let readError = AXUIElementCopyAttributeValue(
+    let tier1Error = AXUIElementCopyAttributeValue(
         element, kAXSelectedTextAttribute as CFString, &selected)
-    guard readError == .success, let original = selected as? String, !original.isEmpty else {
-        return ["  write: skipped - nothing readable to write back (\(name(readError)))"]
+    var original = (tier1Error == .success) ? (selected as? String) : nil
+    var readVia = "tier 1"
+    if original?.isEmpty != false {
+        original = markerSelection(element)
+        readVia = "tier 2"
     }
 
+    guard let original, !original.isEmpty else {
+        return ["  write: skipped - nothing selected on either tier"]
+    }
     let replacement = original.uppercased()
-    if replacement == original {
+    guard replacement != original else {
         return ["  write: skipped - selection is already uppercase, pick mixed-case text"]
     }
 
-    // The whole value, so a no-op is detectable even if the selection moves.
+    // Snapshot both ways, because which one can see a change depends on the
+    // surface: AXValue is nil on a WebArea, and the marker read is absent on a
+    // plain text field.
     let valueBefore = string(element, kAXValueAttribute as String)
+    let markersBefore = markerSelection(element)
 
     let writeError = AXUIElementSetAttributeValue(
         element, kAXSelectedTextAttribute as CFString, replacement as CFString)
-    lines.append("  write: API returned \(name(writeError))")
+    var lines = ["  write: read via \(readVia); API returned \(name(writeError))"]
 
     Thread.sleep(forTimeInterval: 0.6)
     let valueAfter = string(element, kAXValueAttribute as String)
+    let markersAfter = markerSelection(element)
 
+    // Section 7 item 2: the return code is evidence of nothing. Compare state.
     if let before = valueBefore, let after = valueAfter {
-        if before == after {
-            lines.append("  verify: value UNCHANGED -> SILENT NO-OP, whatever the API said")
-        } else if after.contains(replacement) {
-            lines.append("  verify: value changed and contains the replacement -> WRITE OK")
-        } else {
-            lines.append("  verify: value changed but does not contain the replacement -> SUSPECT")
-        }
-        return lines
+        lines.append(verdict(before: before, after: after, replacement: replacement, via: "AXValue"))
+    } else if markersBefore != nil || markersAfter != nil {
+        lines.append(
+            verdict(
+                before: markersBefore ?? "", after: markersAfter ?? "",
+                replacement: replacement, via: "tier-2 selection"))
+    } else {
+        lines.append("  verify: no readable state either side -> UNVERIFIED")
     }
-
-    // No AXValue to compare: fall back to re-reading the selection.
-    var after: AnyObject?
-    let backError = AXUIElementCopyAttributeValue(
-        element, kAXSelectedTextAttribute as CFString, &after)
-    guard backError == .success, let text = after as? String else {
-        lines.append("  verify: could not read back (\(name(backError))) -> UNVERIFIED")
-        return lines
-    }
-    lines.append(
-        text == replacement
-            ? "  verify: selection reads back as the replacement -> WRITE OK"
-            : "  verify: selection still reads \"\(text.prefix(40))\" -> SILENT NO-OP")
     return lines
+}
+
+func verdict(before: String, after: String, replacement: String, via: String) -> String {
+    if before == after {
+        return "  verify: \(via) UNCHANGED -> SILENT NO-OP, whatever the API said"
+    }
+    if after.contains(replacement) {
+        return "  verify: \(via) changed and contains the replacement -> WRITE OK"
+    }
+    return "  verify: \(via) changed but lacks the replacement -> SUSPECT, inspect by eye"
 }
 
 print("=== 3. Accessibility grant, live ===")

@@ -396,6 +396,30 @@ built from. An element did appear on the retry after that failed arming, and an
 earlier version of the probe credited the arming for it; the extra wait was the
 only thing that changed.
 
+### Write-back, measured
+
+Spike #30 measured writes on the private machine: verified in TextEdit, a
+silent no-op on Mail's **read-only** HTML view. It explicitly left editable web
+content untested -- tier 2 read proven, tier 2 write not.
+
+Added 2026-09-20, same machine:
+
+| Surface | Focused role | Read | Write |
+|---|---|---|---|
+| Safari smart search field | `AXComboBox` | tier 1 and 2, 21 chars | **success returned, value unchanged -- silent no-op** |
+
+So item 2 is not a quirk of one read-only view. A surface that reads cleanly on
+*both* tiers still accepted a write, reported `success`, and changed nothing.
+That is the second independent surface to lie in the same way, which moves
+"read back and compare" from a precaution to a requirement.
+
+**Editable web content is still untested.** The run that was meant to cover it
+skipped the write on every `AXWebArea`, because the probe took its source text
+from a tier-1 read and tier 1 returns `noValue` there. It measured nothing on
+the exact surface it existed for, three times in one run. Fixed: the write now
+takes its source from whichever tier can see the selection, and verifies
+through whichever of `AXValue` or the marker read is available on that surface.
+
 ### What this means for the clipboard
 
 The spike said the clipboard is common rather than rare. These measurements say
