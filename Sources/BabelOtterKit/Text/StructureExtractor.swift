@@ -121,7 +121,12 @@ public enum StructureExtractor {
         var lines: [(content: String, terminator: String)] = []
         var current = ""
         for character in text {
-            if character == "\r\n" || character == "\n" || character == "\r" {
+            // `isNewline` rather than three equality checks against "\r\n",
+            // "\n" and "\r". Swift folds CRLF into one Character, so all three
+            // are single graphemes and this covers them plus the rarer Unicode
+            // line separators. The terminator is stored exactly as it appeared,
+            // so widening what counts as a break cannot change the round trip.
+            if character.isNewline {
                 lines.append((current, String(character)))
                 current = ""
             } else {
@@ -180,38 +185,34 @@ public enum StructureExtractor {
     /// `-5 degrees` loses its minus sign and `1.5 metres` becomes a numbered
     /// list -- both silent corruptions of the user's own text.
     private static func markerLength(in remainder: Substring) -> Int {
-        let characters = Array(remainder)
-        guard let first = characters.first else { return 0 }
+        // Written with prefix/dropFirst rather than an index and a count.
+        // Indexed access needed a bounds comparison at every step, and those
+        // comparisons carried no information: with `remainder` non-empty,
+        // `count > 1` and `count != 1` are the same test, so the bounds checks
+        // were unkillable by any test and there was a subscript one edit away
+        // from crashing. This version cannot read past the end at all.
+        guard let first = remainder.first else { return 0 }
+        let rest = remainder.dropFirst()
 
         if bulletMarkers.contains(first) {
-            // if/else rather than a ternary, for the reason given in
-            // PromptBuilder.languages.
-            if characters.count > 1 && characters[1].isWhitespace { return 1 }
-            return 0
+            guard rest.first?.isWhitespace == true else { return 0 }
+            return 1
         }
 
         if first.isNumber {
-            var index = 0
-            // Written as a nested guard rather than `while a < b, predicate`:
-            // muter's RelationalOperatorReplacement mis-parses a comma-
-            // conjunction while-condition and emits invalid Swift, which
-            // poisons the whole file's mutation run. See muter.conf.yml. This
-            // file is a named high-value mutation target, so it is worth one
-            // extra line to keep it measurable under every operator.
-            while index < characters.count {
-                guard characters[index].isNumber else { break }
-                index += 1
-            }
-            guard index < characters.count, characters[index] == "." || characters[index] == ")"
+            let digits = remainder.prefix { $0.isNumber }
+            let afterDigits = remainder.dropFirst(digits.count)
+            guard let punctuation = afterDigits.first,
+                punctuation == "." || punctuation == ")",
+                afterDigits.dropFirst().first?.isWhitespace == true
             else { return 0 }
-            let afterPunctuation = index + 1
-            guard afterPunctuation < characters.count,
-                characters[afterPunctuation].isWhitespace
-            else { return 0 }
-            return afterPunctuation
+            return digits.count + 1
         }
 
-        if first.isLetter, characters.count > 2, characters[1] == ")", characters[2].isWhitespace {
+        if first.isLetter {
+            guard rest.first == ")", rest.dropFirst().first?.isWhitespace == true else {
+                return 0
+            }
             return 2
         }
 

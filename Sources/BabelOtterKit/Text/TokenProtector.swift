@@ -82,7 +82,9 @@ public enum TokenProtector {
                 index = text.index(after: index)
                 continue
             }
-            if parsed.index < protected.terms.count {
+            // `indices.contains` rather than a bounds comparison: it says what
+            // the check is for, and it cannot be off by one.
+            if protected.terms.indices.contains(parsed.index) {
                 let start = result.count
                 result += protected.terms[parsed.index]
                 offsets.append((start: start, end: result.count))

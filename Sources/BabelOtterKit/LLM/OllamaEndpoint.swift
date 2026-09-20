@@ -67,7 +67,14 @@ public struct OllamaEndpoint: Sendable, Equatable, Hashable {
 
     /// `http://127.0.0.1:11434`, with IPv6 hosts bracketed.
     public var baseURL: URL {
-        let hostComponent = host.contains(":") ? "[\(host)]" : host
+        // if/else rather than a ternary: muter's SwapTernary operator
+        // intermittently emits invalid Swift here, and because every mutant for
+        // a file compiles into one binary, that one bad mutant makes the whole
+        // file unmeasurable and fails the gate. Observed as a buildError on one
+        // run and a clean result on the next -- the flakiness recorded in
+        // docs/HANDOFF.md, now pinned to this line.
+        var hostComponent = host
+        if host.contains(":") { hostComponent = "[\(host)]" }
         guard let url = URL(string: "http://\(hostComponent):\(port)") else {
             preconditionFailure("loopback host \(host):\(port) must form a valid URL")
         }
