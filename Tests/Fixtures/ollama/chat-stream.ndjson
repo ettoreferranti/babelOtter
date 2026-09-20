@@ -1,0 +1,5 @@
+{"model":"mistral-small3.2:24b","created_at":"2026-09-21T08:00:00.000Z","message":{"role":"assistant","content":"{\"detected_source\""},"done":false}
+{"model":"mistral-small3.2:24b","created_at":"2026-09-21T08:00:00.100Z","message":{"role":"assistant","content":": \"en\", "},"done":false}
+{"model":"mistral-small3.2:24b","created_at":"2026-09-21T08:00:00.200Z","message":{"role":"assistant","content":"\"blocks\": ["},"done":false}
+{"model":"mistral-small3.2:24b","created_at":"2026-09-21T08:00:00.300Z","message":{"role":"assistant","content":"\"Guten Morgen\"]}"},"done":false}
+{"model":"mistral-small3.2:24b","created_at":"2026-09-21T08:00:00.400Z","message":{"role":"assistant","content":""},"done":true,"total_duration":412000000,"eval_count":18}

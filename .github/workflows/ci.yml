@@ -146,6 +146,7 @@ jobs:
           PASS2="Sources/BabelOtterKit/Privacy/StorageLocator.swift"
           PASS1="Sources/BabelOtterKit/BabelOtterKit.swift
           Sources/BabelOtterKit/LLM/NDJSONFramer.swift
+          Sources/BabelOtterKit/LLM/OllamaWire.swift
           Sources/BabelOtterKit/Config/AudienceProfile.swift
           Sources/BabelOtterKit/Config/Configuration.swift
           Sources/BabelOtterKit/Config/ConfigurationStore.swift
