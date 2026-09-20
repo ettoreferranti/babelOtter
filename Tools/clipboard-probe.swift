@@ -195,7 +195,13 @@ for round in 1...rounds {
         print("  capture: changeCount moved but no string arrived")
     }
 
-    if pasteMode, let text = captured, !text.isEmpty, text != text.uppercased() {
+    // `moved` is not optional decoration. `captured` reads the pasteboard
+    // whether or not Command-C did anything, so without this guard a failed
+    // capture falls through to whatever was on the clipboard already and pastes
+    // THAT into the user's document. It did exactly that on 2026-09-20: a Mail
+    // round where Command-C produced nothing still pasted 36 characters of
+    // unrelated older clipboard content into the message.
+    if pasteMode, moved, let text = captured, !text.isEmpty, text != text.uppercased() {
         let replacement = text.uppercased()
         NSPasteboard.general.clearContents()
         let item = NSPasteboardItem()
@@ -207,10 +213,14 @@ for round in 1...rounds {
 
         sendCommand(keyV)
         Thread.sleep(forTimeInterval: 0.8)
-        print("  paste: Command-V sent with \(replacement.count) chars, marked concealed")
-        print("         check by eye whether the text was replaced")
+        print("  paste: Command-V sent, \(replacement.count) chars, marked concealed")
+        print("         expect to see: \(replacement.prefix(48))")
+        print("         if the document is unchanged, Command-V did not land")
+    } else if pasteMode, !moved {
+        print("  paste: SKIPPED - capture failed, so there is nothing of yours to put back")
+        print("         pasting here would insert unrelated clipboard content")
     } else if pasteMode {
-        print("  paste: skipped - nothing captured, or already uppercase")
+        print("  paste: skipped - nothing captured, or the selection is already uppercase")
     }
 
     restorePasteboard(saved)

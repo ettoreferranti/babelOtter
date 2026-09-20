@@ -435,6 +435,41 @@ result back.** AX write is confirmed working only in native AppKit text.
 `AXTextArea` and is the one work-critical surface that might accept an AX
 write; Notes; Pages. One round each, whenever convenient.
 
+### The clipboard conduit works
+
+Measured 2026-09-20 with `Tools/clipboard-probe.sh --paste`, private machine.
+
+| App | Command-C capture | Pasteboard restore |
+|---|---|---|
+| Safari | OK, 129 chars | OK |
+| Safari | OK, 79 chars | OK |
+| Mail | **changeCount did not move** | OK |
+| Mail | OK, 47 chars | OK |
+
+**Synthetic Command-C works, and full-fidelity save/restore works.** Every
+round returned the previous clipboard contents intact, including the round
+where the capture itself failed. That is the part the product depends on most,
+because it runs on every action whether or not anything else succeeds.
+
+**One capture failed with no error.** Mail returned an unmoved `changeCount`
+inside a two-second window, and the next Mail round succeeded. So the
+clipboard path is not reliable-by-construction: a capture can simply produce
+nothing, and `changeCount` is the only signal that it did. Capture must treat
+"the count did not move" as a failure and say so, never fall through to
+whatever the pasteboard already held.
+
+That is not hypothetical. The probe's first version read the pasteboard
+regardless of whether the count moved, so on that failed round it pasted 36
+characters of unrelated older clipboard content into the user's message. A
+real implementation making the same mistake would silently corrupt a document
+with text from a previous copy.
+
+**Still unmeasured: the apps that actually need this.** Teams, Word, OneNote
+and VS Code are the surfaces Accessibility cannot reach, and none of them were
+covered -- the rounds hit Safari and Mail, which Accessibility already reads.
+The conduit is proven to work; it is not yet proven to work *where it is the
+only option*.
+
 ### Handoff state is not readable, and the clipboard conduit is untested
 
 Two measured negatives, 2026-09-20, both of which constrain what can be built.
