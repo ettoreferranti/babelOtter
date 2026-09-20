@@ -361,40 +361,54 @@ Measured 2026-09-20 with `Tools/ax-probe.sh`, selections made by hand.
 | App | Focused role | Tier 1 | Tier 2 | Verdict |
 |---|---|---|---|---|
 | TextEdit | `AXTextArea` | OK, 77 chars | unsupported | **Tier 1** |
-| Preview | `AXGroup` | OK, 31 chars | unsupported | **Tier 1** |
-| Safari (page body) | `AXWebArea` | `noValue` | **OK, 213 chars** | **Tier 2** |
-| Safari (address bar) | `AXTextField` | EMPTY | unsupported | chrome, not content |
-| Microsoft Outlook | `AXWindow` | unsupported | unsupported | container, see below |
-| Microsoft Teams | `AXWindow` | unsupported | unsupported | container, see below |
-| Microsoft Word | `AXSplitGroup` | unsupported | unsupported | container, see below |
-| Microsoft OneNote | `AXScrollArea` | unsupported | unsupported | container, see below |
+| Preview | `AXGroup` | OK, 46 chars | unsupported | **Tier 1** |
+| Outlook (message body) | `AXTextArea` | OK, 20 chars | OK, 20 chars | **Tier 1** |
+| Safari (page body) | `AXWebArea` | `noValue` | OK, 213 chars | **Tier 2** |
+| Microsoft Teams | `AXWindow` | unsupported | unsupported | **Tier 3** |
+| Microsoft Word | `AXSplitGroup` | unsupported | unsupported | **Tier 3** |
+| Microsoft OneNote | `AXScrollArea` | unsupported | unsupported | **Tier 3** |
 | VS Code | no element | `noValue` | `noValue` | **Tier 3** |
 
-**Tier 2 is confirmed.** Safari with a selection in the body of a page returns
+**Tier 2 earns its place.** Safari with a selection in the body of a page gives
 `noValue` for `kAXSelectedTextAttribute` and 213 characters through
-`AXSelectedTextMarkerRange` → `AXStringForTextMarkerRange`. This is the case
-that justifies the tier existing, and without it Safari would be clipboard-only.
-The earlier inconclusive reading was of the address bar.
+`AXSelectedTextMarkerRange` → `AXStringForTextMarkerRange`. Without tier 2,
+Safari is clipboard-only.
 
-**In Outlook, Teams, Word and OneNote the focused element is a container** --
-`AXWindow`, `AXSplitGroup`, `AXScrollArea` -- which supports neither selection
-attribute. That is not the same as the text being unreachable: it says the
-focused element is not the text. `kAXFocusedUIElementAttribute` is documented as
-the focused element, but these apps answer with an ancestor of it.
+**A container role means the reading is invalid, not that the app is tier 3.**
+Outlook first measured as `AXWindow` with nothing readable, and on a second
+attempt -- with the selection genuinely inside a message body -- came back
+`AXTextArea` and read cleanly on both tiers. The first reading was of a window
+whose focus was not in text. Anything reporting `AXWindow`, `AXSplitGroup` or
+`AXScrollArea` should be re-measured before being believed.
 
-This is an open question, not a result, and it matters: four of the apps most
-likely to be used at work land here. The probe now walks the tree below the
-focused element looking for a descendant that does expose a selection, which
-separates "tier 1 needs to search downward" from "genuinely tier 3". **Until
-that is measured, do not assume either.**
+**Teams, Word and OneNote are tier 3 on this evidence.** All three focus a
+container, support neither attribute on it, and a breadth-first walk of up to
+400 descendants found nothing selectable below it. Two caveats, stated because
+the conclusion is load-bearing: a 400-node breadth-first budget is not proof
+that nothing exists deeper, and the Outlook lesson above means a container role
+always deserves a second attempt. But three Microsoft apps behaving identically,
+after Outlook proved the probe can find text when it is there, is reasonable
+evidence.
 
-**`AXManualAccessibility` returned `attributeUnsupported` on Outlook and
-Teams**, so whatever they are, the Chromium arming path in item 4 does not
-apply to them. An element *did* appear on the retry after that failed arming,
-and the probe's first version credited the arming for it -- wrongly. The extra
-wait was the only thing that changed. The message now attributes it honestly,
-because a diagnostic that misattributes its own cause is worse than one that
-says nothing.
+**`AXManualAccessibility` is `attributeUnsupported` on Outlook and Teams**, so
+the Chromium arming path in item 4 does not apply to them, whatever they are
+built from. An element did appear on the retry after that failed arming, and an
+earlier version of the probe credited the arming for it; the extra wait was the
+only thing that changed.
+
+### What this means for the clipboard
+
+The spike said the clipboard is common rather than rare. These measurements say
+something sharper: **for the applications this user actually works in, the
+clipboard is the majority path.** Teams, Word, OneNote and VS Code are all tier
+3. Outlook, Safari, TextEdit and Preview are not.
+
+So #77's strict Accessibility-only mode does not shave off an edge case. Turning
+it on would make babelOtter refuse to operate in Teams, Word and OneNote
+altogether. That is a defensible choice for someone who wants the guarantee
+absolute, and it is a very different product for someone who does not -- which
+makes the default a real product decision rather than a detail, and makes the
+setting itself worth having either way.
 
 ### A terminal cannot measure itself
 
@@ -412,7 +426,8 @@ never by asking what is supported.
 
 ### Not yet measured
 
-Whether the text in Outlook, Teams, Word and OneNote is reachable below their
-focused container -- the single most valuable outstanding measurement, since it
-decides whether four everyday apps are tier 1 or tier 3. Also Chrome, and the
-focus-taking panel variant (#52).
+Chrome; the focus-taking panel variant (#52); whether Word or Teams expose text
+deeper than a 400-node walk reaches; and replacement, which has been measured
+nowhere -- every reading above is a read. Item 2 warns that
+`AXUIElementSetAttributeValue` returns success for writes that do nothing, and
+that has not been re-confirmed on this machine.

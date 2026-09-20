@@ -150,10 +150,20 @@ granting Accessibility to something of their own. Local admin was needed, and a
 policy refresh could revoke it, which makes #71 real rather than hypothetical.
 Full detail in `docs/architecture.md` §7.
 
-Still unmeasured: Teams, the focus-taking panel variant (#52), Chrome, Word,
-Outlook, and Safari and TextEdit on the managed machine. The probe now waits
-for the reader rather than counting down, so covering those is a single run of
-`Tools/ax-probe.sh`.
+**Per-app tiers are measured.** Tier 1: TextEdit, Preview, Outlook. Tier 2:
+Safari. **Tier 3, clipboard-only: Teams, Word, OneNote, VS Code.** Full table
+and caveats in `docs/architecture.md` section 7.
+
+That last row is the finding that matters. The clipboard is not a fallback for
+edge cases -- for the apps a working day is actually spent in, it is the only
+path. #77's strict mode would make babelOtter refuse to operate in Teams, Word
+and OneNote entirely, which makes its default a product decision rather than a
+detail.
+
+Still unmeasured: Chrome, the focus-taking panel variant (#52), and
+**replacement** -- every reading so far is a read. Section 7 item 2 warns that
+`AXUIElementSetAttributeValue` returns success for writes that do nothing, and
+that has not been re-confirmed on this machine.
 
 ## What M1a must carry from spike #30
 

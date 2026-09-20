@@ -85,13 +85,21 @@ When the Accessibility API cannot read or write the selection in a given app,
 babelOtter falls back to simulating ⌘C / ⌘V through the general pasteboard.
 Your previous clipboard contents are saved and restored around the operation.
 
-**This path is not rare.** An earlier version of this document called it a
-fallback for "some Electron apps and web content", which implied an edge case.
-Spike #30 measured it against real applications on 2026-09-19 and found
-otherwise: the clipboard is the *only* working path for Electron apps such as
-VS Code, and the only path for writing a result back into web content. For
-anyone who works mainly in those, it is not the fallback -- it is the normal
-case. Details in `docs/architecture.md` section 7.
+**This path is not rare. On measurement, it is the majority path.** An earlier
+version of this document called it a fallback for "some Electron apps and web
+content", which implied an edge case. Two rounds of measurement against real
+applications, on 2026-09-19 and 2026-09-20, say otherwise.
+
+Of the applications measured, the Accessibility API can read the selection in
+TextEdit, Preview, Outlook and Safari. It cannot in **Microsoft Teams,
+Microsoft Word, Microsoft OneNote or VS Code** -- those focus a container that
+exposes no selection at all, and a walk of their accessibility trees found
+nothing selectable underneath. For those four, the clipboard is not the
+fallback. It is the only path.
+
+Anyone whose working day is mostly Teams, Word and OneNote should read the risk
+below as applying to most of what they do, not to an occasional edge case. The
+full per-application table is in `docs/architecture.md` section 7.
 
 **The risk:** if Handoff / Universal Clipboard is active, macOS may sync
 general pasteboard contents to your other Apple devices via iCloud. That is
