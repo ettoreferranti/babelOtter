@@ -477,34 +477,52 @@ copy.
 **Still unmeasured:** Teams, Word and OneNote, which are work-machine only.
 VS Code standing in for Electron is reasonable evidence but not proof for them.
 
-### Concealment does not stop Universal Clipboard
+### Universal Clipboard transfers at paste time, not at copy time
 
-Measured 2026-09-20, across two Macs on one account. A pasteboard item marked
-`org.nspasteboard.ConcealedType` **and** `com.apple.is-sensitive` was copied on
-one machine and pasted verbatim on the other.
+Two measurements, 2026-09-20, across two Macs on one account. Together they
+establish the mechanism, and it is better news than the first one alone
+suggested.
 
-`PRIVACY.md` had carried that as the one outstanding mitigation, and it is
-gone. The markers stay, because clipboard managers honour them and keeping
-user text out of a clipboard history app has value, but they are not a defence
-against Handoff.
+| Test | Item on the pasteboard | Peer pressed Command-V | Peer received |
+|---|---|---|---|
+| `--conceal` | left in place | seconds later | **the marker** |
+| `--flash 250` | restored after 250ms | seconds later | **the restored clipboard** |
 
-**The advertise blob is not a usable local signal.** `useractivityd` stages the
-shared pasteboard at the path in `kLocalPasteboardBlobName`. Its contents are
-TCC-protected, but size and mtime are readable, and the first concealed marker
--- 34 characters -- produced a 34-byte blob, which looked like a way to detect
-exposure locally without a second machine.
+So the peer does not receive a copy when you copy. It fetches whatever is on
+the pasteboard **at the moment it pastes**. An item that has already been
+restored is never transferred.
 
-It is not. A 217-byte marker held for eight seconds never changed the blob at
-all, while the 34-byte blob's timestamp matched the moment the *other* Mac
-pasted. So the blob is written when a peer pulls, not when the clipboard
-changes: its size is evidence of a completed transfer, not of an offer. Worth
-recording because the inference was tempting and wrong, and because it hints
-the transfer is pull-based -- which, if true, would make a short-lived
-clipboard item much less exposed than a long-lived one.
+**Concealment is not a mitigation.** The first test's item carried
+`org.nspasteboard.ConcealedType` **and** `com.apple.is-sensitive`, and pasted
+verbatim on the other machine. The markers stay, because clipboard managers
+honour them and keeping user text out of a clipboard history app has value,
+but they do nothing about Handoff.
 
-That is the open question, and only a second Mac can answer it:
-`Tools/clipboard-probe.sh --flash 250` places a marker, restores after 250ms,
-and asks what the other machine sees.
+**Dwell time is the mitigation, and it is a real one.** The exposure is not
+"everything babelOtter copies reaches your other devices". It is "content is
+reachable for as long as it sits on the pasteboard, and only if another device
+pastes during that window". babelOtter holds it for a few hundred
+milliseconds per action and restores immediately, so the window is small --
+but it is not zero, and a paste on another device at the wrong instant would
+land on it.
+
+**This is a design requirement, not an observation.** Capture and replacement
+must both restore the previous pasteboard contents as soon as the operation
+completes, on every path including failures, because the restore is what ends
+the exposure. `NFR-P9` now says so.
+
+**Caveats.** One trial each, and the pull model is inferred from the pair
+rather than from documentation. A peer pasting *during* the window cannot be
+tested by hand. Treat "small window" as measured and "no exposure" as false.
+
+**The advertise blob is not a usable local signal**, though it looked like
+one. `useractivityd` stages the shared pasteboard at the path in
+`kLocalPasteboardBlobName`; its contents are TCC-protected but size and mtime
+are readable, and the 34-character concealed marker produced a 34-byte blob. A
+217-byte marker held for eight seconds never changed it, while that 34-byte
+blob's timestamp matched the moment the other Mac pasted. The blob records a
+completed transfer, not an offer -- which is the same pull model seen from the
+other side.
 
 ### Handoff state is not readable, and the clipboard conduit is untested
 

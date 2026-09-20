@@ -169,6 +169,7 @@ rather than merely producing correct output for them.
 - **NFR-P7** Local storage is `0600`, excluded from backup, and outside any iCloud-synced tree; the path resolver refuses otherwise.
 - **NFR-P8** This repository is public: fixtures, eval cases, glossary defaults and screenshots must be synthetic, enforced by a CI content guard. Integration tests run locally only.
 - **NFR-P9** The clipboard is an accepted conduit, not a deferred risk. It is the only capture path for Electron apps and the only replacement path for everything except native AppKit text, so it is load-bearing rather than a fallback. Its exposure is stated in `PRIVACY.md` and the user is told, per action, when it was used.
+- **NFR-P10** Pasteboard dwell time is minimised, and the previous contents are restored as soon as the operation completes, on every path including failures. Universal Clipboard transfers at paste time rather than at copy time, so the restore is what ends the exposure — it is a privacy mechanism, not a courtesy.
 
 ### 5.2 Quality — `NFR-Q`
 

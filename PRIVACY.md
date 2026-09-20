@@ -109,33 +109,48 @@ apps, and the only replacement path for everything except native AppKit text.
 A product that refused to use it would not work in most of the places people
 write.
 
-**The exposure.** When babelOtter uses the clipboard it places your text on the
-general pasteboard and restores what was there before. If Handoff is enabled,
-macOS may sync the general pasteboard to your other Apple devices. That is
-macOS, not babelOtter — but the effect on your content is the same, so it is
-stated here rather than explained away.
+**The exposure, measured.** When babelOtter uses the clipboard it places your
+text on the general pasteboard and restores what was there before. If Handoff
+is enabled, another Apple device signed in to your account can read the
+pasteboard.
+
+It reads it **at the moment you paste there**, not when babelOtter copies.
+Measured across two Macs on 2026-09-20: an item left on the pasteboard pasted
+verbatim on the other machine, while an item restored after 250ms did not —
+that machine received the restored clipboard instead.
+
+So the exposure is not "everything babelOtter touches reaches your other
+devices". It is:
+
+> Your text is readable by another device for as long as it sits on the
+> pasteboard, which is a few hundred milliseconds per action, and only if you
+> paste on that device during exactly that window.
+
+Small, but not zero, and stated that way rather than rounded down to nothing.
+
+**Concealment does not help.** The test item was marked
+`org.nspasteboard.ConcealedType` and `com.apple.is-sensitive` and synced
+anyway. babelOtter still sets them, because clipboard managers honour them and
+keeping your text out of a clipboard history app is worth something — but they
+are not a defence against Handoff, and an earlier version of this document
+recorded that as unverified rather than as known.
 
 **babelOtter cannot tell whether Handoff is on.**
-`com.apple.coreservices.useractivityd` exposes no readable setting for it, and
-the per-host domain does not exist. So the app cannot warn you only when the
-risk is live; it has to assume it always might be.
+`com.apple.coreservices.useractivityd` exposes no readable setting for it, so
+the app cannot warn you only when it matters; it has to assume it always
+might.
 
 **What babelOtter does about it**
 
-- Tells you, per action, when the clipboard path was used, so exposure is never
-  silent (`FR-CAP`, `NFR-P9`).
-- Restores your previous clipboard contents around every operation, including
-  on the failure paths.
-- Marks its pasteboard items `org.nspasteboard.ConcealedType` and
-  `com.apple.is-sensitive`. **Measured 2026-09-20: these do not stop Universal
-  Clipboard.** A concealed item copied on one Mac pasted verbatim on another,
-  signed in to the same account. The markers are still set, because clipboard
-  managers do respect them and keeping your text out of a clipboard history
-  app is worth something — but they are not a defence against Handoff, and
-  this document previously recorded that as unverified rather than as known.
+- Restores your previous clipboard contents the instant the operation
+  completes, on every path including failures. Since the transfer happens at
+  paste time, that restore is what ends the exposure — a privacy mechanism,
+  not a courtesy (`NFR-P10`).
+- Tells you, per action, when the clipboard path was used, so exposure is
+  never silent (`FR-CAP`, `NFR-P9`).
+- Sets the concealment markers, for the clipboard-manager benefit above.
 
-There is no other mitigation available. The only reliable way to keep the
-clipboard path off your other devices is to turn Handoff off:
+The only way to remove the exposure entirely is to turn Handoff off:
 `System Settings → General → AirDrop & Handoff → Handoff: off`.
 
 **If this matters to you today**, disable Handoff:
