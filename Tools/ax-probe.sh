@@ -33,7 +33,9 @@ run_checks() {
     echo
 
     echo "=== 2. MDM and privacy policy payloads ==="
-    profiles status -type enrollment 2>/dev/null
+    # The MDM server URL names the employer, and these transcripts get shared.
+    profiles status -type enrollment 2>/dev/null \
+        | sed "s|https://[^ ]*|<redacted MDM server>|"
     echo "--- TCC / privacy payloads: names and keys only ---"
     echo "    (system_profiler can take 10-30s on a managed Mac; it is not stuck)"
     echo "    NOTE: this describes your employer's management profiles. Read it"
