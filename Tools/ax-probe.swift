@@ -349,19 +349,32 @@ guard AXIsProcessTrusted() else {
 
 print("")
 print("Trusted. This terminal is \(host?.label ?? "unknown").")
+
+// The confirmation comes BEFORE the "switch to an app" instructions, and
+// nothing else prints until it is answered. The first version printed the
+// instructions first and then blocked here, so the reader dutifully went off
+// switching apps and selecting text while the program sat waiting for a
+// keypress, with no output to explain why nothing was happening.
+if writeMode {
+    print("")
+    print("*** WRITE MODE ***")
+    print("This REPLACES the text you select with an uppercase version of itself.")
+    print("Use a scratch document, not anything you care about.")
+    print("")
+    if isatty(FileHandle.standardInput.fileDescriptor) == 1 {
+        print("Press Return in THIS TERMINAL to start, or Ctrl-C to stop", terminator: " > ")
+        _ = readLine()
+    } else {
+        print("(stdin is not a terminal, so starting without a confirmation)")
+    }
+}
+
 print("")
 print("It waits for you, so there is no countdown to race:")
 print("  1. Switch to an app and SELECT SOME TEXT.")
 print("  2. It reads ~2s after the switch settles, then asks you to come back.")
 print("  3. Switch back here, and it sets up the next round.")
 print("")
-if writeMode {
-    print("")
-    print("*** WRITE MODE. This REPLACES the text you select with an uppercase")
-    print("*** version of itself. Use a scratch document, not anything you care")
-    print("*** about. Press Return to continue, or Ctrl-C to stop.")
-    _ = readLine()
-}
 print("Worth covering: TextEdit, Safari, Outlook, Teams, Word, VS Code.")
 print("A terminal cannot be measured this way - it is the one app that is never")
 print("in front when a reading is taken.")
