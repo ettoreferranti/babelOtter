@@ -3,7 +3,7 @@ import Foundation
 /// The only address babelOtter is permitted to talk to.
 ///
 /// NFR-P1 says no user content leaves the machine. The App Sandbox cannot enforce
-/// that for us — `com.apple.security.network.client` is all-or-nothing with no
+/// that for us -- `com.apple.security.network.client` is all-or-nothing with no
 /// loopback-only variant, and denying it would block Ollama too. So the guarantee
 /// lives here: a non-loopback endpoint is unrepresentable, and the architecture
 /// guard in `NetworkingCallSiteTests` asserts that every network call in the
@@ -19,7 +19,7 @@ public struct OllamaEndpoint: Sendable, Equatable, Hashable {
     /// `localhost` is deliberately absent, and deliberately still accepted:
     /// ``normalize(_:)`` rewrites it to `127.0.0.1` before this check. It is a
     /// name resolved through `/etc/hosts` and the system resolver, neither of
-    /// which this type controls, and neither of which guarantees loopback — so
+    /// which this type controls, and neither of which guarantees loopback -- so
     /// storing it in ``host`` would mean the stored value's destination is
     /// decided elsewhere. Rewriting instead of rejecting keeps
     /// `OllamaEndpoint(host: "localhost")` working for callers while making
@@ -67,7 +67,14 @@ public struct OllamaEndpoint: Sendable, Equatable, Hashable {
 
     /// `http://127.0.0.1:11434`, with IPv6 hosts bracketed.
     public var baseURL: URL {
-        let hostComponent = host.contains(":") ? "[\(host)]" : host
+        // if/else rather than a ternary: muter's SwapTernary operator
+        // intermittently emits invalid Swift here, and because every mutant for
+        // a file compiles into one binary, that one bad mutant makes the whole
+        // file unmeasurable and fails the gate. Observed as a buildError on one
+        // run and a clean result on the next -- the flakiness recorded in
+        // docs/HANDOFF.md, now pinned to this line.
+        var hostComponent = host
+        if host.contains(":") { hostComponent = "[\(host)]" }
         guard let url = URL(string: "http://\(hostComponent):\(port)") else {
             preconditionFailure("loopback host \(host):\(port) must form a valid URL")
         }

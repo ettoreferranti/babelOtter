@@ -79,12 +79,19 @@ Nothing babelOtter writes ever lands inside the repository. See `.gitignore`.
 
 Stated plainly rather than buried.
 
-### ⚠️ ACCEPTED RISK (v1) — Clipboard fallback and Universal Clipboard
+### ⚠️ OPEN RISK — Clipboard fallback and Universal Clipboard (closing in M1a, #77)
 
-When the Accessibility API cannot read or write the selection in a given app
-(common in some Electron apps and web content), babelOtter falls back to
-simulating ⌘C / ⌘V through the general pasteboard. Your previous clipboard
-contents are saved and restored around the operation.
+When the Accessibility API cannot read or write the selection in a given app,
+babelOtter falls back to simulating ⌘C / ⌘V through the general pasteboard.
+Your previous clipboard contents are saved and restored around the operation.
+
+**This path is not rare.** An earlier version of this document called it a
+fallback for "some Electron apps and web content", which implied an edge case.
+Spike #30 measured it against real applications on 2026-09-19 and found
+otherwise: the clipboard is the *only* working path for Electron apps such as
+VS Code, and the only path for writing a result back into web content. For
+anyone who works mainly in those, it is not the fallback -- it is the normal
+case. Details in `docs/architecture.md` section 7.
 
 **The risk:** if Handoff / Universal Clipboard is active, macOS may sync
 general pasteboard contents to your other Apple devices via iCloud. That is
@@ -96,9 +103,14 @@ clipboard managers*; Apple does not document any supported way to exclude an
 item from Universal Clipboard, and it is unverified whether concealment
 suppresses the sync at all.
 
-**Decision:** this risk is **knowingly accepted for v1** and documented here.
-Investigation and a strict AX-only mode are deferred to post-v1 — see the
-`privacy` + `post-v1` issues in the backlog.
+**Decision:** this risk is **knowingly accepted for the moment**, and is being
+closed rather than carried. It was originally accepted for the whole of v1 on
+the assumption that the clipboard was a rare fallback. Once spike #30 showed
+that assumption was false, the strict Accessibility-only mode that closes the
+gap was pulled forward out of post-v1 into M1a (issue #77), so that it ships in
+the same milestone as the fallback it guards rather than after it.
+
+Until #77 lands, the exposure described above is real and unmitigated.
 
 **If this matters to you today**, disable Handoff:
 `System Settings → General → AirDrop & Handoff → Handoff: off`.

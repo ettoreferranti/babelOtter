@@ -9,6 +9,11 @@ on:
   push:
     branches:
       - main
+      # This milestone's own branch, so its pre-merge runs keep working before
+      # a pull request exists for it. REMOVE THIS LINE when the branch merges:
+      # while both this entry and `pull_request` are live, a PR on this branch
+      # is the one case still double-running.
+      - feat/m1a-core
 
 # BABELOTTER_INTEGRATION is deliberately unset: integration tests are local-only.
 jobs:
@@ -134,10 +139,31 @@ jobs:
           # Pass 2 is StorageLocator.swift alone, run with
           # RelationalOperatorReplacement excluded — see muter.conf.yml's
           # KNOWN BUG block for why it cannot go in pass 1.
+          # StorageLocator alone still needs the RelationalOperatorReplacement
+          # workaround: its `while components.count > 1, !exists(...)` is the
+          # comma-conjunction condition muter mis-parses (see muter.conf.yml).
+          # New M1a code deliberately avoids that spelling, so it all runs in
+          # pass 1 under every operator — StructureExtractor and TokenProtector
+          # are named high-value targets and are worth keeping fully measured.
           PASS2="Sources/BabelOtterKit/Privacy/StorageLocator.swift"
-          PASS1="Sources/BabelOtterKit/LLM/OllamaEndpoint.swift
-          Sources/BabelOtterKit/BabelOtterKit.swift
-          Sources/BabelOtterKit/Privacy/UserText.swift"
+          PASS1="Sources/BabelOtterKit/BabelOtterKit.swift
+          Sources/BabelOtterKit/Config/AudienceProfile.swift
+          Sources/BabelOtterKit/Config/Configuration.swift
+          Sources/BabelOtterKit/Config/ConfigurationStore.swift
+          Sources/BabelOtterKit/Config/Glossary.swift
+          Sources/BabelOtterKit/Config/LanguageConfig.swift
+          Sources/BabelOtterKit/LLM/BlockCountPolicy.swift
+          Sources/BabelOtterKit/LLM/OllamaEndpoint.swift
+          Sources/BabelOtterKit/LLM/PromptBuilder.swift
+          Sources/BabelOtterKit/LLM/ResponseContracts.swift
+          Sources/BabelOtterKit/LLM/ResponseParser.swift
+          Sources/BabelOtterKit/Privacy/UserText.swift
+          Sources/BabelOtterKit/Text/LanguageDetector.swift
+          Sources/BabelOtterKit/Text/LocaleRuleApplier.swift
+          Sources/BabelOtterKit/Text/PostProcessor.swift
+          Sources/BabelOtterKit/Text/StructureExtractor.swift
+          Sources/BabelOtterKit/Text/TargetLanguageResolver.swift
+          Sources/BabelOtterKit/Text/TokenProtector.swift"
 
           MUTATED=$(printf '%s\n%s\n' "$PASS1" "$PASS2")
           ACTUAL=$(find Sources/BabelOtterKit -name '*.swift' | sort)

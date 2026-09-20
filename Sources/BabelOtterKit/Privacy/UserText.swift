@@ -1,6 +1,6 @@
 import Foundation
 
-/// Text belonging to the user — anything they selected, wrote, or got back.
+/// Text belonging to the user -- anything they selected, wrote, or got back.
 ///
 /// NFR-P5: this must never reach a log. Swift cannot make interpolation a
 /// compile error, so the defence is inverted instead: every textual
@@ -10,14 +10,14 @@ import Foundation
 public struct UserText: Sendable, Equatable, Hashable {
 
     /// The real content. Referencing this in a logging context is a review
-    /// finding — use ``summary(languageCode:action:)`` instead.
+    /// finding -- use ``summary(languageCode:action:)`` instead.
     public let value: String
 
     public init(_ value: String) {
         self.value = value
     }
 
-    /// Grapheme-cluster count, so "👩‍👩‍👧" counts as one character.
+    /// Grapheme-cluster count, so a multi-person emoji counts as one character.
     public var characterCount: Int { value.count }
 
     public var isEmpty: Bool {
@@ -35,13 +35,16 @@ public struct UserText: Sendable, Equatable, Hashable {
 }
 
 extension UserText: CustomStringConvertible, CustomDebugStringConvertible {
-    public var description: String { "⟨redacted \(characterCount) chars⟩" }
+    // U+27E8/U+27E9 angle brackets, as escapes for the ASCII-only source rule.
+    public var description: String {
+        "\u{27E8}redacted \(characterCount) chars\u{27E9}"
+    }
     public var debugDescription: String { description }
 }
 
 extension UserText: CustomReflectable {
-    /// `Mirror(reflecting:)` and `dump(_:)` read stored properties directly —
-    /// they do not consult `description`/`debugDescription` at all — so
+    /// `Mirror(reflecting:)` and `dump(_:)` read stored properties directly --
+    /// they do not consult `description`/`debugDescription` at all -- so
     /// without this conformance, `dump(userText)` while debugging would print
     /// the real content despite every textual representation above being
     /// redacted. This closes that path by replacing the reflected children
