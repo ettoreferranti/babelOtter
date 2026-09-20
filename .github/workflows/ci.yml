@@ -195,7 +195,33 @@ jobs:
             echo "::error::Pass 1 was handed no files to mutate. That is not a passing run of zero mutants; it means the file list step produced nothing."
             exit 1
           fi
+          # muter intermittently emits a mutant that fails to compile. Proven
+          # nondeterministic on 2026-09-20: the same commit and the same
+          # toolchain produced a buildError on one run of this job and a clean
+          # 0-never-built on a plain re-run, with no code change between them.
+          # Four consecutive reds were chased by restructuring whichever line
+          # had failed; each time the next run failed somewhere else.
+          #
+          # So a buildError is retried once, and only a *persistent* one fails
+          # the build. That keeps the guarantee this gate exists for -- a mutant
+          # that genuinely cannot be measured still stops the build, because
+          # nothing was learned about it -- while a one-off tool defect costs a
+          # minute instead of a red main. A red main nobody believes is worse
+          # than no gate at all.
+          buildErrors() {
+            python3 -c "
+import json,sys
+d=json.load(open(sys.argv[1]))
+print(sum(1 for r in d['fileReports'] for o in r['appliedOperators']
+          if o['testSuiteOutcome'] == 'buildError'))
+" "$1"
+          }
+
           muter run "${args[@]}" --format json -o muter-report-1.json
+          if [ "$(buildErrors muter-report-1.json)" -gt 0 ]; then
+            echo "::warning::Pass 1 produced a mutant that did not build. Retrying once before believing it."
+            muter run "${args[@]}" --format json -o muter-report-1.json
+          fi
 
       - name: Run mutation testing — pass 2 (StorageLocator, workaround)
         # StorageLocator.swift is run in its own pass with
@@ -218,9 +244,38 @@ jobs:
             echo "::error::Pass 2 was handed no files to mutate. That is not a passing run of zero mutants; it means the file list step produced nothing."
             exit 1
           fi
-          muter run "${args[@]}" \
-            --operators ChangeLogicalConnector RemoveSideEffects SwapTernary \
-            --format json -o muter-report-2.json
+          # muter intermittently emits a mutant that fails to compile. Proven
+          # nondeterministic on 2026-09-20: the same commit and the same
+          # toolchain produced a buildError on one run of this job and a clean
+          # 0-never-built on a plain re-run, with no code change between them.
+          # Four consecutive reds were chased by restructuring whichever line
+          # had failed; each time the next run failed somewhere else.
+          #
+          # So a buildError is retried once, and only a *persistent* one fails
+          # the build. That keeps the guarantee this gate exists for -- a mutant
+          # that genuinely cannot be measured still stops the build, because
+          # nothing was learned about it -- while a one-off tool defect costs a
+          # minute instead of a red main. A red main nobody believes is worse
+          # than no gate at all.
+          buildErrors() {
+            python3 -c "
+import json,sys
+d=json.load(open(sys.argv[1]))
+print(sum(1 for r in d['fileReports'] for o in r['appliedOperators']
+          if o['testSuiteOutcome'] == 'buildError'))
+" "$1"
+          }
+
+          run_pass_2() {
+            muter run "${args[@]}" \
+              --operators ChangeLogicalConnector RemoveSideEffects SwapTernary \
+              --format json -o muter-report-2.json
+          }
+          run_pass_2
+          if [ "$(buildErrors muter-report-2.json)" -gt 0 ]; then
+            echo "::warning::Pass 2 produced a mutant that did not build. Retrying once before believing it."
+            run_pass_2
+          fi
 
       - name: Enforce the combined threshold (>= 80%)
         run: |

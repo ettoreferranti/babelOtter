@@ -79,11 +79,26 @@ which produce identical strings from an ASCII file.
 - A `while` condition that is a comma-conjunction containing a relational
   operator (`while a < b, predicate`). Already recorded in `muter.conf.yml` for
   `StorageLocator`, which still needs the pass-2 workaround.
-- A ternary whose condition ends in an enum member. `OllamaEndpoint`'s ternary
-  was rewritten as if/else after producing a `buildError` on one run and clean
-  code on the next — **that is the intermittent buildError this document used to
-  record as "observed once on CI, never reproduced locally".** It is pinned to
-  that line, and it is gone.
+- A ternary whose condition ends in an enum member.
+
+**The intermittent `buildError` is nondeterministic, and chasing it is a trap.**
+This document used to record it as "observed once on CI, never reproduced
+locally". It is now understood: on 2026-09-20 `main` went red four times, each
+on a single mutant that failed to build, a different line each time. Each red
+was chased by restructuring whichever construct had failed. Then the same job
+was re-run on the *same commit with no code change* and passed with zero
+unmeasured mutants.
+
+So the line it names is not the cause, and restructuring it fixes nothing. The
+mutation passes in `ci.yml` now retry once on a `buildError`, and only a
+persistent one fails the build — a mutant that genuinely cannot be measured
+still stops CI, because nothing was learned about it.
+
+The restructuring it prompted was kept, because the code is better for it:
+`TokenProtector` walks a shrinking `Substring` instead of comparing indices
+against `endIndex`, and `OllamaEndpoint` asks `!inner.isEmpty` rather than
+`count > 2`. Fewer comparisons also means fewer mutants — 51 down to 44 — which
+is a smaller denominator, not worse coverage.
 
 **Local runs need a clean working copy.** muter reuses `../babelOtter_mutated`
 between runs and will measure stale tests against fresh sources — which is what
