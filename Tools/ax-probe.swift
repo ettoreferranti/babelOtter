@@ -10,6 +10,7 @@
 
 import AppKit
 import ApplicationServices
+import CoreGraphics
 import Foundation
 
 // Unbuffered stdout. This probe spends most of its life blocked waiting for
@@ -24,14 +25,44 @@ setvbuf(stdout, nil, _IONBF, 0)
 
 let rounds = Int(CommandLine.arguments.dropFirst().first ?? "6") ?? 6
 
-/// The terminal this was launched from. Readings are taken in *other* apps, so
-/// this is the app whose return to the front means "ready for the next one".
-let host = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
-
-func describe(_ app: NSRunningApplication?) -> String {
-    guard let app else { return "unknown" }
-    return "\(app.localizedName ?? "?")  [\(app.bundleIdentifier ?? "?")]"
+/// Which application currently owns the frontmost window.
+///
+/// Deliberately NOT `NSWorkspace.shared.frontmostApplication`. That property is
+/// updated through workspace notifications, which need a running run loop, and
+/// this is a command-line tool that never starts one. Measured on 2026-09-20:
+/// with the frontmost app switched from Finder to a terminal mid-run,
+/// `NSWorkspace` kept reporting Finder for the whole eight seconds while the
+/// window list tracked the change immediately. That is why the first version of
+/// this probe reported the launching terminal for all six rounds, and why the
+/// second version waited forever for a switch it could not see.
+///
+/// The window list needs no run loop and no extra permission: owner name and
+/// owner pid are available without Screen Recording, which only gates window
+/// *titles*.
+struct Frontmost {
+    let pid: pid_t
+    let label: String
 }
+
+func frontmost() -> Frontmost? {
+    guard
+        let windows = CGWindowListCopyWindowInfo(
+            [.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]]
+    else { return nil }
+
+    for window in windows {
+        guard let layer = window[kCGWindowLayer as String] as? Int, layer == 0,
+            let name = window[kCGWindowOwnerName as String] as? String,
+            let pid = window[kCGWindowOwnerPID as String] as? pid_t
+        else { continue }
+        let bundle = NSRunningApplication(processIdentifier: pid)?.bundleIdentifier
+        return Frontmost(pid: pid, label: "\(name)  [\(bundle ?? "?")]")
+    }
+    return nil
+}
+
+/// The terminal this was launched from: whatever is in front when we start.
+let host = frontmost()
 
 /// AXError by name. `-25204` tells you nothing; `cannotComplete` tells you the
 /// app never answered, which is a different problem from `attributeUnsupported`.
@@ -91,12 +122,12 @@ func tier2(_ element: AXUIElement) -> String {
     return "OK - \(string.count) chars"
 }
 
-/// The focused element, system-wide, falling back to asking the app directly.
+/// The focused element, system-wide, falling back to asking the app by pid.
 ///
 /// The system-wide element answers for whichever app has focus, but some apps
-/// refuse it while still answering when addressed by pid. Trying both is what
+/// refuse it while still answering when addressed directly. Trying both is what
 /// separates "this app exposes nothing" from "this route exposes nothing".
-func focusedElement(in app: NSRunningApplication) -> (AXUIElement?, String) {
+func focusedElement(pid: pid_t) -> (AXUIElement?, String) {
     var focused: AnyObject?
     let systemError = AXUIElementCopyAttributeValue(
         AXUIElementCreateSystemWide(), kAXFocusedUIElementAttribute as CFString, &focused)
@@ -104,48 +135,49 @@ func focusedElement(in app: NSRunningApplication) -> (AXUIElement?, String) {
         return ((raw as! AXUIElement), "system-wide")
     }
 
-    let appElement = AXUIElementCreateApplication(app.processIdentifier)
     var appFocused: AnyObject?
     let appError = AXUIElementCopyAttributeValue(
-        appElement, kAXFocusedUIElementAttribute as CFString, &appFocused)
+        AXUIElementCreateApplication(pid), kAXFocusedUIElementAttribute as CFString, &appFocused)
     if appError == .success, let raw = appFocused {
         return ((raw as! AXUIElement), "per-application")
     }
     return (nil, "system-wide \(name(systemError)); per-application \(name(appError))")
 }
 
-/// Blocks until some app other than the launching terminal is frontmost and has
-/// stayed there long enough for a selection to exist.
+/// Blocks until an app other than the launching terminal is frontmost and has
+/// settled, printing what it can see while it waits.
 ///
-/// This replaces a fixed countdown. The countdown assumed the reader would
-/// switch apps on the probe's schedule; in practice the terminal stayed
-/// frontmost for all six rounds and every reading was of the terminal itself.
-func waitForForeignApp(timeout: TimeInterval = 120) -> NSRunningApplication? {
+/// The heartbeat is not decoration. When this waited on a source that never
+/// updated, it sat silent and looked hung; printing what it currently sees
+/// would have shown the cause in seconds.
+func waitForForeignApp(timeout: TimeInterval = 180) -> Frontmost? {
     let deadline = Date().addingTimeInterval(timeout)
+    var lastBeat = Date.distantPast
     while Date() < deadline {
-        guard let app = NSWorkspace.shared.frontmostApplication,
-            app.bundleIdentifier != host
-        else {
-            Thread.sleep(forTimeInterval: 0.3)
+        if let current = frontmost(), current.pid != host?.pid {
+            Thread.sleep(forTimeInterval: 2.0)
+            if let settled = frontmost(), settled.pid == current.pid { return settled }
             continue
         }
-        // Let the switch settle, then confirm we are still there. Guards
-        // against reading mid-transition through an app launcher.
-        Thread.sleep(forTimeInterval: 2.0)
-        if let settled = NSWorkspace.shared.frontmostApplication,
-            settled.bundleIdentifier == app.bundleIdentifier
-        {
-            return settled
+        if Date().timeIntervalSince(lastBeat) > 4 {
+            print("  waiting for you to switch away... (frontmost now: \(frontmost()?.label ?? "unknown"))")
+            lastBeat = Date()
         }
+        Thread.sleep(forTimeInterval: 0.3)
     }
     return nil
 }
 
 /// Blocks until the launching terminal is frontmost again.
-func waitForReturnHome(timeout: TimeInterval = 120) {
+func waitForReturnHome(timeout: TimeInterval = 180) {
     let deadline = Date().addingTimeInterval(timeout)
+    var lastBeat = Date.distantPast
     while Date() < deadline {
-        if NSWorkspace.shared.frontmostApplication?.bundleIdentifier == host { return }
+        if frontmost()?.pid == host?.pid { return }
+        if Date().timeIntervalSince(lastBeat) > 4 {
+            print("  waiting for you to come back... (frontmost now: \(frontmost()?.label ?? "unknown"))")
+            lastBeat = Date()
+        }
         Thread.sleep(forTimeInterval: 0.3)
     }
 }
@@ -157,7 +189,7 @@ guard AXIsProcessTrusted() else {
     print("")
     print("NOT TRUSTED YET. Grant Accessibility to this terminal:")
     print("  System Settings > Privacy & Security > Accessibility > +")
-    print("  (add \(describe(NSWorkspace.shared.frontmostApplication)))")
+    print("  (add \(frontmost()?.label ?? "this terminal"))")
     print("Then QUIT it completely (Cmd-Q), reopen it, and rerun this script.")
     print("")
     print("If the + button is greyed out, or the toggle refuses to stay on, that is")
@@ -166,7 +198,7 @@ guard AXIsProcessTrusted() else {
 }
 
 print("")
-print("Trusted. This terminal is \(describe(NSWorkspace.shared.frontmostApplication)).")
+print("Trusted. This terminal is \(host?.label ?? "unknown").")
 print("")
 print("It waits for you, so there is no countdown to race:")
 print("  1. Switch to an app and SELECT SOME TEXT.")
@@ -186,8 +218,8 @@ for round in 1...rounds {
         break
     }
 
-    let (element, route) = focusedElement(in: app)
-    print("  app:    \(describe(app))")
+    let (element, route) = focusedElement(pid: app.pid)
+    print("  app:    \(app.label)")
     guard let element else {
         print("  focused element: NONE (\(route))")
         print("  -> tier 3 only: this app exposes no focused element at all")
