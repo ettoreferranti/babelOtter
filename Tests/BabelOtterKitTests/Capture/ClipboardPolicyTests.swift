@@ -5,7 +5,7 @@ import Testing
 
 /// Records every operation in order, so "restore happened, and happened last"
 /// is testable rather than assumed.
-private final class FakePasteboard: Pasteboard, @unchecked Sendable {
+private final class FakePasteboard: PasteboardAccess, @unchecked Sendable {
     enum Operation: Equatable {
         case snapshot
         case restore

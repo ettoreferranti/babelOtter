@@ -16,7 +16,7 @@ public struct PasteboardSnapshot: Sendable, Equatable {
 }
 
 /// The pasteboard, narrowed to what capture and replacement need.
-public protocol Pasteboard: Sendable {
+public protocol PasteboardAccess: Sendable {
     var changeCount: Int { get }
     /// Every type of every item, so a restore is faithful rather than
     /// string-shaped.
@@ -92,13 +92,13 @@ public struct ClipboardPolicy: Sendable {
 /// how this obligation would otherwise be lost.
 public struct ClipboardCapture: Sendable {
 
-    private let pasteboard: any Pasteboard
+    private let pasteboard: any PasteboardAccess
     private let keystrokes: any KeystrokeSending
     private let policy: ClipboardPolicy
     private let firstTimeout: Double
 
     public init(
-        pasteboard: any Pasteboard,
+        pasteboard: any PasteboardAccess,
         keystrokes: any KeystrokeSending,
         policy: ClipboardPolicy = ClipboardPolicy(),
         firstTimeout: Double = 2.0
@@ -144,10 +144,10 @@ public struct ClipboardCapture: Sendable {
 /// Replacement through the clipboard: activate, write, Command-V, restore.
 public struct ClipboardReplacement: Sendable {
 
-    private let pasteboard: any Pasteboard
+    private let pasteboard: any PasteboardAccess
     private let keystrokes: any KeystrokeSending
 
-    public init(pasteboard: any Pasteboard, keystrokes: any KeystrokeSending) {
+    public init(pasteboard: any PasteboardAccess, keystrokes: any KeystrokeSending) {
         self.pasteboard = pasteboard
         self.keystrokes = keystrokes
     }
