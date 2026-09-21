@@ -149,6 +149,31 @@ might.
 - Tells you, per action, when the clipboard path was used, so exposure is
   never silent (`FR-CAP`, `NFR-P9`).
 - Sets the concealment markers, for the clipboard-manager benefit above.
+- Offers **strict capture** (`strictCaptureOnly`, off by default), which
+  refuses to use the clipboard for *reading*. See below.
+
+### Strict capture
+
+Reading and writing expose different things, so babelOtter lets you refuse one
+without losing the other.
+
+**Reading** puts your *existing* text on the pasteboard — an email you
+received, a document you did not write, something you may not have chosen to
+put anywhere. **Writing** puts babelOtter's *own output* there, which you have
+just read and approved.
+
+`strictCaptureOnly` refuses the clipboard for reading only. Replacement
+continues to use it, because there is no alternative: Accessibility writes were
+measured returning success while changing nothing on every web surface tried.
+
+**What it costs**, from the table in `docs/architecture.md` section 7: with
+strict capture on, babelOtter cannot read a selection in **Microsoft Teams,
+Word, OneNote or VS Code** at all, and says so rather than falling back. It
+keeps TextEdit, Preview, Outlook, Safari and Mail — including both mail
+clients, which is most of what makes it worth having.
+
+It is off by default because that trade is yours to make, not a default worth
+imposing.
 
 The only way to remove the exposure entirely is to turn Handoff off:
 `System Settings → General → AirDrop & Handoff → Handoff: off`.
