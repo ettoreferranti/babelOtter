@@ -78,6 +78,10 @@ public enum ActionPrecondition {
     /// generation is that the model is never called, so the user is not left
     /// waiting on a request that was never worth making.
     public static func refusal(for snapshot: SelectionSnapshot) -> CaptureRefusal? {
-        snapshot.isEmpty ? .nothingSelected : nil
+        // if/else rather than a ternary whose branch begins with an enum
+        // member: that is the shape muter's SwapTernary mis-parsed in
+        // PromptBuilder, and one bad mutant makes a whole file unmeasurable.
+        guard snapshot.isEmpty else { return nil }
+        return .nothingSelected
     }
 }
