@@ -42,8 +42,8 @@ struct PartialTranslateBlocksTests {
 
     @Test("a unicode escape is decoded, including a surrogate pair")
     func unicodeEscapes() {
-        #expect(PartialTranslateBlocks.extract(from: #"{"blocks": ["café"]}"#) == ["caf\u{00E9}"])
-        #expect(PartialTranslateBlocks.extract(from: #"{"blocks": ["🦦"]}"#) == ["\u{1F9A6}"])
+        #expect(PartialTranslateBlocks.extract(from: #"{"blocks": ["caf\u00e9"]}"#) == ["caf\u{00E9}"])
+        #expect(PartialTranslateBlocks.extract(from: #"{"blocks": ["\ud83e\udda6"]}"#) == ["\u{1F9A6}"])
     }
 
     @Test("an escape cut off mid-way is left out rather than guessed", arguments: [
