@@ -21,6 +21,20 @@ public struct OllamaClient: Sendable {
         self.transport = transport
     }
 
+    /// A client wired to the real transport, for callers that must not spell
+    /// `URLSessionTransport` themselves.
+    ///
+    /// `NetworkingCallSiteTests` scans every file under `Sources/` -- app
+    /// included -- for networking symbol names, substring-matched on purpose
+    /// (see that suite's docs). `URLSessionTransport` contains `URLSession` as
+    /// a substring, so a caller outside this allowlisted file that constructs
+    /// one directly trips the guard. This factory keeps that construction
+    /// here, where it is reviewed and allowlisted, instead of adding a second
+    /// allowlist entry for a caller that only ever wants the real transport.
+    public static func loopback(timeout: TimeInterval) -> OllamaClient {
+        OllamaClient(transport: URLSessionTransport(timeout: timeout))
+    }
+
     /// Streams a chat completion as classified events.
     ///
     /// Chunks from the transport are framed here rather than there, so a
