@@ -142,6 +142,7 @@ jobs:
           Sources/BabelOtterKit/LLM/ResponseContracts.swift
           Sources/BabelOtterKit/LLM/ResponseParser.swift
           Sources/BabelOtterKit/Pipeline/PartialTranslateBlocks.swift
+          Sources/BabelOtterKit/Pipeline/Translator.swift
           Sources/BabelOtterKit/Privacy/UserText.swift
           Sources/BabelOtterKit/Text/LanguageDetector.swift
           Sources/BabelOtterKit/Text/LocaleRuleApplier.swift
