@@ -1,6 +1,27 @@
-# Handoff — state as of 2026-09-20
+# Handoff — state as of 2026-09-25
 
 Read this first if you are picking babelOtter up in a new session.
+
+## Update 2026-09-25: testing stops, prototyping starts
+
+**M1a is merged to `main` and closed.** The shell's remaining manual
+measurements (Task 14, Steps 2-4) are deferred, not done, and recorded as open
+in `docs/architecture.md` section 7. The clipboard is accepted as the conduit
+wherever it is needed, Universal Clipboard exposure included.
+
+**The next thing is a working Translate prototype**, a thin slice of M1b: menu
+bar app, global hotkey, capture, pipeline, streaming popup, Replace/Copy.
+Plan: `docs/superpowers/plans/2026-09-25-translate-prototype.md`.
+
+**Rigour is now split by layer.** `BabelOtterKit` keeps TDD and the mutation
+gate. `Sources/BabelOtterApp` is AppKit glue and is built for speed, verified
+by using it. Mutation testing moved to `.github/workflows/mutation.yml` and only
+runs when the kit or its tests change; its timeout went from 60 to 150 minutes
+after three runs were cancelled at the hour.
+
+**Default model:** `mistral-small3.2:24b`, pulled locally.
+
+Everything below is the 2026-09-20 state, kept for its reasoning.
 
 ## Where things stand
 
