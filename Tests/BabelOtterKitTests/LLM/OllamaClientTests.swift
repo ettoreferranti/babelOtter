@@ -260,6 +260,17 @@ struct OllamaClientTests {
         #expect(terminated, "cancelling the consumer must reach the transport, not leave it running")
     }
 
+    /// `loopback(timeout:)` is the one production call site that wires the
+    /// app to the real transport (`AppEnvironment.load()`), so it is worth
+    /// its own assertion rather than trusting the default-argument plumbing
+    /// by inspection. `endpoint` is `internal` in `OllamaClient` for exactly
+    /// this read.
+    @Test("loopback(timeout:) targets the loopback endpoint")
+    func loopbackTargetsLoopbackEndpoint() {
+        let client = OllamaClient.loopback(timeout: 5)
+        #expect(client.endpoint == .loopback)
+    }
+
     @Test("installed models are read from the tags endpoint")
     func installedModels() async throws {
         let transport = FakeTransport(chunks: [

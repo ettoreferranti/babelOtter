@@ -8,6 +8,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private let ollamaLine = NSMenuItem(title: "Ollama: checking...", action: nil, keyEquivalent: "")
     private let accessLine = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+    /// Hidden unless `environment.configurationNote` has something to say --
+    /// most launches have nothing wrong with the config file, and a menu
+    /// line reporting that would be noise.
+    private let configLine = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private(set) var environment = AppEnvironment.load()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -21,9 +25,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         item.button?.title = "\u{1F9A6}"
         item.button?.toolTip = "babelOtter"
 
+        if let note = environment.configurationNote {
+            configLine.title = "Configuration: \(note)"
+            configLine.isHidden = false
+        } else {
+            configLine.isHidden = true
+        }
+
         let menu = NSMenu()
         menu.addItem(ollamaLine)
         menu.addItem(accessLine)
+        menu.addItem(configLine)
         menu.addItem(.separator())
         menu.addItem(action("Check Again", #selector(refreshStatusAction)))
         menu.addItem(action("Open Configuration Folder", #selector(openConfiguration)))

@@ -13,7 +13,11 @@ import Foundation
 /// convention into a property of the type system.
 public struct OllamaClient: Sendable {
 
-    private let endpoint: OllamaEndpoint
+    // `internal`, not `private`: `OllamaClientTests` reads this via
+    // `@testable import` to prove `loopback(timeout:)` actually targets
+    // `.loopback` rather than merely defaulting to it by accident. Still not
+    // `public` -- nothing outside this package should branch on it.
+    let endpoint: OllamaEndpoint
     private let transport: any OllamaTransport
 
     public init(endpoint: OllamaEndpoint = .loopback, transport: any OllamaTransport) {
