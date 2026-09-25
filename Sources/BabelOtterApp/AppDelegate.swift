@@ -1,6 +1,8 @@
 import AppKit
 import ApplicationServices
 import BabelOtterKit
+import Carbon.HIToolbox
+import SwiftUI
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -13,9 +15,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// line reporting that would be noise.
     private let configLine = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private(set) var environment = AppEnvironment.load()
+    private var hotKey: HotKey?
+    private let panel = PopupPanel()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         buildMenu()
+        hotKey = HotKey(
+            keyCode: UInt32(kVK_ANSI_T), modifiers: UInt32(controlKey | optionKey), id: 1
+        ) { [weak self] in self?.translateSelection() }
+        if hotKey == nil { ollamaLine.title = "Control-Option-T is taken by another app" }
         promptForAccessibilityIfNeeded()
         refreshStatus()
     }
@@ -33,6 +41,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let menu = NSMenu()
+        menu.addItem(action("Translate Selection (Control-Option-T)", #selector(translateSelectionAction)))
         menu.addItem(ollamaLine)
         menu.addItem(accessLine)
         menu.addItem(configLine)
@@ -74,5 +83,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func openConfiguration() {
         let home = FileManager.default.homeDirectoryForCurrentUser
         NSWorkspace.shared.open(home.appending(path: "Library/Application Support/ch.babelotter"))
+    }
+
+    @objc private func translateSelectionAction() { translateSelection() }
+
+    /// Captures the frontmost application's selection and shows what was
+    /// captured -- a character count and the tier it came from, never the
+    /// text itself (NFR-P3/P5). Translation is not wired up yet: this task is
+    /// the hotkey, the capture, and the popup that proves both work.
+    func translateSelection() {
+        guard AXIsProcessTrusted() else {
+            promptForAccessibilityIfNeeded()
+            return
+        }
+        guard let front = NSWorkspace.shared.frontmostApplication,
+            front.processIdentifier != ProcessInfo.processInfo.processIdentifier
+        else { return }
+        let source = SourceApplication(
+            processIdentifier: front.processIdentifier,
+            bundleIdentifier: front.bundleIdentifier,
+            name: front.localizedName ?? "this application")
+
+        panel.show(Text("Reading the selection...").padding(16))
+        let capturer = SelectionCapturer(configuration: environment.configuration)
+        Task {
+            let outcome = await Task.detached { capturer.capture(from: source) }.value
+            switch outcome {
+            case .refused(let refusal):
+                panel.show(Text(refusal.detail).padding(16))
+            case .captured(let snapshot):
+                panel.show(Text(
+                    "Captured \(snapshot.text.characterCount) characters via \(String(describing: snapshot.tier))"
+                ).padding(16))
+            }
+        }
     }
 }
