@@ -134,6 +134,18 @@ struct TranslatorTests {
         #expect(!finished.warnings.isEmpty)
     }
 
+    @Test("an unparseable reply still restores a protected term")
+    func unparseableReplyRestoresProtectedTerm() async throws {
+        let chat = ScriptedChat([["\(open)DNT0\(close) is good, sorry no JSON"]])
+        let events = try await collect(translator(chat).translate(
+            UserText("Otterbach ist gut"),
+            direction: Direction(source: german, target: english), profile: .colleagues))
+
+        let finished = try #require(result(events))
+        #expect(finished.text == UserText("Otterbach is good, sorry no JSON"))
+        #expect(!finished.warnings.isEmpty)
+    }
+
     @Test("a mangled sentinel becomes a warning")
     func mangledSentinel() async throws {
         let chat = ScriptedChat([["{\"blocks\": [\"The school is good\"]}"]])

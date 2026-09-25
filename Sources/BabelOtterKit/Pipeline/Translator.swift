@@ -149,7 +149,7 @@ public struct Translator: Sendable {
         let raw = try await generate(masked, context, emit)
 
         guard case .decoded(let response) = ResponseParser.parseTranslate(raw) else {
-            return emit(.finished(unparsed(raw, direction, context)))
+            return emit(.finished(unparsed(raw, masked.first, direction, context)))
         }
         let decision = BlockCountPolicy().decide(
             expected: extracted.skeleton.blockCount, received: response.blocks.count, attempt: 0)
@@ -179,7 +179,7 @@ public struct Translator: Sendable {
         let whole = TokenProtector.mask(text.value, terms: context.terms)
         let raw = try await generate([whole], context, emit)
         guard case .decoded(let response) = ResponseParser.parseTranslate(raw) else {
-            return emit(.finished(unparsed(raw, direction, context)))
+            return emit(.finished(unparsed(raw, whole, direction, context)))
         }
         let decision = BlockCountPolicy().decide(
             expected: 1, received: response.blocks.count, attempt: 1)
@@ -230,13 +230,26 @@ public struct Translator: Sendable {
         }.joined(separator: "\n")
     }
 
+    /// A reply that never became valid JSON is still shown, but any protected
+    /// term the model echoed back as a bare sentinel must still come back as
+    /// itself rather than as the sentinel -- an unparseable reply is exactly
+    /// the case where the user most needs to trust what they are looking at.
+    ///
+    /// `protected` is `nil` only when there was nothing to mask in the first
+    /// place (an empty selection produces zero blocks); today's behaviour --
+    /// locale rules with no protected spans -- is kept for that case.
     private func unparsed(
-        _ raw: String, _ direction: Direction, _ context: Context
+        _ raw: String, _ protected: ProtectedText?, _ direction: Direction, _ context: Context
     ) -> TranslationResult {
-        let text = LocaleRuleApplier.apply(context.processor.rules, to: raw, protecting: [])
+        let format = "The model's reply was not in the expected format, so it is shown as it came."
+        guard let protected else {
+            let text = LocaleRuleApplier.apply(context.processor.rules, to: raw, protecting: [])
+            return TranslationResult(text: UserText(text), direction: direction, warnings: [format])
+        }
+        let finished = context.processor.finish(raw, protected: protected)
         return TranslationResult(
-            text: UserText(text), direction: direction,
-            warnings: ["The model's reply was not in the expected format, so it is shown as it came."])
+            text: UserText(finished.text), direction: direction,
+            warnings: [format] + warnings(finished.problems))
     }
 
     private func joined(
