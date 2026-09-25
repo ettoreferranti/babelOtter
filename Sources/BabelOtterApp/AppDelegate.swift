@@ -17,6 +17,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) var environment = AppEnvironment.load()
     private var hotKey: HotKey?
     private let panel = PopupPanel()
+    private var currentModel: PopupModel?
+    /// A clipboard capture must always run to its own restore -- cancelling
+    /// it mid-flight would abandon that restore and leave the user's real
+    /// clipboard clobbered. So a capture in flight is not cancelled; a hotkey
+    /// press (or the menu item) received while one is running is dropped
+    /// instead, which is simpler and cannot race two captures against the
+    /// same pasteboard (Task 5 review finding: two concurrent
+    /// `SelectionCapturer.capture` calls can interleave their save/copy/read/
+    /// restore sequences on `NSPasteboard.general` and leave the wrong
+    /// content on the clipboard).
+    private var isCapturing = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         buildMenu()
@@ -87,15 +98,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func translateSelectionAction() { translateSelection() }
 
-    /// Captures the frontmost application's selection and shows what was
-    /// captured -- a character count and the tier it came from, never the
-    /// text itself (NFR-P3/P5). Translation is not wired up yet: this task is
-    /// the hotkey, the capture, and the popup that proves both work.
+    /// Captures the frontmost application's selection and streams a
+    /// translation into the popup (NFR-P3/P5: never the text itself, outside
+    /// the popup's own view and the clipboard on Copy).
+    ///
+    /// While a capture is already in flight, a fresh press is ignored
+    /// outright -- the capture is left to run to its own restore rather than
+    /// being raced or cancelled. Only once no capture is in flight does a
+    /// second press dismiss (and so cancel) the current popup before
+    /// starting a new one.
     func translateSelection() {
         guard AXIsProcessTrusted() else {
             promptForAccessibilityIfNeeded()
             return
         }
+        guard !isCapturing else { return }
         guard let front = NSWorkspace.shared.frontmostApplication,
             front.processIdentifier != ProcessInfo.processInfo.processIdentifier
         else { return }
@@ -104,18 +121,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             bundleIdentifier: front.bundleIdentifier,
             name: front.localizedName ?? "this application")
 
-        panel.show(Text("Reading the selection...").padding(16))
+        currentModel?.dismiss()
+
+        let model = PopupModel(environment: environment) { [weak self] in self?.panel.dismiss() }
+        currentModel = model
+        panel.show(PopupView(model: model))
+
+        isCapturing = true
         let capturer = SelectionCapturer(configuration: environment.configuration)
         Task {
             let outcome = await Task.detached { capturer.capture(from: source) }.value
-            switch outcome {
-            case .refused(let refusal):
-                panel.show(Text(refusal.detail).padding(16))
-            case .captured(let snapshot):
-                panel.show(Text(
-                    "Captured \(snapshot.text.characterCount) characters via \(String(describing: snapshot.tier))"
-                ).padding(16))
-            }
+            isCapturing = false
+            // A stale result -- from a capture whose popup is no longer the
+            // current one -- must never land in a newer popup.
+            guard currentModel === model else { return }
+            model.begin(with: outcome)
         }
     }
 }
