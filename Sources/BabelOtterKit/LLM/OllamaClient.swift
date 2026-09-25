@@ -45,7 +45,12 @@ public struct OllamaClient: Sendable {
         let endpoint = endpoint
         let transport = transport
         return LazyStream { AsyncThrowingStream { continuation in
-            Task {
+            // Kept, rather than discarded, so `onTermination` below can
+            // cancel it: a consumer that stops iterating (Escape, a timeout)
+            // must stop the request in flight, not just stop listening to
+            // it. Without this, the daemon keeps generating and the
+            // transport keeps reading long after nobody is looking.
+            let task = Task {
                 do {
                     let body = try JSONEncoder().encode(
                         ChatRequest(model: model, messages: messages, stream: true))
@@ -67,6 +72,7 @@ public struct OllamaClient: Sendable {
                     continuation.finish(throwing: error)
                 }
             }
+            continuation.onTermination = { _ in task.cancel() }
         } }
     }
 
@@ -93,7 +99,10 @@ public struct OllamaClient: Sendable {
         let endpoint = endpoint
         let transport = transport
         return LazyStream { AsyncThrowingStream { continuation in
-            Task {
+            // Same reasoning as `chat`: kept so `onTermination` can cancel it
+            // when the consumer stops listening, rather than leaving a
+            // multi-gigabyte download running with nobody watching it.
+            let task = Task {
                 do {
                     let body = try JSONEncoder().encode(PullRequest(name: model, stream: true))
                     let stream = try await transport.chunks(
@@ -118,6 +127,7 @@ public struct OllamaClient: Sendable {
                     continuation.finish(throwing: error)
                 }
             }
+            continuation.onTermination = { _ in task.cancel() }
         } }
     }
 
