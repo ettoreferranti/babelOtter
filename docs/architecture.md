@@ -515,6 +515,13 @@ copy.
 **Still unmeasured:** Teams, Word and OneNote, which are work-machine only.
 VS Code standing in for Electron is reasonable evidence but not proof for them.
 
+**Left open deliberately, 2026-09-25.** Measurement stopped here and
+prototyping began. Three questions stay unanswered: clipboard capture in Teams,
+Word and OneNote; whether Outlook's message body accepts an Accessibility write
+(moot while replacement always goes through the clipboard); and Chrome. The
+prototype will show the first and third in daily use; if it contradicts this
+section, record it here plainly.
+
 ### Universal Clipboard transfers at paste time, not at copy time
 
 Two measurements, 2026-09-20, across two Macs on one account. Together they

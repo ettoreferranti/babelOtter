@@ -35,6 +35,10 @@ public struct Configuration: Sendable, Equatable, Codable {
     /// Selections shorter than this are never guessed at (`FR-TRN-03`).
     /// Measured in non-whitespace characters -- see ``LanguageDetector``.
     public var minimumLengthForDetection: Int
+    /// Refuse the clipboard for *reading* (#77). Replacement still uses it.
+    /// Off by default: turning it on means no capture at all in Teams, Word,
+    /// OneNote or VS Code, which is a product decision rather than a detail.
+    public var strictCaptureOnly: Bool
 
     public init(
         languages: [LanguageConfig],
@@ -45,7 +49,8 @@ public struct Configuration: Sendable, Equatable, Codable {
         timeoutSeconds: Double,
         retentionDays: Int,
         detectionConfidenceFloor: Double,
-        minimumLengthForDetection: Int
+        minimumLengthForDetection: Int,
+        strictCaptureOnly: Bool = false
     ) {
         self.languages = languages
         self.profiles = profiles
@@ -56,6 +61,7 @@ public struct Configuration: Sendable, Equatable, Codable {
         self.retentionDays = retentionDays
         self.detectionConfidenceFloor = detectionConfidenceFloor
         self.minimumLengthForDetection = minimumLengthForDetection
+        self.strictCaptureOnly = strictCaptureOnly
     }
 
     public var enabledLanguages: [LanguageConfig] {
@@ -106,6 +112,7 @@ extension Configuration {
         timeoutSeconds: 60,
         retentionDays: 90,
         detectionConfidenceFloor: 0.65,
-        minimumLengthForDetection: 12
+        minimumLengthForDetection: 12,
+        strictCaptureOnly: false
     )
 }

@@ -1,6 +1,27 @@
-# Handoff — state as of 2026-09-20
+# Handoff — state as of 2026-09-25
 
 Read this first if you are picking babelOtter up in a new session.
+
+## Update 2026-09-25: testing stops, prototyping starts
+
+**M1a is merged to `main` and closed.** The shell's remaining manual
+measurements (Task 14, Steps 2-4) are deferred, not done, and recorded as open
+in `docs/architecture.md` section 7. The clipboard is accepted as the conduit
+wherever it is needed, Universal Clipboard exposure included.
+
+**The next thing is a working Translate prototype**, a thin slice of M1b: menu
+bar app, global hotkey, capture, pipeline, streaming popup, Replace/Copy.
+Plan: `docs/superpowers/plans/2026-09-25-translate-prototype.md`.
+
+**Rigour is now split by layer.** `BabelOtterKit` keeps TDD and the mutation
+gate. `Sources/BabelOtterApp` is AppKit glue and is built for speed, verified
+by using it. Mutation testing moved to `.github/workflows/mutation.yml` and only
+runs when the kit or its tests change; its timeout went from 60 to 150 minutes
+after three runs were cancelled at the hour.
+
+**Default model:** `mistral-small3.2:24b`, pulled locally.
+
+Everything below is the 2026-09-20 state, kept for its reasoning.
 
 ## Where things stand
 
@@ -8,13 +29,25 @@ Read this first if you are picking babelOtter up in a new session.
 single `--no-ff` merge, so the milestone reads as one unit with every commit
 intact. `main` is green.
 
+**M1a's shell is on `feat/m1a-shell`, not merged.** Tasks 1-13 of
+`docs/superpowers/plans/2026-09-20-m1a-shell.md` are done: the whole Ollama
+client, the capture ladder, clipboard capture and replacement, strict mode,
+result custody and the empty-selection gate. Task 14 is the integration suite,
+which needs a granted Accessibility permission and real applications, so it is
+yours to run rather than mine.
+
+What is deliberately *not* covered by tests is small and named: three files in
+`Sources/BabelOtterApp` -- `AccessibilityReader`, `SystemPasteboard`,
+`SyntheticKeystrokes` -- which cannot be unit-tested at all. Everything that
+decides anything is pure and lives in the kit.
+
 **M1a's pure core is merged to `main`.** It is the whole translation pipeline
 except the parts that touch the outside world: no Accessibility, no clipboard,
 no network, no UI. All of it runs in CI.
 
 | | |
 |---|---|
-| Branch | `feat/m1a-core`, merged to `main` 2026-09-20 |
+| Branches | `feat/m1a-core` merged 2026-09-20; `feat/m1a-shell` open |
 | Tests | 255 in 25 suites, green from a clean build |
 | Mutation | 42/49 = **85.7%**, gating CI at ≥80%, no unmeasured mutants |
 | CI | green — build+test and the mutation job both pass |
