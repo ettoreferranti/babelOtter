@@ -102,9 +102,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// translation into the popup (NFR-P3/P5: never the text itself, outside
     /// the popup's own view and the clipboard on Copy).
     ///
-    /// While a capture is already in flight, a fresh press is ignored
-    /// outright -- the capture is left to run to its own restore rather than
-    /// being raced or cancelled. Only once no capture is in flight does a
+    /// While a capture or a replacement is already in flight, a fresh press
+    /// is ignored outright -- both are pasteboard work that must run to its
+    /// own restore rather than being raced or cancelled, and
+    /// `ClipboardReplacement`/`ClipboardCapture` share the same
+    /// `NSPasteboard.general`, so two of either kind interleaving is exactly
+    /// as unsafe as two captures. Only once neither is in flight does a
     /// second press dismiss (and so cancel) the current popup before
     /// starting a new one.
     func translateSelection() {
@@ -112,7 +115,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             promptForAccessibilityIfNeeded()
             return
         }
-        guard !isCapturing else { return }
+        guard !isCapturing, currentModel?.isReplacing != true else { return }
         guard let front = NSWorkspace.shared.frontmostApplication,
             front.processIdentifier != ProcessInfo.processInfo.processIdentifier
         else { return }
@@ -126,8 +129,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let model = PopupModel(
             environment: environment,
             close: { [weak self] in self?.panel.dismiss() },
-            reopen: { [weak self] in
-                guard let self, let model = self.currentModel else { return }
+            reopen: { [weak self] model in
+                guard let self else { return }
+                self.currentModel = model
                 self.panel.show(PopupView(model: model))
             })
         currentModel = model

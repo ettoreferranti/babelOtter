@@ -24,7 +24,7 @@ final class PopupModel {
     let configuration: Configuration
     private let translator: Translator
     private let close: @MainActor () -> Void
-    private let reopen: @MainActor () -> Void
+    private let reopen: @MainActor (PopupModel) -> Void
     private(set) var snapshot: SelectionSnapshot?
     private var consumer: Task<Void, Never>?
     private var watchdog: Task<Void, Never>?
@@ -34,10 +34,18 @@ final class PopupModel {
     /// that have already started, and `dismiss()` is reachable from
     /// `.capturing`, before any exist.
     private var isDismissed = false
+    /// True for the whole of `replace()`'s pasteboard work, from the moment
+    /// it starts until `settle(_:)` runs on every path, source-quit included.
+    /// `AppDelegate` refuses a hotkey press while this is true, the same way
+    /// it refuses one during a capture -- `ClipboardReplacement` and
+    /// `ClipboardCapture`/`SelectionCapturer`'s clipboard tier both
+    /// save/write/restore `NSPasteboard.general`, and letting a second one
+    /// start mid-flight would interleave the two on the same pasteboard.
+    private(set) var isReplacing = false
 
     init(
         environment: AppEnvironment, close: @escaping @MainActor () -> Void,
-        reopen: @escaping @MainActor () -> Void
+        reopen: @escaping @MainActor (PopupModel) -> Void
     ) {
         self.configuration = environment.configuration
         self.translator = Translator(configuration: environment.configuration, chat: environment.client)
@@ -98,7 +106,8 @@ final class PopupModel {
     /// message instead of losing the result behind a closed, dismissed
     /// popup.
     func replace() {
-        guard phase == .finished, let snapshot else { return }
+        guard phase == .finished, let snapshot, !isReplacing else { return }
+        isReplacing = true
         let result = GeneratedResult(
             text: UserText(text), action: .translate,
             capturedViaPasteboard: snapshot.usedPasteboard)
@@ -124,17 +133,26 @@ final class PopupModel {
             let outcome = await Task.detached {
                 ClipboardReplacement(
                     pasteboard: SystemPasteboard(), keystrokes: SyntheticKeystrokes(),
-                    settle: { Thread.sleep(forTimeInterval: 0.5) }
+                    // Tools/clipboard-probe.swift measured 0.8s between
+                    // Command-V and the target reading the pasteboard; less
+                    // than that risks restoring the user's old clipboard
+                    // before the paste lands, so the wrong text is what gets
+                    // pasted.
+                    settle: { Thread.sleep(forTimeInterval: 0.8) }
                 ).replace(with: text, activateSource: { isFront })
             }.value
             settle(ResultCustody.afterReplacement(outcome, result: result))
         }
     }
 
+    /// Runs on every path out of `replace()`, source-quit included, so
+    /// `isReplacing` never stays stuck true past the pasteboard work it
+    /// guards.
     private func settle(_ custody: Custody) {
+        isReplacing = false
         message = custody.message
         guard custody.keepsPopupOpen else { return }
-        reopen()
+        reopen(self)
     }
 
     func dismiss() {

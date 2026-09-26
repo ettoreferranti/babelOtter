@@ -91,6 +91,15 @@ combination.
 | Mail compose, Outlook body | replaced |
 | Teams, Word, VS Code | replaced |
 | Source app quit before pressing Replace | popup stays, says the application has closed, Copy still works |
+| Press the hotkey again while a Replace is still settling (right after the popup closes, before the source app's title bar has fully returned) | the press is ignored, the same as during a capture; watch `ollama ps`/Console for a second, overlapping capture rather than a clean no-op |
+
+Watch for one more failure shape on every Replace row above, not its own
+row: **the user's old clipboard content appears in the document instead of
+the translation.** That means the settle time between Command-V and the
+restore (0.8s, matching what `Tools/clipboard-probe.swift` measured) was too
+short for that application to read the pasteboard before babelOtter put the
+old clipboard back -- worth a note of which app and how much text, since the
+fix is a longer, possibly per-app, settle time.
 
 Anything any of these contradicts in `docs/architecture.md` section 7 belongs
 there, plainly, once it is actually measured -- that document is measured
