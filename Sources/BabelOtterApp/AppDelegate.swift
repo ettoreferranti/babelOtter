@@ -123,7 +123,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         currentModel?.dismiss()
 
-        let model = PopupModel(environment: environment) { [weak self] in self?.panel.dismiss() }
+        let model = PopupModel(
+            environment: environment,
+            close: { [weak self] in self?.panel.dismiss() },
+            reopen: { [weak self] in
+                guard let self, let model = self.currentModel else { return }
+                self.panel.show(PopupView(model: model))
+            })
         currentModel = model
         panel.show(PopupView(model: model))
 

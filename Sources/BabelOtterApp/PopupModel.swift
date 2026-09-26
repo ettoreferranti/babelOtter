@@ -24,6 +24,7 @@ final class PopupModel {
     let configuration: Configuration
     private let translator: Translator
     private let close: @MainActor () -> Void
+    private let reopen: @MainActor () -> Void
     private(set) var snapshot: SelectionSnapshot?
     private var consumer: Task<Void, Never>?
     private var watchdog: Task<Void, Never>?
@@ -34,10 +35,14 @@ final class PopupModel {
     /// `.capturing`, before any exist.
     private var isDismissed = false
 
-    init(environment: AppEnvironment, close: @escaping @MainActor () -> Void) {
+    init(
+        environment: AppEnvironment, close: @escaping @MainActor () -> Void,
+        reopen: @escaping @MainActor () -> Void
+    ) {
         self.configuration = environment.configuration
         self.translator = Translator(configuration: environment.configuration, chat: environment.client)
         self.close = close
+        self.reopen = reopen
     }
 
     func begin(with outcome: CaptureOutcome) {
@@ -80,6 +85,56 @@ final class PopupModel {
         guard phase == .finished else { return }
         SystemPasteboard().write(text, concealed: false)
         dismiss()
+    }
+
+    /// Pastes the translation over the original selection, through the
+    /// clipboard, then restores whatever the user had copied before.
+    ///
+    /// `close()` hides the panel -- the panel must not be key when Command-V
+    /// is posted -- but this deliberately does **not** call `dismiss()` and
+    /// so never sets `isDismissed`. A replacement that turns out not to have
+    /// been attempted (the source application quit, or something failed
+    /// before the keystroke) reopens the same, still-live model with a
+    /// message instead of losing the result behind a closed, dismissed
+    /// popup.
+    func replace() {
+        guard phase == .finished, let snapshot else { return }
+        let result = GeneratedResult(
+            text: UserText(text), action: .translate,
+            capturedViaPasteboard: snapshot.usedPasteboard)
+        let pid = snapshot.application.processIdentifier
+
+        guard let source = NSRunningApplication(processIdentifier: pid), !source.isTerminated else {
+            settle(ResultCustody.afterSourceQuit(result: result))
+            return
+        }
+        close()  // the panel must not be key when Command-V is posted
+        source.activate()
+        let text = self.text
+        Task {
+            var frontmost = false
+            for _ in 0..<50 {
+                if NSWorkspace.shared.frontmostApplication?.processIdentifier == pid {
+                    frontmost = true
+                    break
+                }
+                try? await Task.sleep(for: .milliseconds(20))
+            }
+            let isFront = frontmost
+            let outcome = await Task.detached {
+                ClipboardReplacement(
+                    pasteboard: SystemPasteboard(), keystrokes: SyntheticKeystrokes(),
+                    settle: { Thread.sleep(forTimeInterval: 0.5) }
+                ).replace(with: text, activateSource: { isFront })
+            }.value
+            settle(ResultCustody.afterReplacement(outcome, result: result))
+        }
+    }
+
+    private func settle(_ custody: Custody) {
+        message = custody.message
+        guard custody.keepsPopupOpen else { return }
+        reopen()
     }
 
     func dismiss() {

@@ -64,6 +64,9 @@ struct PopupView: View {
 
     private var actions: some View {
         HStack {
+            Button("Replace") { model.replace() }
+                .keyboardShortcut(.defaultAction)
+                .disabled(model.phase != .finished)
             Button("Copy") { model.copy() }
                 .keyboardShortcut("c", modifiers: .command)
                 .disabled(model.phase != .finished)
