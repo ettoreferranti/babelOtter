@@ -9,9 +9,33 @@ measurements (Task 14, Steps 2-4) are deferred, not done, and recorded as open
 in `docs/architecture.md` section 7. The clipboard is accepted as the conduit
 wherever it is needed, Universal Clipboard exposure included.
 
-**The next thing is a working Translate prototype**, a thin slice of M1b: menu
-bar app, global hotkey, capture, pipeline, streaming popup, Replace/Copy.
-Plan: `docs/superpowers/plans/2026-09-25-translate-prototype.md`.
+**The Translate prototype is built**, a thin slice of M1b, on
+`feat/translate-prototype` (not yet merged to `main`): a menu bar app, a
+global hotkey (Control-Option-T, fixed), selection capture through the
+three-tier ladder (Accessibility first, then the clipboard), a
+non-activating streaming popup near the cursor, direction auto-detection
+with a manual choice and a swap when it can't tell, and Replace (paste back
+through the clipboard, the user's own clipboard restored afterwards) / Copy.
+Plan: `docs/superpowers/plans/2026-09-25-translate-prototype.md`; its seven
+tasks are all done.
+
+**Deliberately not in this slice** -- each a small, separate follow-up once
+the prototype has seen daily use:
+
+- **Audience profile control.** Every translation runs against the fixed
+  Colleagues profile. There is no picker, and no per-invocation style note
+  ("shorter", "more encouraging").
+- **A settings window.** Configuration is hand-edited JSON only (see the
+  README's status block for the path).
+- **Onboarding.** The Accessibility prompt is the bare system one; there is
+  no guided setup, and no re-prompt if a grant is later revoked (#71).
+- **History.** Nothing is written to disk. A result lives only in the popup
+  until Replace, Copy, or Dismiss.
+- **Regenerate.** A translation that came back wrong has to be re-triggered
+  from scratch -- dismiss, reselect if needed, hotkey again. There is no
+  in-popup retry.
+- **Configurable hotkeys.** Control-Option-T is the one hotkey, and it is
+  hardcoded.
 
 **Rigour is now split by layer.** `BabelOtterKit` keeps TDD and the mutation
 gate. `Sources/BabelOtterApp` is AppKit glue and is built for speed, verified
@@ -20,6 +44,57 @@ runs when the kit or its tests change; its timeout went from 60 to 150 minutes
 after three runs were cancelled at the hour.
 
 **Default model:** `mistral-small3.2:24b`, pulled locally.
+
+### Outstanding manual checks (yours -- nothing here can be pressed or watched from a coding session)
+
+`swift test && Tools/make-app.sh --run`, grant Accessibility when prompted
+(menu bar icon shows the status; *Check Again* rereads it), then work
+through these. They come from tasks 5, 6 and 7 of the prototype plan and
+none of them have been run yet.
+
+**Capture** -- select text in each app, then press Control-Option-T:
+
+| App | Expected |
+|---|---|
+| TextEdit | `via accessibilityText` |
+| Safari (page text) | `via textMarkerRange` |
+| VS Code, Teams, Word | `via clipboard`; your previous clipboard is still there afterwards |
+| Any app, nothing selected | the *nothing selected* message |
+
+The panel must appear near the pointer without the source app losing its
+active title bar. If Control-Option-T does nothing at all, check the menu
+bar icon's first item -- it reads "Control-Option-T is taken by another
+app" if registration lost to something else already holding that
+combination.
+
+**Translation:**
+
+| Do | Expected |
+|---|---|
+| Select a German paragraph in TextEdit, Control-Option-T | Swiss Standard German -> English; text streams in; no `⟦DNT` debris, no JSON |
+| Select English, Control-Option-T | English -> Swiss Standard German; no eszett anywhere, preview included |
+| Select "Hallo", Control-Option-T | *Translate into:* with two buttons; either one translates |
+| Press Swap during or after a translation | the direction flips and it re-runs |
+| Press Escape mid-stream | popup closes; `ollama ps` shows the request stopping |
+| A bullet list | markers and line structure survive |
+| Quit Ollama, Control-Option-T | "Ollama could not be reached" rather than a hang |
+| Copy | result on the clipboard, popup closed |
+| Press Control-Option-T in VS Code, then Escape before the popup shows a result | popup closes; `ollama ps` shows no new request |
+| Press the hotkey again while a popup from a previous selection is still open/streaming | the first one closes (and its in-flight request stops) before the second one starts |
+
+**Replace:**
+
+| Surface | Expected |
+|---|---|
+| TextEdit | selection replaced; previous clipboard intact afterwards (Command-V elsewhere) |
+| Safari `<textarea>` (`Tools/editable-scratch.html`) | replaced |
+| Mail compose, Outlook body | replaced |
+| Teams, Word, VS Code | replaced |
+| Source app quit before pressing Replace | popup stays, says the application has closed, Copy still works |
+
+Anything any of these contradicts in `docs/architecture.md` section 7 belongs
+there, plainly, once it is actually measured -- that document is measured
+reality, not a place to record an expectation nobody has confirmed.
 
 Everything below is the 2026-09-20 state, kept for its reasoning.
 
