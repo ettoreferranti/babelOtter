@@ -174,6 +174,14 @@ final class PopupModel {
         configuration.profile(id: AudienceProfile.colleagues.id) ?? .colleagues
     }
 
+    /// Holds one `run()`'s `consumer` and `watchdog` so each can cancel the
+    /// other without going through `self`. See the comment in `run(_:)`.
+    @MainActor
+    private final class RunTasks {
+        var consumer: Task<Void, Never>?
+        var watchdog: Task<Void, Never>?
+    }
+
     private func run(_ direction: Direction) {
         guard !isDismissed, let snapshot else { return }
         stop()
@@ -187,9 +195,33 @@ final class PopupModel {
         let timeout = configuration.timeoutSeconds
 
         // Both tasks inherit the main actor, so they touch `self` directly.
+        //
+        // `consumer` and `watchdog` are a pair, each existing only to cancel
+        // the other -- through `pair`, a holder created fresh for this one
+        // `run()`, rather than through `self.consumer` / `self.watchdog`. A
+        // cancelled `AsyncThrowingStream` iterator returns nil rather than
+        // throwing, so a stale consumer -- cancelled by `stop()` because a
+        // later `run()` (Swap, a retry) already replaced both properties --
+        // can still reach the code after the loop. Reading `self.watchdog`
+        // there would hand it whichever watchdog happens to be current by
+        // then, i.e. the new run's; `pair` is this run's own, so a stale
+        // consumer only ever cancels the watchdog it was started alongside.
+        // (A plain local `var` captured directly by both closures hits
+        // Swift's "mutated after capture by sendable closure" diagnostic,
+        // since `consumer` must capture it before `watchdog` exists --
+        // `pair` sidesteps that by never being reassigned itself, only its
+        // properties.)
+        let pair = RunTasks()
         let consumer = Task { [weak self] in
             do {
-                for try await event in stream { self?.apply(event) }
+                for try await event in stream {
+                    // Events already buffered ahead of a cancellation --
+                    // including `.finished` -- must not be applied once this
+                    // consumer is stale; they would overwrite the new run's
+                    // text and phase with the old run's.
+                    guard !Task.isCancelled else { return }
+                    self?.apply(event)
+                }
             } catch {
                 // A cancelled request can surface as a URL error rather than
                 // CancellationError; either way the reason was set by
@@ -197,16 +229,20 @@ final class PopupModel {
                 guard !Task.isCancelled else { return }
                 self?.phase = .failed(Self.describe(error))
             }
-            self?.watchdog?.cancel()
+            guard !Task.isCancelled else { return }
+            pair.watchdog?.cancel()
         }
-        watchdog = Task { [weak self] in
+        let watchdog = Task { [weak self] in
             try? await Task.sleep(for: .seconds(timeout))
             guard !Task.isCancelled, let self, self.phase == .translating else { return }
-            consumer.cancel()
+            pair.consumer?.cancel()
             self.phase = .failed(
                 ResultCustody.afterCancellation(.timedOut).message ?? "Timed out.")
         }
+        pair.consumer = consumer
+        pair.watchdog = watchdog
         self.consumer = consumer
+        self.watchdog = watchdog
     }
 
     private func apply(_ event: TranslationEvent) {
