@@ -243,7 +243,11 @@ public struct URLSessionTransport: OllamaTransport {
         }
 
         return AsyncThrowingStream { continuation in
-            Task {
+            // Kept, rather than discarded, so `onTermination` below can
+            // cancel it: without this, a consumer that stops listening
+            // (Escape, a timeout) never stops `bytes.lines` from reading, and
+            // the daemon keeps generating for a request nobody is waiting on.
+            let task = Task {
                 do {
                     // `lines` strips the terminator; the framer above expects
                     // them, and re-adding one keeps that contract explicit
@@ -256,6 +260,7 @@ public struct URLSessionTransport: OllamaTransport {
                     continuation.finish(throwing: error)
                 }
             }
+            continuation.onTermination = { _ in task.cancel() }
         }
     }
 }
