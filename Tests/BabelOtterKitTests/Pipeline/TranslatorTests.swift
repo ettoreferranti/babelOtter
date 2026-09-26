@@ -25,6 +25,56 @@ private final class ScriptedChat: ChatStreaming, @unchecked Sendable {
     }
 }
 
+/// Records whether its own stream was told the consumer is gone, mirroring
+/// `OllamaClientTests`' recorder -- standing in for "the chat stream was
+/// actually stopped" without depending on a real transport.
+private final class TerminationRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var isTerminated = false
+
+    func markTerminated() {
+        lock.lock()
+        isTerminated = true
+        lock.unlock()
+    }
+
+    private var terminated: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return isTerminated
+    }
+
+    /// Polls in short steps rather than sleeping a fixed duration: fast when
+    /// termination already landed, bounded when it never does.
+    func waitForTermination(timeoutNanoseconds: UInt64 = 500_000_000) async -> Bool {
+        let step: UInt64 = 5_000_000
+        var waited: UInt64 = 0
+        while waited < timeoutNanoseconds {
+            if terminated { return true }
+            try? await Task.sleep(nanoseconds: step)
+            waited += step
+        }
+        return terminated
+    }
+}
+
+/// A chat stream that yields once and then never finishes on its own --
+/// exactly what a generation in flight looks like from `Translator`'s side.
+/// Only cancellation can end it; this is how the test proves cancelling a
+/// translation reaches the chat stream, not just the caller.
+private final class NeverEndingChat: ChatStreaming, @unchecked Sendable {
+    let recorder = TerminationRecorder()
+
+    func chat(model: String, messages: [ChatMessage]) -> LazyStream<StreamEvent> {
+        LazyStream { [recorder] in
+            AsyncThrowingStream { continuation in
+                continuation.onTermination = { _ in recorder.markTerminated() }
+                continuation.yield(.delta("a"))
+            }
+        }
+    }
+}
+
 private let open = "\u{27E6}"
 private let close = "\u{27E7}"
 private let german = LanguageConfig.swissGerman.code
@@ -184,6 +234,34 @@ struct TranslatorTests {
             UserText("Hello"),
             direction: Direction(source: english, target: german), profile: .colleagues))
         #expect(chat.models == ["tiny:1b"])
+    }
+
+    /// A generation the consumer stopped listening to (Escape, a timeout)
+    /// must not keep running underneath. `Translator.translate` wires its own
+    /// `Task` to `continuation.onTermination`; without it, cancelling the
+    /// caller never reaches the chat stream at all.
+    @Test("cancelling a translation reaches the chat stream")
+    func cancellingTranslationStopsTheChatStream() async throws {
+        let chat = NeverEndingChat()
+        let neverEnding = Translator(configuration: Configuration.default, chat: chat)
+
+        let task = Task {
+            var iterator = neverEnding.translate(
+                UserText("Hello"),
+                direction: Direction(source: english, target: german), profile: .colleagues
+            ).makeAsyncIterator()
+            _ = try? await iterator.next()  // .started, emitted before the chat stream runs
+            _ = try? await iterator.next()  // parks here until cancelled
+        }
+
+        // Let the consuming task actually reach the parked await before
+        // cancelling it, so cancellation lands mid-stream rather than before
+        // anything began.
+        try await Task.sleep(nanoseconds: 20_000_000)
+        task.cancel()
+
+        let terminated = await chat.recorder.waitForTermination()
+        #expect(terminated, "cancelling the consumer must reach the chat stream, not leave it running")
     }
 
     @Test("building a translation sends nothing until it is iterated")
