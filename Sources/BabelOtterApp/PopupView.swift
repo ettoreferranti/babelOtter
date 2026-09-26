@@ -67,8 +67,11 @@ struct PopupView: View {
             Button("Replace") { model.replace() }
                 .keyboardShortcut(.defaultAction)
                 .disabled(model.phase != .finished)
+            // Not Command-C: the result text is selectable, and a user
+            // copying part of it with Command-C must not have that hijacked
+            // into copying (and dismissing over) the whole translation.
             Button("Copy") { model.copy() }
-                .keyboardShortcut("c", modifiers: .command)
+                .keyboardShortcut("c", modifiers: [.command, .shift])
                 .disabled(model.phase != .finished)
             Spacer()
             Button("Dismiss") { model.dismiss() }

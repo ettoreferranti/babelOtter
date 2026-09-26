@@ -258,10 +258,26 @@ final class PopupModel {
         }
     }
 
+    /// Names an error for what it is, rather than always blaming Ollama:
+    /// only a transport failure means the daemon could not be reached.
     private static func describe(_ error: any Error) -> String {
-        if let failure = error as? TranslationError, failure == .emptyResponse {
-            return "Nothing came back from the model."
+        if let failure = error as? TranslationError {
+            switch failure {
+            case .emptyResponse:
+                return "Nothing came back from the model."
+            case .languageNotConfigured(let code):
+                return "This looks like \(code), which is not one of your languages."
+            case .directionUnknown:
+                // Not reachable from here: `run(_:)` always calls in with an
+                // already-resolved direction, and `direction(for:)` /
+                // `direction(into:)` are what raise this, before a
+                // translation ever starts.
+                return "Could not tell which language this is."
+            }
         }
-        return "Ollama could not be reached. Is it running?"
+        if error is OllamaTransportError || error is URLError {
+            return "Ollama could not be reached. Is it running?"
+        }
+        return "The translation failed: \(error.localizedDescription)"
     }
 }
