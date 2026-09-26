@@ -23,12 +23,25 @@ final class PopupPanel: NSPanel {
 
     override var canBecomeKey: Bool { true }
 
-    func show<Content: View>(_ content: Content) {
+    /// Shows `content` near the cursor. `activate` defaults to true for the
+    /// common case (choosing a direction, a finished translation reopened
+    /// after Replace); pass `false` for the moment capture starts, when a
+    /// synthetic Command-C must still reach the source application rather
+    /// than this panel -- see `makeKeyNow()`.
+    func show<Content: View>(_ content: Content, activate: Bool = true) {
         let controller = NSHostingController(rootView: content)
         controller.sizingOptions = [.preferredContentSize]
         contentViewController = controller
         placeNearCursor()
         orderFrontRegardless()
+        if activate { makeKey() }
+    }
+
+    /// Grants keyboard focus to a panel already on screen. Called once
+    /// capture has finished reading the selection, so the synthetic
+    /// Command-C the clipboard tier may have posted was routed to the source
+    /// application, not to this panel (spec M1b, "non-activating popup").
+    func makeKeyNow() {
         makeKey()
     }
 
