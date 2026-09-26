@@ -108,31 +108,48 @@ public struct OllamaClient: Sendable {
             // multi-gigabyte download running with nobody watching it.
             let task = Task {
                 do {
-                    let body = try JSONEncoder().encode(PullRequest(name: model, stream: true))
-                    let stream = try await transport.chunks(
-                        from: endpoint.url(path: "api/pull"), body: body)
-
-                    var framer = NDJSONFramer()
-                    var emitted = 0
-                    for try await chunk in stream {
-                        emitted += yieldProgress(framer.consume(chunk), to: continuation)
-                    }
-                    emitted += yieldProgress(framer.finish(), to: continuation)
-
-                    // A pull that reported nothing at all is not a success.
-                    // Finishing quietly here would leave the UI showing a
-                    // progress bar that never moved and never ended.
-                    guard emitted > 0 else {
-                        continuation.finish(throwing: OllamaTransportError.undecodableBody)
-                        return
-                    }
-                    continuation.finish()
+                    try await relayPull(
+                        model: model, endpoint: endpoint, transport: transport, to: continuation)
                 } catch {
                     continuation.finish(throwing: error)
                 }
             }
             continuation.onTermination = { _ in task.cancel() }
         } }
+    }
+
+    /// The body of `pull`, as a named function rather than inline in the
+    /// task closure.
+    ///
+    /// Not a style choice. muter 16 mis-rewrites a `guard ... else { ...;
+    /// return }` inside a `do` block inside a `Task` closure: it replaced
+    /// that whole `do` body with a bare `return`, so even the unmutated
+    /// baseline never sent the request or finished the stream, every pull
+    /// test hung, and the mutation job could never start. Reproduced locally
+    /// with `muter run --files-to-mutate` on this file. In a named function
+    /// the same guard is rewritten correctly, as it is throughout the kit.
+    private func relayPull(
+        model: String, endpoint: OllamaEndpoint, transport: any OllamaTransport,
+        to continuation: AsyncThrowingStream<PullProgress, any Error>.Continuation
+    ) async throws {
+        let body = try JSONEncoder().encode(PullRequest(name: model, stream: true))
+        let stream = try await transport.chunks(
+            from: endpoint.url(path: "api/pull"), body: body)
+
+        var framer = NDJSONFramer()
+        var emitted = 0
+        for try await chunk in stream {
+            emitted += yieldProgress(framer.consume(chunk), to: continuation)
+        }
+        emitted += yieldProgress(framer.finish(), to: continuation)
+
+        // A pull that reported nothing at all is not a success. Finishing
+        // quietly here would leave the UI showing a progress bar that never
+        // moved and never ended.
+        guard emitted > 0 else {
+            throw OllamaTransportError.undecodableBody
+        }
+        continuation.finish()
     }
 
     /// Decodes progress lines, skipping any the daemon words differently than
