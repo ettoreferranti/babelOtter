@@ -206,6 +206,13 @@ which produce identical strings from an ASCII file.
   operator (`while a < b, predicate`). Already recorded in `muter.conf.yml` for
   `StorageLocator`, which still needs the pass-2 workaround.
 - A ternary whose condition ends in an enum member.
+- A `guard ... else { ...; return }` inside a `do` block inside a `Task`
+  closure. muter replaced the whole `do` body with a bare `return`, so the
+  *unmutated* baseline did nothing, and `OllamaClient.pull`'s tests hung. That
+  hang is why every Mutation run from the M1a shell until 2026-09-26 was
+  cancelled at its time limit instead of scored. Put such bodies in a named
+  function (see `OllamaClient.relayPull`). The stream suites now also carry a
+  one-minute `.timeLimit`, so a hang fails loudly instead of stalling CI.
 
 **The intermittent `buildError` is nondeterministic, and chasing it is a trap.**
 This document used to record it as "observed once on CI, never reproduced
