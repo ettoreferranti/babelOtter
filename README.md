@@ -21,7 +21,7 @@ leaving your machine.
 > [`docs/HANDOFF.md`](docs/HANDOFF.md) — capture, translation, replace, across
 > real applications — has not been run yet. Translate is the only action
 > implemented; **Correct**, **Explain** and **Re-pitch** below are not built
-> yet, and neither are audience-profile switching, a settings window,
+> yet, and neither are audience inference, a settings window,
 > onboarding or history — see [`docs/HANDOFF.md`](docs/HANDOFF.md) for exactly
 > what the prototype does and skips.
 >

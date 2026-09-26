@@ -20,6 +20,13 @@ final class PopupModel {
     private(set) var text = ""
     private(set) var warnings: [String] = []
     private(set) var message: String?
+    /// The audience profile, which carries the register (du/Sie). Starts at
+    /// the one last chosen, so a user who writes to one audience all day
+    /// picks it once.
+    private(set) var profileID: String
+    /// Free text for this invocation only ("shorter", "use Sie"). Never
+    /// saved: it can quote the user's own text.
+    var instruction = ""
 
     let configuration: Configuration
     private let translator: Translator
@@ -51,6 +58,53 @@ final class PopupModel {
         self.translator = Translator(configuration: environment.configuration, chat: environment.client)
         self.close = close
         self.reopen = reopen
+        self.profileID = Self.initialProfileID(in: environment.configuration)
+    }
+
+    // MARK: - Profile and instruction
+
+    /// UserDefaults holds only the profile's id -- never text -- as a
+    /// per-machine convenience. An id that no longer names a configured
+    /// profile falls back to Colleagues.
+    private static let lastProfileKey = "lastProfileID"
+
+    private static func initialProfileID(in configuration: Configuration) -> String {
+        let saved = UserDefaults.standard.string(forKey: lastProfileKey)
+        if let saved, configuration.profile(id: saved) != nil { return saved }
+        return configuration.profile(id: AudienceProfile.colleagues.id)?.id
+            ?? configuration.profiles.first?.id ?? AudienceProfile.colleagues.id
+    }
+
+    var profiles: [AudienceProfile] { configuration.profiles }
+
+    /// Switching audience re-runs the translation already on screen, since
+    /// the whole point is to see it in the other register.
+    func selectProfile(_ id: String) {
+        guard !isDismissed, id != profileID, configuration.profile(id: id) != nil else { return }
+        profileID = id
+        UserDefaults.standard.set(id, forKey: Self.lastProfileKey)
+        regenerate()
+    }
+
+    /// Runs the translation again with the current audience and instruction.
+    /// Only once a direction exists: before that there is nothing to redo.
+    func regenerate() {
+        guard !isDismissed, !isReplacing, let direction else { return }
+        run(direction)
+    }
+
+    var canRegenerate: Bool {
+        guard direction != nil, !isReplacing else { return false }
+        switch phase {
+        case .translating, .finished, .failed: return true
+        case .capturing, .choosingDirection: return false
+        }
+    }
+
+    private var styleNote: String? {
+        let trimmed = instruction.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { return nil }
+        return trimmed
     }
 
     func begin(with outcome: CaptureOutcome) {
@@ -171,7 +225,7 @@ final class PopupModel {
     }
 
     private var profile: AudienceProfile {
-        configuration.profile(id: AudienceProfile.colleagues.id) ?? .colleagues
+        configuration.profile(id: profileID) ?? .colleagues
     }
 
     /// Holds one `run()`'s `consumer` and `watchdog` so each can cancel the
@@ -191,7 +245,8 @@ final class PopupModel {
         message = nil
         phase = .translating
 
-        let stream = translator.translate(snapshot.text, direction: direction, profile: profile)
+        let stream = translator.translate(
+            snapshot.text, direction: direction, profile: profile, styleNote: styleNote)
         let timeout = configuration.timeoutSeconds
 
         // Both tasks inherit the main actor, so they touch `self` directly.
