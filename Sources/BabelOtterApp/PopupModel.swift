@@ -27,6 +27,12 @@ final class PopupModel {
     private(set) var snapshot: SelectionSnapshot?
     private var consumer: Task<Void, Never>?
     private var watchdog: Task<Void, Never>?
+    /// Set the instant `dismiss()` runs, so a capture or a stream event that
+    /// arrives afterward can never start -- or continue -- a translation
+    /// nobody can see. `stop()` alone is not enough: it only cancels tasks
+    /// that have already started, and `dismiss()` is reachable from
+    /// `.capturing`, before any exist.
+    private var isDismissed = false
 
     init(environment: AppEnvironment, close: @escaping @MainActor () -> Void) {
         self.configuration = environment.configuration
@@ -35,6 +41,7 @@ final class PopupModel {
     }
 
     func begin(with outcome: CaptureOutcome) {
+        guard !isDismissed else { return }
         switch outcome {
         case .refused(let refusal):
             phase = .failed(refusal.detail)
@@ -54,11 +61,13 @@ final class PopupModel {
     }
 
     func choose(target: LanguageCode) {
+        guard !isDismissed else { return }
         guard let direction = translator.direction(into: target) else { return }
         run(direction)
     }
 
     func swap() {
+        guard !isDismissed else { return }
         guard let direction else { return }
         run(direction.swapped)
     }
@@ -74,6 +83,7 @@ final class PopupModel {
     }
 
     func dismiss() {
+        isDismissed = true
         stop()
         close()
     }
@@ -92,7 +102,7 @@ final class PopupModel {
     }
 
     private func run(_ direction: Direction) {
-        guard let snapshot else { return }
+        guard !isDismissed, let snapshot else { return }
         stop()
         self.direction = direction
         text = ""
