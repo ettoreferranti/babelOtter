@@ -91,14 +91,21 @@ public struct Translator: Sendable {
 
     /// Lazy for the same reason `OllamaClient.chat` is: building the value
     /// must not transmit the user's text (NFR-P1).
+    ///
+    /// `styleNote` is the user's free-text instruction for this one
+    /// invocation ("shorter", "use Sie"). It goes into every prompt the
+    /// translation sends, the whole-text retry included.
     public func translate(
-        _ text: UserText, direction: Direction, profile: AudienceProfile
+        _ text: UserText, direction: Direction, profile: AudienceProfile,
+        styleNote: String? = nil
     ) -> LazyStream<TranslationEvent> {
         LazyStream { [self] in
             AsyncThrowingStream { continuation in
                 let task = Task {
                     do {
-                        try await run(text, direction: direction, profile: profile) {
+                        try await run(
+                            text, direction: direction, profile: profile, styleNote: styleNote
+                        ) {
                             continuation.yield($0)
                         }
                         continuation.finish()
@@ -119,6 +126,7 @@ public struct Translator: Sendable {
         let source: LanguageConfig
         let target: LanguageConfig
         let profile: AudienceProfile
+        let styleNote: String?
         let glossary: [GlossaryEntry]
         let terms: [String]
         let model: String
@@ -126,7 +134,7 @@ public struct Translator: Sendable {
     }
 
     private func run(
-        _ text: UserText, direction: Direction, profile: AudienceProfile,
+        _ text: UserText, direction: Direction, profile: AudienceProfile, styleNote: String?,
         emit: (TranslationEvent) -> Void
     ) async throws {
         guard let source = configuration.language(for: direction.source) else {
@@ -136,7 +144,7 @@ public struct Translator: Sendable {
             throw TranslationError.languageNotConfigured(direction.target)
         }
         let context = Context(
-            source: source, target: target, profile: profile,
+            source: source, target: target, profile: profile, styleNote: styleNote,
             glossary: configuration.glossary.entries(
                 for: LanguagePair(source: direction.source, target: direction.target)),
             terms: configuration.doNotTranslate,
@@ -200,7 +208,8 @@ public struct Translator: Sendable {
         let prompt = PromptBuilder().build(PromptRequest(
             action: .translate, source: context.source, target: context.target,
             profile: context.profile, glossary: context.glossary,
-            doNotTranslate: context.terms, blocks: blocks.map(\.text)))
+            doNotTranslate: context.terms, styleNote: context.styleNote,
+            blocks: blocks.map(\.text)))
 
         var raw = ""
         var shown: [String] = []

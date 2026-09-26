@@ -241,6 +241,43 @@ struct TranslatorTests {
         #expect(chat.models == ["tiny:1b"])
     }
 
+    @Test("a style note reaches the prompt, on the retry too")
+    func styleNoteReachesEveryPrompt() async throws {
+        let chat = ScriptedChat([
+            ["{\"blocks\": [\"only one\"]}"],
+            ["{\"blocks\": [\"Erste Zeile.\\nZweite Zeile.\"]}"],
+        ])
+        _ = try await collect(translator(chat).translate(
+            UserText("First line.\nSecond line."),
+            direction: Direction(source: english, target: german), profile: .colleagues,
+            styleNote: "use Sie"))
+        #expect(chat.prompts.count == 2)
+        #expect(chat.prompts.allSatisfy { $0.contains("use Sie") })
+    }
+
+    @Test("no style note, no style section")
+    func noStyleNote() async throws {
+        let chat = ScriptedChat([["{\"blocks\": [\"x\"]}"]])
+        _ = try await collect(translator(chat).translate(
+            UserText("Hello"),
+            direction: Direction(source: english, target: german), profile: .colleagues))
+        #expect(!chat.prompts[0].contains("Additional instruction"))
+    }
+
+    @Test("the profile's register reaches the prompt")
+    func profileRegisterReachesPrompt() async throws {
+        let chat = ScriptedChat([["{\"blocks\": [\"x\"]}"], ["{\"blocks\": [\"x\"]}"]])
+        let subject = translator(chat)
+        _ = try await collect(subject.translate(
+            UserText("Hello"),
+            direction: Direction(source: english, target: german), profile: .administration))
+        _ = try await collect(subject.translate(
+            UserText("Hello"),
+            direction: Direction(source: english, target: german), profile: .colleagues))
+        #expect(chat.prompts[0].contains("\"Sie\""))
+        #expect(chat.prompts[1].contains("\"du\""))
+    }
+
     /// A generation the consumer stopped listening to (Escape, a timeout)
     /// must not keep running underneath. `Translator.translate` wires its own
     /// `Task` to `continuation.onTermination`; without it, cancelling the

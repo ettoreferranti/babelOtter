@@ -22,20 +22,35 @@ tasks are all done.
 **Deliberately not in this slice** -- each a small, separate follow-up once
 the prototype has seen daily use:
 
-- **Audience profile control.** Every translation runs against the fixed
-  Colleagues profile. There is no picker, and no per-invocation style note
-  ("shorter", "more encouraging").
+- **Profile inference.** The audience is picked in the popup (it starts at
+  the last one chosen) but not yet inferred from the source text (#58). The
+  model already returns a `detected_audience`; nothing reads it.
 - **A settings window.** Configuration is hand-edited JSON only (see the
   README's status block for the path).
 - **Onboarding.** The Accessibility prompt is the bare system one; there is
   no guided setup, and no re-prompt if a grant is later revoked (#71).
 - **History.** Nothing is written to disk. A result lives only in the popup
   until Replace, Copy, or Dismiss.
-- **Regenerate.** A translation that came back wrong has to be re-triggered
-  from scratch -- dismiss, reselect if needed, hotkey again. There is no
-  in-popup retry.
 - **Configurable hotkeys.** Control-Option-T is the one hotkey, and it is
   hardcoded.
+
+**Audience and instruction (branch `feat/profile-and-instruction`).** Once a
+translation has started, the popup shows an audience menu -- each profile
+labelled with its register, e.g. "Students (Sie)", "Colleagues (du)" -- and a
+one-line instruction field with a Regenerate button. Changing the audience
+re-runs the translation; the instruction ("shorter", "use Sie") applies on
+Return or Regenerate, to this invocation only, and is never saved. The last
+audience chosen is remembered (its id only, in UserDefaults). While the
+instruction field has focus, Return means Regenerate, not Replace.
+
+Manual checks for it, not yet run:
+
+| Do | Expected |
+|---|---|
+| Translate English to German, pick "Students (Sie)" | re-runs, addresses the reader as Sie |
+| Pick "Colleagues (du)" | re-runs with du |
+| Type "shorter" in the instruction field, press Return | re-runs shorter; nothing is pasted |
+| Next Control-Option-T | starts with the audience picked last |
 
 **Rigour is now split by layer.** `BabelOtterKit` keeps TDD and the mutation
 gate. `Sources/BabelOtterApp` is AppKit glue and is built for speed, verified
