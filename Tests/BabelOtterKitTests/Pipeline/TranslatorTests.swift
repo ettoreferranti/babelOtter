@@ -91,7 +91,12 @@ private func result(_ events: [TranslationEvent]) -> TranslationResult? {
     return result
 }
 
-@Suite("The translator, from selected text to finished translation")
+/// `.timeLimit`: muter has no per-mutant timeout, and a mutant that deletes a
+/// `continuation.finish()` leaves every stream here open forever. Without a
+/// limit one such mutant stalls the whole mutation job until CI cancels it,
+/// which is what happened to every run from the M1a shell onward. With it,
+/// the hang is a failure -- a killed mutant -- after a minute.
+@Suite("The translator, from selected text to finished translation", .timeLimit(.minutes(1)))
 struct TranslatorTests {
 
     private func translator(
