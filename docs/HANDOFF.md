@@ -45,6 +45,15 @@ after three runs were cancelled at the hour.
 
 **Default model:** `mistral-small3.2:24b`, pulled locally.
 
+**Watchdog budget.** The 60s timeout (`timeoutSeconds`) budgets the *whole*
+translation -- including the one retry on a bad block count, and Ollama
+loading the 24B model from disk if it is not already resident. A first
+translation right after a reboot, or after Ollama has unloaded the model from
+being idle, can plausibly hit that budget while the model is still loading and
+show as a timeout rather than a slow success. If that happens often, raise
+`timeoutSeconds` in `config.json`; this is a known, accepted trade-off, not a
+bug to fix here.
+
 ### Outstanding manual checks (yours -- nothing here can be pressed or watched from a coding session)
 
 `swift test && Tools/make-app.sh --run`, grant Accessibility when prompted
@@ -75,11 +84,11 @@ combination.
 | Select English, Control-Option-T | English -> Swiss Standard German; no eszett anywhere, preview included |
 | Select "Hallo", Control-Option-T | *Translate into:* with two buttons; either one translates |
 | Press Swap during or after a translation | the direction flips and it re-runs |
-| Press Escape mid-stream | popup closes; `ollama ps` shows the request stopping |
+| Press Escape mid-stream | popup closes; the `ollama serve` terminal (or Activity Monitor's CPU/GPU column for the `ollama` process) drops back to idle within a second or two, rather than keeps generating -- `ollama ps` only lists loaded models, not in-flight requests, so it will not show this |
 | A bullet list | markers and line structure survive |
 | Quit Ollama, Control-Option-T | "Ollama could not be reached" rather than a hang |
 | Copy | result on the clipboard, popup closed |
-| Press Control-Option-T in VS Code, then Escape before the popup shows a result | popup closes; `ollama ps` shows no new request |
+| Press Control-Option-T in VS Code, then Escape before the popup shows a result | popup closes; the `ollama serve` terminal shows no new generation starting (or Activity Monitor's `ollama` process never spikes) |
 | Press the hotkey again while a popup from a previous selection is still open/streaming | the first one closes (and its in-flight request stops) before the second one starts |
 
 **Replace:**
@@ -91,7 +100,7 @@ combination.
 | Mail compose, Outlook body | replaced |
 | Teams, Word, VS Code | replaced |
 | Source app quit before pressing Replace | popup stays, says the application has closed, Copy still works |
-| Press the hotkey again while a Replace is still settling (right after the popup closes, before the source app's title bar has fully returned) | the press is ignored, the same as during a capture; watch `ollama ps`/Console for a second, overlapping capture rather than a clean no-op |
+| Press the hotkey again while a Replace is still settling (right after the popup closes, before the source app's title bar has fully returned) | the press is ignored, the same as during a capture; watch the `ollama serve` terminal (or Activity Monitor's `ollama` process) and Console for a second, overlapping capture rather than a clean no-op -- `ollama ps` will not show this either, for the same reason as above |
 
 Watch for one more failure shape on every Replace row above, not its own
 row: **the user's old clipboard content appears in the document instead of
