@@ -73,3 +73,6 @@ muter_logs/
 # Throwaway spikes (e.g. Spikes/focus-loss) — findings get written up and
 # kept; the prototype code itself never enters the public repo.
 Spikes/
+
+# The assembled .app from Tools/make-app.sh
+build/

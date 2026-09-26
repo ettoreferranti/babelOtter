@@ -7,11 +7,41 @@ Highlight text anywhere in macOS, hit a hotkey, and get a translation,
 a correction, or an explanation — without a single byte of your writing
 leaving your machine.
 
-> **Status: M0 Foundations.** The skeleton and the guards are built, not the
-> product: four SwiftPM targets, 65 tests in 8 suites, the six privacy
-> mechanisms below, and a CI pipeline that gates on all of them plus mutation
-> testing of `BabelOtterKit` at ≥80%. **None of the behaviour described below
-> this line is implemented yet** — that begins with M1a.
+> **Status: M1a done; a Translate prototype is built, and awaiting manual
+> verification.** M1a's pipeline — capture, language detection, structure
+> preservation, prompt building, streaming, response parsing, config — is
+> merged to `main`, with the privacy mechanisms below and a CI pipeline that
+> gates on all of them plus mutation testing of `BabelOtterKit` at ≥80%.
+>
+> On top of that, `feat/translate-prototype` (not yet merged) adds a thin,
+> working slice of M1b: a menu bar app, a global hotkey
+> (**Control-Option-T**), selection capture, a streaming popup, and
+> **Replace** / **Copy**. `swift test` on this branch runs 409 tests in 43
+> suites, all green; the manual checklist in
+> [`docs/HANDOFF.md`](docs/HANDOFF.md) — capture, translation, replace, across
+> real applications — has not been run yet. Translate is the only action
+> implemented; **Correct**, **Explain** and **Re-pitch** below are not built
+> yet, and neither are audience-profile switching, a settings window,
+> onboarding or history — see [`docs/HANDOFF.md`](docs/HANDOFF.md) for exactly
+> what the prototype does and skips.
+>
+> **To build and run it:**
+>
+> ```sh
+> Tools/make-app.sh --run
+> ```
+>
+> One-time step first, or macOS forgets the Accessibility grant on every
+> rebuild: the grant is tied to the app's code signature, and an ad-hoc
+> signature (the default without this step) changes on every build. In
+> Keychain Access, *Certificate Assistant > Create a Certificate...*, name it
+> `babelOtter Dev`, Identity Type *Self Signed Root*, Certificate Type *Code
+> Signing*. `Tools/make-app.sh` finds it automatically once it exists; without
+> it, the script signs ad hoc and warns.
+>
+> Configuration lives at
+> `~/Library/Application Support/ch.babelotter/config.json` (menu bar icon >
+> *Open Configuration Folder*), written with defaults on first launch.
 >
 > Requirements are captured as GitHub issues
 > (see [the backlog](../../issues)); the architecture is in

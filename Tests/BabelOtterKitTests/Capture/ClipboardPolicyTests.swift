@@ -70,6 +70,17 @@ private final class FakeKeystrokes: KeystrokeSending, @unchecked Sendable {
     func paste() { pastes += 1 }
 }
 
+private final class SettleRecorder: @unchecked Sendable {
+    private(set) var calls = 0
+    private(set) var pastesAtSettle = 0
+    private(set) var operationsAtSettle: [FakePasteboard.Operation] = []
+    func record(pastes: Int, operations: [FakePasteboard.Operation]) {
+        calls += 1
+        pastesAtSettle = pastes
+        operationsAtSettle = operations
+    }
+}
+
 @Suite("Clipboard capture restores on every path")
 struct ClipboardCaptureTests {
 
@@ -211,6 +222,38 @@ struct ClipboardReplacementTests {
             #expect(outcome.retainsResult)
             #expect(outcome.offersCopy)
         }
+    }
+
+    /// The target reads the pasteboard after Command-V is delivered, not when
+    /// it is posted. Restoring first pastes the user's old clipboard.
+    @Test("the paste is given time to land before the clipboard is restored")
+    func settlesBeforeRestoring() {
+        let pasteboard = FakePasteboard(movements: [], arriving: nil)
+        let keystrokes = FakeKeystrokes()
+        let seen = SettleRecorder()
+        let outcome = ClipboardReplacement(
+            pasteboard: pasteboard, keystrokes: keystrokes,
+            settle: {
+                seen.record(pastes: keystrokes.pastes, operations: pasteboard.operations)
+            }
+        ).replace(with: "die Uebersetzung", activateSource: { true })
+
+        #expect(outcome == .pasted)
+        #expect(seen.calls == 1)
+        #expect(seen.pastesAtSettle == 1, "settle must run after Command-V")
+        #expect(!seen.operationsAtSettle.contains(.restore), "settle must run before the restore")
+        #expect(pasteboard.operations.last == .restore)
+    }
+
+    @Test("nothing settles when nothing was pasted")
+    func noSettleWithoutPaste() {
+        let seen = SettleRecorder()
+        _ = ClipboardReplacement(
+            pasteboard: FakePasteboard(movements: [], arriving: nil),
+            keystrokes: FakeKeystrokes(),
+            settle: { seen.record(pastes: 0, operations: []) }
+        ).replace(with: "text", activateSource: { false })
+        #expect(seen.calls == 0)
     }
 }
 

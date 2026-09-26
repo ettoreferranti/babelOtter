@@ -31,7 +31,63 @@ private final class FakeTransport: OllamaTransport, @unchecked Sendable {
     }
 }
 
-@Suite("Ollama client")
+/// Records whether its own stream was told the consumer is gone -- standing
+/// in for "the request was actually stopped" without depending on
+/// `URLSessionTransport`, which cannot be exercised in CI (it needs a real
+/// daemon; see its own doc comment).
+private final class TerminationRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var isTerminated = false
+
+    func markTerminated() {
+        lock.lock()
+        isTerminated = true
+        lock.unlock()
+    }
+
+    private var terminated: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return isTerminated
+    }
+
+    /// Polls in short steps rather than sleeping a fixed duration: fast when
+    /// termination already landed, bounded when it never does.
+    func waitForTermination(timeoutNanoseconds: UInt64 = 500_000_000) async -> Bool {
+        let step: UInt64 = 5_000_000
+        var waited: UInt64 = 0
+        while waited < timeoutNanoseconds {
+            if terminated { return true }
+            try? await Task.sleep(nanoseconds: step)
+            waited += step
+        }
+        return terminated
+    }
+}
+
+/// A transport whose stream yields once and then never finishes on its own --
+/// exactly what a real generation in flight looks like from `OllamaClient`'s
+/// side. Only cancellation can end it; this is how the test proves that
+/// cancellation actually reaches "the network" rather than merely stopping
+/// the caller from listening.
+private final class NeverEndingTransport: OllamaTransport, @unchecked Sendable {
+    let recorder = TerminationRecorder()
+
+    func chunks(from url: URL, body: Data?) async throws -> AsyncThrowingStream<String, any Error> {
+        AsyncThrowingStream { continuation in
+            continuation.onTermination = { [recorder] _ in recorder.markTerminated() }
+            continuation.yield(
+                #"{"message":{"role":"assistant","content":"a"},"done":false}"# + "\n")
+        }
+    }
+}
+
+/// `.timeLimit`: muter has no per-mutant timeout, and a mutant that deletes a
+/// `continuation.finish()` leaves every stream here open forever. Without a
+/// limit one such mutant stalls the whole mutation job until CI cancels it,
+/// which is what happened to every run from the M1a shell onward. With it,
+/// the hang is a failure -- a killed mutant -- after a minute.
+@Suite("Ollama client", .timeLimit(.minutes(1)))
 struct OllamaClientTests {
 
     private static func fixtureChunks() throws -> [String] {
@@ -182,6 +238,42 @@ struct OllamaClientTests {
 
         for try await _ in client.chat(model: "m", messages: []) {}
         #expect(transport.requestedURLs.count == 1)
+    }
+
+    /// A generation the consumer stopped listening to (Escape, a timeout)
+    /// must not keep running underneath. Before the fix, `chat`'s own `Task`
+    /// had no `onTermination` wired up, so cancelling the caller never
+    /// reached the transport at all -- the request kept running forever.
+    @Test("cancelling the consumer stops the request rather than leaving it running")
+    func cancellingConsumerStopsTheRequest() async throws {
+        let transport = NeverEndingTransport()
+        let client = OllamaClient(endpoint: .loopback, transport: transport)
+
+        let task = Task {
+            var iterator = client.chat(model: "m", messages: []).makeAsyncIterator()
+            _ = try? await iterator.next()  // the one event the transport ever yields
+            _ = try? await iterator.next()  // parks here until cancelled
+        }
+
+        // Let the consuming task actually reach the second, parked await
+        // before cancelling it, so cancellation lands mid-stream rather than
+        // before anything began.
+        try await Task.sleep(nanoseconds: 20_000_000)
+        task.cancel()
+
+        let terminated = await transport.recorder.waitForTermination()
+        #expect(terminated, "cancelling the consumer must reach the transport, not leave it running")
+    }
+
+    /// `loopback(timeout:)` is the one production call site that wires the
+    /// app to the real transport (`AppEnvironment.load()`), so it is worth
+    /// its own assertion rather than trusting the default-argument plumbing
+    /// by inspection. `endpoint` is `internal` in `OllamaClient` for exactly
+    /// this read.
+    @Test("loopback(timeout:) targets the loopback endpoint")
+    func loopbackTargetsLoopbackEndpoint() {
+        let client = OllamaClient.loopback(timeout: 5)
+        #expect(client.endpoint == .loopback)
     }
 
     @Test("installed models are read from the tags endpoint")

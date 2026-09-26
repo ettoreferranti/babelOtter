@@ -7,6 +7,7 @@ let package = Package(
     products: [
         .library(name: "BabelOtterKit", targets: ["BabelOtterKit"]),
         .executable(name: "babelotter-eval", targets: ["babelotter-eval"]),
+        .executable(name: "BabelOtterApp", targets: ["BabelOtterApp"]),
     ],
     // No dependencies. Adding one requires an entry in
     // Config/dependency-allowlist.txt — see Task 7 and NFR-P6.

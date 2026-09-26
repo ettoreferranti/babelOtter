@@ -9,9 +9,33 @@ measurements (Task 14, Steps 2-4) are deferred, not done, and recorded as open
 in `docs/architecture.md` section 7. The clipboard is accepted as the conduit
 wherever it is needed, Universal Clipboard exposure included.
 
-**The next thing is a working Translate prototype**, a thin slice of M1b: menu
-bar app, global hotkey, capture, pipeline, streaming popup, Replace/Copy.
-Plan: `docs/superpowers/plans/2026-09-25-translate-prototype.md`.
+**The Translate prototype is built**, a thin slice of M1b, on
+`feat/translate-prototype` (not yet merged to `main`): a menu bar app, a
+global hotkey (Control-Option-T, fixed), selection capture through the
+three-tier ladder (Accessibility first, then the clipboard), a
+non-activating streaming popup near the cursor, direction auto-detection
+with a manual choice and a swap when it can't tell, and Replace (paste back
+through the clipboard, the user's own clipboard restored afterwards) / Copy.
+Plan: `docs/superpowers/plans/2026-09-25-translate-prototype.md`; its seven
+tasks are all done.
+
+**Deliberately not in this slice** -- each a small, separate follow-up once
+the prototype has seen daily use:
+
+- **Audience profile control.** Every translation runs against the fixed
+  Colleagues profile. There is no picker, and no per-invocation style note
+  ("shorter", "more encouraging").
+- **A settings window.** Configuration is hand-edited JSON only (see the
+  README's status block for the path).
+- **Onboarding.** The Accessibility prompt is the bare system one; there is
+  no guided setup, and no re-prompt if a grant is later revoked (#71).
+- **History.** Nothing is written to disk. A result lives only in the popup
+  until Replace, Copy, or Dismiss.
+- **Regenerate.** A translation that came back wrong has to be re-triggered
+  from scratch -- dismiss, reselect if needed, hotkey again. There is no
+  in-popup retry.
+- **Configurable hotkeys.** Control-Option-T is the one hotkey, and it is
+  hardcoded.
 
 **Rigour is now split by layer.** `BabelOtterKit` keeps TDD and the mutation
 gate. `Sources/BabelOtterApp` is AppKit glue and is built for speed, verified
@@ -20,6 +44,75 @@ runs when the kit or its tests change; its timeout went from 60 to 150 minutes
 after three runs were cancelled at the hour.
 
 **Default model:** `mistral-small3.2:24b`, pulled locally.
+
+**Watchdog budget.** The 60s timeout (`timeoutSeconds`) budgets the *whole*
+translation -- including the one retry on a bad block count, and Ollama
+loading the 24B model from disk if it is not already resident. A first
+translation right after a reboot, or after Ollama has unloaded the model from
+being idle, can plausibly hit that budget while the model is still loading and
+show as a timeout rather than a slow success. If that happens often, raise
+`timeoutSeconds` in `config.json`; this is a known, accepted trade-off, not a
+bug to fix here.
+
+### Outstanding manual checks (yours -- nothing here can be pressed or watched from a coding session)
+
+`swift test && Tools/make-app.sh --run`, grant Accessibility when prompted
+(menu bar icon shows the status; *Check Again* rereads it), then work
+through these. They come from tasks 5, 6 and 7 of the prototype plan and
+none of them have been run yet.
+
+**Capture** -- select text in each app, then press Control-Option-T:
+
+| App | Expected |
+|---|---|
+| TextEdit | `via accessibilityText` |
+| Safari (page text) | `via textMarkerRange` |
+| VS Code, Teams, Word | `via clipboard`; your previous clipboard is still there afterwards |
+| Any app, nothing selected | the *nothing selected* message |
+
+The panel must appear near the pointer without the source app losing its
+active title bar. If Control-Option-T does nothing at all, check the menu
+bar icon's first item -- it reads "Control-Option-T is taken by another
+app" if registration lost to something else already holding that
+combination.
+
+**Translation:**
+
+| Do | Expected |
+|---|---|
+| Select a German paragraph in TextEdit, Control-Option-T | Swiss Standard German -> English; text streams in; no `⟦DNT` debris, no JSON |
+| Select English, Control-Option-T | English -> Swiss Standard German; no eszett anywhere, preview included |
+| Select "Hallo", Control-Option-T | *Translate into:* with two buttons; either one translates |
+| Press Swap during or after a translation | the direction flips and it re-runs |
+| Press Escape mid-stream | popup closes; the `ollama serve` terminal (or Activity Monitor's CPU/GPU column for the `ollama` process) drops back to idle within a second or two, rather than keeps generating -- `ollama ps` only lists loaded models, not in-flight requests, so it will not show this |
+| A bullet list | markers and line structure survive |
+| Quit Ollama, Control-Option-T | "Ollama could not be reached" rather than a hang |
+| Copy | result on the clipboard, popup closed |
+| Press Control-Option-T in VS Code, then Escape before the popup shows a result | popup closes; the `ollama serve` terminal shows no new generation starting (or Activity Monitor's `ollama` process never spikes) |
+| Press the hotkey again while a popup from a previous selection is still open/streaming | the first one closes (and its in-flight request stops) before the second one starts |
+
+**Replace:**
+
+| Surface | Expected |
+|---|---|
+| TextEdit | selection replaced; previous clipboard intact afterwards (Command-V elsewhere) |
+| Safari `<textarea>` (`Tools/editable-scratch.html`) | replaced |
+| Mail compose, Outlook body | replaced |
+| Teams, Word, VS Code | replaced |
+| Source app quit before pressing Replace | popup stays, says the application has closed, Copy still works |
+| Press the hotkey again while a Replace is still settling (right after the popup closes, before the source app's title bar has fully returned) | the press is ignored, the same as during a capture; watch the `ollama serve` terminal (or Activity Monitor's `ollama` process) and Console for a second, overlapping capture rather than a clean no-op -- `ollama ps` will not show this either, for the same reason as above |
+
+Watch for one more failure shape on every Replace row above, not its own
+row: **the user's old clipboard content appears in the document instead of
+the translation.** That means the settle time between Command-V and the
+restore (0.8s, matching what `Tools/clipboard-probe.swift` measured) was too
+short for that application to read the pasteboard before babelOtter put the
+old clipboard back -- worth a note of which app and how much text, since the
+fix is a longer, possibly per-app, settle time.
+
+Anything any of these contradicts in `docs/architecture.md` section 7 belongs
+there, plainly, once it is actually measured -- that document is measured
+reality, not a place to record an expectation nobody has confirmed.
 
 Everything below is the 2026-09-20 state, kept for its reasoning.
 
@@ -113,6 +206,13 @@ which produce identical strings from an ASCII file.
   operator (`while a < b, predicate`). Already recorded in `muter.conf.yml` for
   `StorageLocator`, which still needs the pass-2 workaround.
 - A ternary whose condition ends in an enum member.
+- A `guard ... else { ...; return }` inside a `do` block inside a `Task`
+  closure. muter replaced the whole `do` body with a bare `return`, so the
+  *unmutated* baseline did nothing, and `OllamaClient.pull`'s tests hung. That
+  hang is why every Mutation run from the M1a shell until 2026-09-26 was
+  cancelled at its time limit instead of scored. Put such bodies in a named
+  function (see `OllamaClient.relayPull`). The stream suites now also carry a
+  one-minute `.timeLimit`, so a hang fails loudly instead of stalling CI.
 
 **The intermittent `buildError` is nondeterministic, and chasing it is a trap.**
 This document used to record it as "observed once on CI, never reproduced

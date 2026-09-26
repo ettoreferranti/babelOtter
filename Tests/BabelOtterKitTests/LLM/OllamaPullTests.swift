@@ -28,7 +28,12 @@ private final class RecordingTransport: OllamaTransport, @unchecked Sendable {
     }
 }
 
-@Suite("Pulling a model through the local daemon")
+/// `.timeLimit`: muter has no per-mutant timeout, and a mutant that deletes a
+/// `continuation.finish()` leaves every stream here open forever. Without a
+/// limit one such mutant stalls the whole mutation job until CI cancels it,
+/// which is what happened to every run from the M1a shell onward. With it,
+/// the hang is a failure -- a killed mutant -- after a minute.
+@Suite("Pulling a model through the local daemon", .timeLimit(.minutes(1)))
 struct OllamaPullTests {
 
     private static func fixture() throws -> String {

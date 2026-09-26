@@ -1,4 +1,7 @@
-import BabelOtterKit
+import AppKit
 
-// The AppKit shell is built in M1b. M0 only proves the target links.
-print("babelOtter shell — \(BabelOtter.bundleIdentifier)")
+let application = NSApplication.shared
+let delegate = AppDelegate()
+application.delegate = delegate
+application.setActivationPolicy(.accessory)
+application.run()

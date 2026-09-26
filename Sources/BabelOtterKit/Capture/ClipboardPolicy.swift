@@ -146,10 +146,21 @@ public struct ClipboardReplacement: Sendable {
 
     private let pasteboard: any PasteboardAccess
     private let keystrokes: any KeystrokeSending
+    private let settle: @Sendable () -> Void
 
-    public init(pasteboard: any PasteboardAccess, keystrokes: any KeystrokeSending) {
+    /// `settle` runs between Command-V and the restore. The target application
+    /// reads the pasteboard when it *handles* the keystroke, not when it is
+    /// posted, so restoring immediately can paste the user's old clipboard.
+    /// The probe waited 0.8s; the app passes a sleep. A closure keeps the kit
+    /// free of timing.
+    public init(
+        pasteboard: any PasteboardAccess,
+        keystrokes: any KeystrokeSending,
+        settle: @escaping @Sendable () -> Void = {}
+    ) {
         self.pasteboard = pasteboard
         self.keystrokes = keystrokes
+        self.settle = settle
     }
 
     /// `activateSource` re-activates the application the selection came from
@@ -171,6 +182,7 @@ public struct ClipboardReplacement: Sendable {
 
         pasteboard.write(text, concealed: true)
         keystrokes.paste()
+        settle()
         return .pasted
     }
 }

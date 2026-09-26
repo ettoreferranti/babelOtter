@@ -13,12 +13,30 @@ import Foundation
 /// convention into a property of the type system.
 public struct OllamaClient: Sendable {
 
-    private let endpoint: OllamaEndpoint
+    // `internal`, not `private`: `OllamaClientTests` reads this via
+    // `@testable import` to prove `loopback(timeout:)` actually targets
+    // `.loopback` rather than merely defaulting to it by accident. Still not
+    // `public` -- nothing outside this package should branch on it.
+    let endpoint: OllamaEndpoint
     private let transport: any OllamaTransport
 
     public init(endpoint: OllamaEndpoint = .loopback, transport: any OllamaTransport) {
         self.endpoint = endpoint
         self.transport = transport
+    }
+
+    /// A client wired to the real transport, for callers that must not spell
+    /// `URLSessionTransport` themselves.
+    ///
+    /// `NetworkingCallSiteTests` scans every file under `Sources/` -- app
+    /// included -- for networking symbol names, substring-matched on purpose
+    /// (see that suite's docs). `URLSessionTransport` contains `URLSession` as
+    /// a substring, so a caller outside this allowlisted file that constructs
+    /// one directly trips the guard. This factory keeps that construction
+    /// here, where it is reviewed and allowlisted, instead of adding a second
+    /// allowlist entry for a caller that only ever wants the real transport.
+    public static func loopback(timeout: TimeInterval) -> OllamaClient {
+        OllamaClient(transport: URLSessionTransport(timeout: timeout))
     }
 
     /// Streams a chat completion as classified events.
@@ -31,7 +49,12 @@ public struct OllamaClient: Sendable {
         let endpoint = endpoint
         let transport = transport
         return LazyStream { AsyncThrowingStream { continuation in
-            Task {
+            // Kept, rather than discarded, so `onTermination` below can
+            // cancel it: a consumer that stops iterating (Escape, a timeout)
+            // must stop the request in flight, not just stop listening to
+            // it. Without this, the daemon keeps generating and the
+            // transport keeps reading long after nobody is looking.
+            let task = Task {
                 do {
                     let body = try JSONEncoder().encode(
                         ChatRequest(model: model, messages: messages, stream: true))
@@ -53,6 +76,7 @@ public struct OllamaClient: Sendable {
                     continuation.finish(throwing: error)
                 }
             }
+            continuation.onTermination = { _ in task.cancel() }
         } }
     }
 
@@ -79,32 +103,53 @@ public struct OllamaClient: Sendable {
         let endpoint = endpoint
         let transport = transport
         return LazyStream { AsyncThrowingStream { continuation in
-            Task {
+            // Same reasoning as `chat`: kept so `onTermination` can cancel it
+            // when the consumer stops listening, rather than leaving a
+            // multi-gigabyte download running with nobody watching it.
+            let task = Task {
                 do {
-                    let body = try JSONEncoder().encode(PullRequest(name: model, stream: true))
-                    let stream = try await transport.chunks(
-                        from: endpoint.url(path: "api/pull"), body: body)
-
-                    var framer = NDJSONFramer()
-                    var emitted = 0
-                    for try await chunk in stream {
-                        emitted += yieldProgress(framer.consume(chunk), to: continuation)
-                    }
-                    emitted += yieldProgress(framer.finish(), to: continuation)
-
-                    // A pull that reported nothing at all is not a success.
-                    // Finishing quietly here would leave the UI showing a
-                    // progress bar that never moved and never ended.
-                    guard emitted > 0 else {
-                        continuation.finish(throwing: OllamaTransportError.undecodableBody)
-                        return
-                    }
-                    continuation.finish()
+                    try await relayPull(
+                        model: model, endpoint: endpoint, transport: transport, to: continuation)
                 } catch {
                     continuation.finish(throwing: error)
                 }
             }
+            continuation.onTermination = { _ in task.cancel() }
         } }
+    }
+
+    /// The body of `pull`, as a named function rather than inline in the
+    /// task closure.
+    ///
+    /// Not a style choice. muter 16 mis-rewrites a `guard ... else { ...;
+    /// return }` inside a `do` block inside a `Task` closure: it replaced
+    /// that whole `do` body with a bare `return`, so even the unmutated
+    /// baseline never sent the request or finished the stream, every pull
+    /// test hung, and the mutation job could never start. Reproduced locally
+    /// with `muter run --files-to-mutate` on this file. In a named function
+    /// the same guard is rewritten correctly, as it is throughout the kit.
+    private func relayPull(
+        model: String, endpoint: OllamaEndpoint, transport: any OllamaTransport,
+        to continuation: AsyncThrowingStream<PullProgress, any Error>.Continuation
+    ) async throws {
+        let body = try JSONEncoder().encode(PullRequest(name: model, stream: true))
+        let stream = try await transport.chunks(
+            from: endpoint.url(path: "api/pull"), body: body)
+
+        var framer = NDJSONFramer()
+        var emitted = 0
+        for try await chunk in stream {
+            emitted += yieldProgress(framer.consume(chunk), to: continuation)
+        }
+        emitted += yieldProgress(framer.finish(), to: continuation)
+
+        // A pull that reported nothing at all is not a success. Finishing
+        // quietly here would leave the UI showing a progress bar that never
+        // moved and never ended.
+        guard emitted > 0 else {
+            throw OllamaTransportError.undecodableBody
+        }
+        continuation.finish()
     }
 
     /// Decodes progress lines, skipping any the daemon words differently than
@@ -215,7 +260,11 @@ public struct URLSessionTransport: OllamaTransport {
         }
 
         return AsyncThrowingStream { continuation in
-            Task {
+            // Kept, rather than discarded, so `onTermination` below can
+            // cancel it: without this, a consumer that stops listening
+            // (Escape, a timeout) never stops `bytes.lines` from reading, and
+            // the daemon keeps generating for a request nobody is waiting on.
+            let task = Task {
                 do {
                     // `lines` strips the terminator; the framer above expects
                     // them, and re-adding one keeps that contract explicit
@@ -228,6 +277,7 @@ public struct URLSessionTransport: OllamaTransport {
                     continuation.finish(throwing: error)
                 }
             }
+            continuation.onTermination = { _ in task.cancel() }
         }
     }
 }
