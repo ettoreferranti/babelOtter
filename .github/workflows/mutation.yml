@@ -150,7 +150,8 @@ jobs:
           Sources/BabelOtterKit/Text/PostProcessor.swift
           Sources/BabelOtterKit/Text/StructureExtractor.swift
           Sources/BabelOtterKit/Text/TargetLanguageResolver.swift
-          Sources/BabelOtterKit/Text/TokenProtector.swift"
+          Sources/BabelOtterKit/Text/TokenProtector.swift
+          Sources/BabelOtterKit/Text/WordDiff.swift"
 
           MUTATED=$(printf '%s\n%s\n' "$PASS1" "$PASS2")
           ACTUAL=$(find Sources/BabelOtterKit -name '*.swift' | sort)
