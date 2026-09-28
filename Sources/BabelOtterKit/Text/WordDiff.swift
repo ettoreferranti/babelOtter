@@ -20,6 +20,12 @@ public enum WordDiff {
     /// than stalling the popup.
     static let maximumCells = 4_000_000
 
+    /// Above this many tokens on either side, even a table within
+    /// `maximumCells` (one huge side against a tiny one) is not worth
+    /// building: the table's own allocation and the backtrack it drives
+    /// both scale with the larger side, not with the product (#41).
+    static let maximumTokens = 2_000
+
     public static func diff(_ original: String, _ revised: String) -> [DiffSegment] {
         let a = tokens(original)
         let b = tokens(revised)
@@ -35,22 +41,22 @@ public enum WordDiff {
             suffix += 1
         }
 
-        var segments: [DiffSegment] = []
-        append(.same(a[0..<prefix].joined()), to: &segments)
+        var builder = SegmentBuilder()
+        for token in a[0..<prefix] { builder.add(.same, token) }
         let middleA = Array(a[prefix..<(a.count - suffix)])
         let middleB = Array(b[prefix..<(b.count - suffix)])
-        for segment in middle(middleA, middleB) {
-            append(segment, to: &segments)
-        }
-        append(.same(a[(a.count - suffix)...].joined()), to: &segments)
-        return segments
+        middle(middleA, middleB, into: &builder)
+        for token in a[(a.count - suffix)...] { builder.add(.same, token) }
+        return builder.build()
     }
 
     /// The changed middle, by longest common subsequence. On a tie, the
     /// removal is shown before the addition.
-    private static func middle(_ a: [String], _ b: [String]) -> [DiffSegment] {
-        guard a.count * b.count <= maximumCells else {
-            return [.removed(a.joined()), .added(b.joined())]
+    private static func middle(_ a: [String], _ b: [String], into builder: inout SegmentBuilder) {
+        guard a.count * b.count <= maximumCells && max(a.count, b.count) <= maximumTokens else {
+            builder.add(.removed, a.joined())
+            builder.add(.added, b.joined())
+            return
         }
         var lengths = Array(repeating: Array(repeating: 0, count: b.count + 1), count: a.count + 1)
         for i in stride(from: a.count - 1, through: 0, by: -1) {
@@ -62,46 +68,67 @@ public enum WordDiff {
                 }
             }
         }
-        var result: [DiffSegment] = []
         var i = 0
         var j = 0
         while i < a.count && j < b.count {
             if a[i] == b[j] {
-                result.append(.same(a[i]))
+                builder.add(.same, a[i])
                 i += 1
                 j += 1
             } else if lengths[i + 1][j] >= lengths[i][j + 1] {
-                result.append(.removed(a[i]))
+                builder.add(.removed, a[i])
                 i += 1
             } else {
-                result.append(.added(b[j]))
+                builder.add(.added, b[j])
                 j += 1
             }
         }
-        for token in a[i...] { result.append(.removed(token)) }
-        for token in b[j...] { result.append(.added(token)) }
-        return result
+        for token in a[i...] { builder.add(.removed, token) }
+        for token in b[j...] { builder.add(.added, token) }
     }
 
-    /// Merges into the previous segment when both are the same kind; drops
-    /// empty text.
-    private static func append(_ segment: DiffSegment, to segments: inout [DiffSegment]) {
-        guard !text(of: segment).isEmpty else { return }
-        guard let last = segments.last else {
-            segments.append(segment)
-            return
-        }
-        switch (last, segment) {
-        case (.same(let x), .same(let y)): segments[segments.count - 1] = .same(x + y)
-        case (.removed(let x), .removed(let y)): segments[segments.count - 1] = .removed(x + y)
-        case (.added(let x), .added(let y)): segments[segments.count - 1] = .added(x + y)
-        default: segments.append(segment)
-        }
-    }
+    /// Accumulates consecutive same-kind tokens into one segment.
+    ///
+    /// Re-concatenating `x + y` for every token, where `x` is the text just
+    /// unwrapped from the previous segment's enum case, is quadratic: the
+    /// unwrap leaves the array's stored copy holding the same buffer, so the
+    /// string is never uniquely referenced and every `+` pays for a fresh
+    /// copy of everything accumulated so far (#41). Growing a single local
+    /// `String` with `+=` instead stays uniquely referenced, so Swift can
+    /// grow its buffer in place with amortised O(1) appends; the run is
+    /// only boxed into a `DiffSegment` once, when it ends.
+    private struct SegmentBuilder {
+        enum Kind: Equatable { case same, removed, added }
 
-    private static func text(of segment: DiffSegment) -> String {
-        switch segment {
-        case .same(let text), .removed(let text), .added(let text): return text
+        private var segments: [DiffSegment] = []
+        private var kind: Kind?
+        private var text = ""
+
+        mutating func add(_ next: Kind, _ token: String) {
+            guard !token.isEmpty else { return }
+            if next == kind {
+                text += token
+            } else {
+                flush()
+                kind = next
+                text = token
+            }
+        }
+
+        private mutating func flush() {
+            guard let kind else { return }
+            switch kind {
+            case .same: segments.append(.same(text))
+            case .removed: segments.append(.removed(text))
+            case .added: segments.append(.added(text))
+            }
+            text = ""
+        }
+
+        mutating func build() -> [DiffSegment] {
+            flush()
+            kind = nil
+            return segments
         }
     }
 

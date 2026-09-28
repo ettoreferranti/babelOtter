@@ -2,7 +2,7 @@ import Testing
 
 @testable import BabelOtterKit
 
-@Suite("Word-level diff")
+@Suite("Word-level diff", .timeLimit(.minutes(1)))
 struct WordDiffTests {
 
     /// Both reconstructions must hold for every diff, or the popup shows a
@@ -78,6 +78,12 @@ struct WordDiffTests {
         ("  zwei  Leerzeichen ", " zwei Leerzeichen"),
         ("line one\nline two", "line one\n\nline two"),
         ("", "neu"),
+        // Just under WordDiff.maximumTokens: the trimmed middle still goes
+        // through the LCS table, not the size fallback.
+        (String(repeating: "a ", count: 500), String(repeating: "b ", count: 500)),
+        // Just over WordDiff.maximumTokens: the trimmed middle is too big
+        // for either cap and takes the removed-then-added fallback.
+        (String(repeating: "a ", count: 5_000), String(repeating: "b ", count: 5_000)),
     ])
     func roundTrips(_ original: String, _ revised: String) {
         expectRoundTrips(original, revised)
@@ -88,5 +94,17 @@ struct WordDiffTests {
         // No token in common: one removal, and the three added tokens
         // ("y", " ", "z") merged into one addition.
         #expect(WordDiff.diff("x", "y z") == [.removed("x"), .added("y z")])
+    }
+
+    /// Pins the fix for #41: a lopsided pair (one short side, one huge side)
+    /// used to be quadratic in the merge step even though the LCS table
+    /// itself stayed small, because merging built each run by re-concatenating
+    /// `x + y` one token at a time. The size fallback plus the amortised
+    /// accumulator both keep this linear; the suite's one-minute time limit
+    /// turns a regression back to that quadratic cost into a failure instead
+    /// of a stall.
+    @Test("a lopsided diff against a huge side stays fast")
+    func lopsided() {
+        expectRoundTrips("x", String(repeating: "y ", count: 200_000))
     }
 }
