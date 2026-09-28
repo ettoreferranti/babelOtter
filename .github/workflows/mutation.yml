@@ -142,6 +142,7 @@ jobs:
           Sources/BabelOtterKit/LLM/ResponseContracts.swift
           Sources/BabelOtterKit/LLM/ResponseParser.swift
           Sources/BabelOtterKit/Pipeline/CorrectionCheck.swift
+          Sources/BabelOtterKit/Pipeline/Corrector.swift
           Sources/BabelOtterKit/Pipeline/PartialBlocks.swift
           Sources/BabelOtterKit/Pipeline/ReplyStream.swift
           Sources/BabelOtterKit/Pipeline/Translator.swift

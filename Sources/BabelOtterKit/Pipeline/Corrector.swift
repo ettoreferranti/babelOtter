@@ -1,0 +1,239 @@
+import Foundation
+
+public enum CorrectionEvent: Sendable, Equatable {
+    case started
+    /// The corrected text so far, post-processed. Never the result.
+    case preview(UserText)
+    case finished(CorrectionResult)
+}
+
+public struct CorrectionResult: Sendable, Equatable {
+    public let original: UserText
+    /// Errors fixed only: what Replace pastes.
+    public let corrected: UserText
+    public let errors: [CorrectionError]
+    public let suggestions: [CorrectionError]
+    public let diff: [DiffSegment]
+    public let warnings: [String]
+    public let hasNoErrors: Bool
+}
+
+public enum CorrectionFailure: Error, Equatable {
+    /// Detection has a guess, and it is not German. Nothing was sent.
+    case notGerman
+    /// The reply did not parse. Never shown as a correction (`FR-COR-06`).
+    case unreadableReply
+    /// The block count was wrong twice. Never stitched together.
+    case structureLost
+    case emptyResponse
+}
+
+/// German text in, a checked correction out (`FR-COR-01`..`06`).
+///
+/// Shaped like `Translator`. The differences are deliberate: parsing is
+/// strict (a correction that cannot be read is never shown as one), a second
+/// structural failure is an error rather than a joined text, and the result
+/// is checked against itself before the user sees it.
+public struct Corrector: Sendable {
+
+    /// Correct is German-only (spec 2026-09-28). The base subtag, so any
+    /// configured German locale qualifies.
+    static let german = LanguageCode("de")
+
+    private let configuration: Configuration
+    private let chat: any ChatStreaming
+    private let detector: LanguageDetector
+
+    public init(
+        configuration: Configuration,
+        chat: any ChatStreaming,
+        recognizer: any LanguageRecognizing = NaturalLanguageRecognizer()
+    ) {
+        self.configuration = configuration
+        self.chat = chat
+        self.detector = LanguageDetector(configuration: configuration, recognizer: recognizer)
+    }
+
+    /// Lazy for the same reason `OllamaClient.chat` is: building the value
+    /// must not transmit the user's text (NFR-P1).
+    public func correct(
+        _ text: UserText, profile: AudienceProfile, styleNote: String? = nil
+    ) -> LazyStream<CorrectionEvent> {
+        LazyStream { [self] in
+            AsyncThrowingStream { continuation in
+                let task = Task {
+                    do {
+                        try await run(text, profile: profile, styleNote: styleNote) {
+                            continuation.yield($0)
+                        }
+                        continuation.finish()
+                    } catch {
+                        continuation.finish(throwing: error)
+                    }
+                }
+                continuation.onTermination = { _ in task.cancel() }
+            }
+        }
+    }
+
+    // MARK: - The pipeline
+
+    private struct Context {
+        let language: LanguageConfig
+        let profile: AudienceProfile
+        let styleNote: String?
+        let terms: [String]
+        let model: String
+        let processor: PostProcessor
+    }
+
+    /// The configured German language, so its locale rules (ss for de-CH)
+    /// apply. Falls back to Swiss German, the shipped default.
+    private var germanLanguage: LanguageConfig {
+        configuration.enabledLanguages.first { $0.code.baseSubtag == Self.german }
+            ?? .swissGerman
+    }
+
+    private func run(
+        _ text: UserText, profile: AudienceProfile, styleNote: String?,
+        emit: (CorrectionEvent) -> Void
+    ) async throws {
+        try gate(text)
+        let language = germanLanguage
+        let context = Context(
+            language: language, profile: profile, styleNote: styleNote,
+            terms: configuration.doNotTranslate,
+            model: configuration.models[.correct] ?? Configuration.defaultModel,
+            processor: PostProcessor(target: language))
+        emit(.started)
+
+        let extracted = StructureExtractor.extract(text.value)
+        let masked = extracted.blocks.map { TokenProtector.mask($0, terms: context.terms) }
+        let first = try await generate(masked, context, emit)
+        let response = try parse(first)
+
+        let decision = BlockCountPolicy().decide(
+            expected: extracted.skeleton.blockCount,
+            received: response.correctedBlocks.count, attempt: 0)
+        switch decision {
+        case .accept:
+            let finished = zip(response.correctedBlocks, masked).map {
+                context.processor.finish($0, protected: $1)
+            }
+            let corrected = try StructureExtractor.reapply(
+                finished.map(\.text), to: extracted.skeleton)
+            emit(.finished(result(
+                text, corrected, response.errors, masked.first,
+                finished.flatMap(\.problems), context)))
+        case .retryWholeText, .degrade:
+            try await retryWholeText(text, context, emit)
+        }
+    }
+
+    /// Refuses only a confident "this is another language". "Can't tell"
+    /// goes through: short German fragments are common.
+    private func gate(_ text: UserText) throws {
+        guard let guess = detector.detect(text.value).languageCode else { return }
+        guard guess.baseSubtag == Self.german else { throw CorrectionFailure.notGerman }
+    }
+
+    private func retryWholeText(
+        _ text: UserText, _ context: Context, _ emit: (CorrectionEvent) -> Void
+    ) async throws {
+        let whole = TokenProtector.mask(text.value, terms: context.terms)
+        let response = try parse(try await generate([whole], context, emit))
+        guard response.correctedBlocks.count == 1 else { throw CorrectionFailure.structureLost }
+        let finished = context.processor.finish(response.correctedBlocks[0], protected: whole)
+        emit(.finished(result(
+            text, finished.text, response.errors, whole, finished.problems, context)))
+    }
+
+    private func generate(
+        _ blocks: [ProtectedText], _ context: Context, _ emit: (CorrectionEvent) -> Void
+    ) async throws -> String {
+        let prompt = PromptBuilder().build(PromptRequest(
+            action: .correct, source: context.language, target: context.language,
+            profile: context.profile, doNotTranslate: context.terms,
+            styleNote: context.styleNote, blocks: blocks.map(\.text)))
+        let raw = try await ReplyStream.collect(
+            chat: chat, model: context.model, prompt: prompt, key: "corrected_blocks",
+            onPartial: { emit(.preview(UserText(preview($0, blocks, context)))) })
+        guard !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw CorrectionFailure.emptyResponse
+        }
+        return raw
+    }
+
+    private func parse(_ raw: String) throws -> CorrectResponse {
+        do {
+            return try ResponseParser.parseCorrect(raw)
+        } catch {
+            throw CorrectionFailure.unreadableReply
+        }
+    }
+
+    private func preview(
+        _ partial: [String], _ blocks: [ProtectedText], _ context: Context
+    ) -> String {
+        partial.enumerated().map { index, block in
+            guard index < blocks.count else { return block }
+            return context.processor.finish(block, protected: blocks[index]).text
+        }.joined(separator: "\n")
+    }
+
+    /// Assembles the result: fragments restored, the locale-rule additions,
+    /// the split by severity, the check and the diff.
+    private func result(
+        _ original: UserText, _ corrected: String, _ items: [CorrectionError],
+        _ reference: ProtectedText?, _ problems: [ProtectionProblem], _ context: Context
+    ) -> CorrectionResult {
+        var restored = items.map { restore($0, reference) }
+        restored += localeRuleErrors(in: original.value, context.language)
+        let verdict = CorrectionCheck.check(
+            original: original.value, corrected: corrected, items: restored,
+            rules: context.language.localeRules)
+        return CorrectionResult(
+            original: original,
+            corrected: UserText(corrected),
+            errors: restored.filter { $0.severity == .error },
+            suggestions: restored.filter { $0.severity == .suggestion },
+            diff: WordDiff.diff(original.value, corrected),
+            warnings: warnings(problems) + verdict.warnings,
+            hasNoErrors: verdict.hasNoErrors)
+    }
+
+    /// Sentinels inside a fragment come back as their terms. Every block is
+    /// masked with the same ordered term list, so any one block's
+    /// `ProtectedText` restores sentinels from all of them.
+    private func restore(_ item: CorrectionError, _ reference: ProtectedText?) -> CorrectionError {
+        guard let reference else { return item }
+        return CorrectionError(
+            original: TokenProtector.restore(item.original, from: reference).text,
+            corrected: TokenProtector.restore(item.corrected, from: reference).text,
+            category: item.category, explanationEn: item.explanationEn,
+            severity: item.severity)
+    }
+
+    /// A locale rule that rewrites the user's own text is a real correction,
+    /// so it is listed and explained, never left as an unexplained change in
+    /// the diff. For de-CH: the eszett.
+    private func localeRuleErrors(in text: String, _ language: LanguageConfig) -> [CorrectionError] {
+        language.localeRules.filter { text.contains($0.replace) }.map { rule in
+            CorrectionError(
+                original: rule.replace, corrected: rule.with, category: .spelling,
+                explanationEn: "\(language.displayName) writes \"\(rule.with)\", never \"\(rule.replace)\".",
+                severity: .error)
+        }
+    }
+
+    private func warnings(_ problems: [ProtectionProblem]) -> [String] {
+        problems.map { problem in
+            switch problem {
+            case .sentinelMissing(_, let term):
+                return "\"\(term)\" may not have been kept as written."
+            case .sentinelDebris:
+                return "The model left a placeholder behind; check the text before using it."
+            }
+        }
+    }
+}
