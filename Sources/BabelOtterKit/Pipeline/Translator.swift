@@ -210,20 +210,9 @@ public struct Translator: Sendable {
             profile: context.profile, glossary: context.glossary,
             doNotTranslate: context.terms, styleNote: context.styleNote,
             blocks: blocks.map(\.text)))
-
-        var raw = ""
-        var shown: [String] = []
-        for try await event in chat.chat(
-            model: context.model, messages: [ChatMessage(role: "user", content: prompt)])
-        {
-            try Task.checkCancellation()
-            guard case .delta(let piece) = event else { continue }
-            raw += piece
-            let partial = PartialTranslateBlocks.extract(from: raw)
-            guard !partial.isEmpty, partial != shown else { continue }
-            shown = partial
-            emit(.preview(UserText(preview(partial, blocks, context))))
-        }
+        let raw = try await ReplyStream.collect(
+            chat: chat, model: context.model, prompt: prompt, key: "blocks",
+            onPartial: { emit(.preview(UserText(preview($0, blocks, context)))) })
         guard !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw TranslationError.emptyResponse
         }
