@@ -68,11 +68,12 @@ exercised:** OneNote, Chrome, Safari, Mail, TextEdit, VS Code; the short-text
 direction picker, bullet-list structure, and "Ollama not running". The tables
 further down still list them.
 
-**Parked, small:** `PopupPanel.makeKeyNow()` should do nothing when the panel
-is hidden (clicking Dismiss during the fraction of a second a capture takes
-could otherwise leave an invisible key panel). The preview parser
-(`PartialTranslateBlocks`) holds 7 of the 15 surviving mutants; tightening its
-tests would lift the score clear of 80%.
+**Cleaned up afterwards:** `PopupPanel.makeKeyNow()` now does nothing when
+the panel is hidden, so clicking Dismiss during a capture cannot leave an
+invisible key window. The 15 mutants the first scored run reported as
+surviving turned out to be muter artifacts. Every one is killed when planted
+by hand, so the true score was 83/83; see the muter trap about closures and
+loops below.
 
 ## Update 2026-09-25: testing stops, prototyping starts
 
@@ -296,6 +297,10 @@ which produce identical strings from an ASCII file.
   operator (`while a < b, predicate`). Already recorded in `muter.conf.yml` for
   `StorageLocator`, which still needs the pass-2 workaround.
 - A ternary whose condition ends in an enum member.
+- A mutant inside a closure, or inside a loop body whose condition is also
+  mutated, is silently never inserted and then reported as a survivor. This
+  understates the score, and it is the reason for every survivor measured so
+  far. See item 3 under "Settled".
 - A `guard ... else { ...; return }` inside a `do` block inside a `Task`
   closure. muter replaced the whole `do` body with a bare `return`, so the
   *unmutated* baseline did nothing, and `OllamaClient.pull`'s tests hung. That
@@ -346,10 +351,18 @@ Worth reporting all of this upstream before M1b leans on it further.
 2. **DNT matching is case-sensitive.** A term is a proper noun, so `otterbach` does
    not match `Otterbach`. Defensible either way; say if you want it case-insensitive.
 
-3. **Seven surviving mutants, all in sort comparators**, look like equivalent
-   mutants — `>` replaced by `>=` in a comparator that still orders the same list
-   identically. The gate passes at 86.3% with them. Killing them means
-   restructuring comparators to suit the tool, so they are left alone.
+3. **~~Seven surviving mutants, all in sort comparators, look like equivalent
+   mutants.~~ Wrong, corrected 2026-09-28: they are not survivors at all.**
+   muter 16 reports a mutant as surviving when it never inserted it into the
+   code. It drops mutants inside closures (the `sorted`, `filter` and
+   `first(where:)` comparators here), and mutants inside a loop body whose own
+   condition also carries a mutant. The tests then run unmodified code and
+   pass, and that reads as a survivor. All 15 "survivors" of the first scored
+   run after the prototype merged (81.9%) were planted by hand, one at a time,
+   at the exact position muter gave, and the suite killed every one: the
+   true score was 83/83. **Before writing a test to kill a reported survivor,
+   plant it by hand.** If the suite already kills it, muter never measured
+   it.
 
 4. **The mutation threshold question is resolved by growth.** At 51 measured
    mutants the small-population rule (`total < 20`) no longer applies, so the
