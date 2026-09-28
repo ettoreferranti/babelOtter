@@ -194,7 +194,7 @@ public struct Corrector: Sendable {
         _ maskedText: String
     ) -> CorrectionResult {
         let rules = context.language.localeRules
-        var restored = items.map { restore($0, reference, rules) }
+        var restored = items.map { restore($0, reference, context) }
         restored += localeRuleErrors(in: maskedText, existing: restored, language: context.language)
         let verdict = CorrectionCheck.check(
             original: original.value, corrected: corrected, items: restored, rules: rules)
@@ -212,16 +212,21 @@ public struct Corrector: Sendable {
     /// masked with the same ordered term list, so any one block's
     /// `ProtectedText` restores sentinels from all of them.
     ///
-    /// `corrected` is then run through the locale rules for display:
-    /// `PostProcessor` already applies them to the pasted text itself, so a
-    /// listed fix whose fragment still shows the pre-rule spelling (an
-    /// eszett `PostProcessor` already turned into `ss`) would read as if the
-    /// fix was never made. `original` is left exactly as the user wrote it.
+    /// `corrected` then goes through `context.processor.finish` -- the same
+    /// function the pasted text itself goes through -- rather than a bare
+    /// sentinel restore. That is what makes the two consistent: a listed fix
+    /// is never shown with a spelling the corrected text no longer has (an
+    /// eszett `PostProcessor` already turned into `ss`), and a restored
+    /// do-not-translate term's own spelling is never rewritten either,
+    /// because `finish` protects exactly the ranges restoration produced.
+    /// Rewriting the fragment with `LocaleRuleApplier` alone, and no
+    /// protected ranges, would fix the first problem by reintroducing the
+    /// second. `original` is left exactly as the user wrote it.
     private func restore(
-        _ item: CorrectionError, _ reference: ProtectedText?, _ rules: [LocaleRule]
+        _ item: CorrectionError, _ reference: ProtectedText?, _ context: Context
     ) -> CorrectionError {
         let original = unmasked(item.original, reference)
-        let corrected = LocaleRuleApplier.apply(rules, to: unmasked(item.corrected, reference), protecting: [])
+        let corrected = displayCorrected(item.corrected, reference, context)
         return CorrectionError(
             original: original, corrected: corrected,
             category: item.category, explanationEn: item.explanationEn,
@@ -231,6 +236,18 @@ public struct Corrector: Sendable {
     private func unmasked(_ fragment: String, _ reference: ProtectedText?) -> String {
         guard let reference else { return fragment }
         return TokenProtector.restore(fragment, from: reference).text
+    }
+
+    /// No reference means no protected term was ever in play (an empty
+    /// selection produces zero blocks), so the locale rules alone are the
+    /// whole of post-processing in that case.
+    private func displayCorrected(
+        _ fragment: String, _ reference: ProtectedText?, _ context: Context
+    ) -> String {
+        guard let reference else {
+            return LocaleRuleApplier.apply(context.language.localeRules, to: fragment, protecting: [])
+        }
+        return context.processor.finish(fragment, protected: reference).text
     }
 
     /// A locale rule that rewrites the user's own text is a real correction,

@@ -240,6 +240,21 @@ struct CorrectorTests {
         #expect(!done.errors.contains { $0.corrected.contains("\u{00DF}") })
     }
 
+    @Test("a listed fix's corrected fragment keeps a protected term as written")
+    func fixFragmentProtectsDNTTerm() async throws {
+        let text = "Wei\u{00DF}enburg ist gro."
+        let errors = """
+            [{"original": "\u{27E6}DNT0\u{27E7} ist gro", \
+            "corrected": "\u{27E6}DNT0\u{27E7} ist gro\u{00DF}", "category": "spelling", \
+            "explanation_en": "adjective ending", "severity": "error"}]
+            """
+        let chat = ScriptedChat([reply(["\u{27E6}DNT0\u{27E7} ist gro\u{00DF}."], errors)])
+        let done = try #require(result(try await collect(
+            corrector(chat) { $0.doNotTranslate = ["Wei\u{00DF}enburg"] }
+                .correct(UserText(text), profile: .colleagues))))
+        #expect(done.errors.first?.corrected == "Wei\u{00DF}enburg ist gross")
+    }
+
     @Test("protected terms come back inside the text and the fragments")
     func sentinels() async throws {
         let text = "Otterbach hat der Kollege gesehen."
