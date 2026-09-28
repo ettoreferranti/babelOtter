@@ -80,7 +80,10 @@ public struct PromptBuilder: Sendable {
                 You are a patient language tutor. Correct the numbered blocks below, \
                 preserving the author's intent, structure and voice. Correct the \
                 language, do not rewrite the message. If there are no errors, return \
-                the text unchanged and an empty error list.
+                the text unchanged and an empty error list. corrected_blocks applies \
+                only changes whose severity is "error". List stylistic suggestions in \
+                errors with severity "suggestion", and do not apply them to \
+                corrected_blocks.
                 """
         case .explain:
             return "You are a language teacher. Explain the numbered blocks below in English."

@@ -166,4 +166,31 @@ struct PromptBuilderTests {
     func noDoubleBlankLines() {
         #expect(!builder.build(request()).contains("\n\n\n"))
     }
+
+    @Test("Correct applies errors only and lists suggestions unapplied")
+    func correctErrorsOnly() {
+        let prompt = builder.build(PromptRequest(
+            action: .correct, source: .swissGerman, target: .swissGerman,
+            profile: .administration, styleNote: "streng", blocks: ["Ich habe"]))
+        #expect(prompt.contains("corrected_blocks applies only changes whose severity is \"error\""))
+        #expect(prompt.contains("do not apply them to corrected_blocks"))
+        #expect(prompt.contains("\"Sie\""))
+        #expect(prompt.contains("streng"))
+    }
+
+    @Test("the errors-only rule is Correct's alone")
+    func errorsOnlyRuleIsCorrectOnly() {
+        let prompt = builder.build(PromptRequest(
+            action: .translate, source: .english, target: .swissGerman,
+            profile: .colleagues, blocks: ["x"]))
+        #expect(!prompt.contains("corrected_blocks applies only"))
+    }
+
+    @Test("a correction item can be built in code")
+    func correctionErrorInit() {
+        let item = CorrectionError(
+            original: "a", corrected: "b", category: .spelling,
+            explanationEn: "why", severity: .error)
+        #expect(item.corrected == "b")
+    }
 }

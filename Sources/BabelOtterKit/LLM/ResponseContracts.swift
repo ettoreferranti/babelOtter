@@ -30,6 +30,17 @@ public struct CorrectionError: Sendable, Equatable, Codable {
     public let category: ErrorCategory
     public let explanationEn: String
     public let severity: Severity
+
+    public init(
+        original: String, corrected: String, category: ErrorCategory,
+        explanationEn: String, severity: Severity
+    ) {
+        self.original = original
+        self.corrected = corrected
+        self.category = category
+        self.explanationEn = explanationEn
+        self.severity = severity
+    }
 }
 
 /// The translate and re-pitch contract (spec section 7).
