@@ -22,12 +22,15 @@ private final class ScriptedChat: ChatStreaming, @unchecked Sendable {
     }
 }
 
-/// Answers a fixed language, so the gate is tested without NaturalLanguage.
+/// Answers a fixed language at a fixed confidence, so the gate is tested
+/// without NaturalLanguage -- confident, below-floor and "no guess at all"
+/// alike.
 private struct FixedRecognizer: LanguageRecognizing {
     let code: String?
+    var confidence: Double = 0.99
     func hypotheses(for text: String) -> [LanguageCode: Double] {
         guard let code else { return [:] }
-        return [LanguageCode(code): 0.99]
+        return [LanguageCode(code): confidence]
     }
 }
 
@@ -56,7 +59,7 @@ private let genderError = """
 struct CorrectorTests {
 
     private func corrector(
-        _ chat: ScriptedChat, language: String? = "de",
+        _ chat: ScriptedChat, language: String? = "de", confidence: Double = 0.99,
         configure: (inout Configuration) -> Void = { _ in }
     ) -> Corrector {
         var configuration = Configuration.default
@@ -64,7 +67,7 @@ struct CorrectorTests {
         configure(&configuration)
         return Corrector(
             configuration: configuration, chat: chat,
-            recognizer: FixedRecognizer(code: language))
+            recognizer: FixedRecognizer(code: language, confidence: confidence))
     }
 
     private let long = "Ich habe gestern mit der Kollege gesprochen."
@@ -124,6 +127,31 @@ struct CorrectorTests {
         #expect(chat.prompts.count == 1)
     }
 
+    @Test("a below-floor guess of another language is still refused")
+    func belowFloorNonGermanRefused() async {
+        let chat = ScriptedChat([])
+        await #expect(throws: CorrectionFailure.notGerman) {
+            _ = try await collect(corrector(chat, language: "en", confidence: 0.4)
+                .correct(UserText(long), profile: .colleagues))
+        }
+        #expect(chat.prompts.isEmpty)
+    }
+
+    @Test("a below-floor guess of German is allowed through")
+    func belowFloorGermanAllowed() async throws {
+        let chat = ScriptedChat([reply([long])])
+        _ = try await collect(corrector(chat, language: "de", confidence: 0.4)
+            .correct(UserText(long), profile: .colleagues))
+        #expect(chat.prompts.count == 1)
+    }
+
+    @Test("no hypothesis at all is allowed through")
+    func noHypothesisAllowed() async throws {
+        let chat = ScriptedChat([reply([long])])
+        _ = try await collect(corrector(chat, language: nil).correct(UserText(long), profile: .colleagues))
+        #expect(chat.prompts.count == 1)
+    }
+
     @Test("an unreadable reply is a failure, never a correction")
     func unreadable() async {
         let chat = ScriptedChat([["Das sieht gut aus!"]])
@@ -171,6 +199,45 @@ struct CorrectorTests {
         #expect(done.errors.contains { $0.category == .spelling && $0.original == "\u{00DF}" })
         #expect(done.warnings.isEmpty)
         #expect(!done.hasNoErrors)
+    }
+
+    @Test("an eszett inside a protected term is never treated as the user's own spelling")
+    func protectedTermEszettIgnored() async throws {
+        let text = "Wei\u{00DF}enburg liegt im Norden."
+        let chat = ScriptedChat([reply(["\u{27E6}DNT0\u{27E7} liegt im Norden."])])
+        let done = try #require(result(try await collect(
+            corrector(chat) { $0.doNotTranslate = ["Wei\u{00DF}enburg"] }
+                .correct(UserText(text), profile: .colleagues))))
+        #expect(done.hasNoErrors)
+        #expect(done.warnings.isEmpty)
+        #expect(!done.errors.contains { $0.category == .spelling })
+    }
+
+    @Test("the model's own eszett fix is not duplicated by a locale-rule row")
+    func eszettFixNotDuplicated() async throws {
+        let text = "Die Stra\u{00DF}e ist alt."
+        let ownFix = """
+            [{"original": "Stra\u{00DF}e", "corrected": "Strasse", "category": "spelling", \
+            "explanation_en": "Swiss orthography", "severity": "error"}]
+            """
+        let chat = ScriptedChat([reply(["Die Strasse ist alt."], ownFix)])
+        let done = try #require(result(try await collect(
+            corrector(chat).correct(UserText(text), profile: .colleagues))))
+        #expect(done.errors.count == 1)
+        #expect(done.errors.first?.original == "Stra\u{00DF}e")
+    }
+
+    @Test("a listed fix's corrected fragment is shown without the eszett")
+    func fixDisplaysWithoutEszett() async throws {
+        let text = "Der Baum ist gross."
+        let errors = """
+            [{"original": "gross", "corrected": "gro\u{00DF}", "category": "spelling", \
+            "explanation_en": "adjective form", "severity": "error"}]
+            """
+        let chat = ScriptedChat([reply(["Der Baum ist gross."], errors)])
+        let done = try #require(result(try await collect(
+            corrector(chat).correct(UserText(text), profile: .colleagues))))
+        #expect(!done.errors.contains { $0.corrected.contains("\u{00DF}") })
     }
 
     @Test("protected terms come back inside the text and the fragments")

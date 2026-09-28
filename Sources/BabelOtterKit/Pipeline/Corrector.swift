@@ -124,7 +124,8 @@ public struct Corrector: Sendable {
                 finished.map(\.text), to: extracted.skeleton)
             emit(.finished(result(
                 text, corrected, response.errors, masked.first,
-                finished.flatMap(\.problems), context)))
+                finished.flatMap(\.problems), context,
+                masked.map(\.text).joined(separator: "\n"))))
         case .retryWholeText, .degrade:
             try await retryWholeText(text, context, emit)
         }
@@ -145,7 +146,7 @@ public struct Corrector: Sendable {
         guard response.correctedBlocks.count == 1 else { throw CorrectionFailure.structureLost }
         let finished = context.processor.finish(response.correctedBlocks[0], protected: whole)
         emit(.finished(result(
-            text, finished.text, response.errors, whole, finished.problems, context)))
+            text, finished.text, response.errors, whole, finished.problems, context, whole.text)))
     }
 
     private func generate(
@@ -183,15 +184,20 @@ public struct Corrector: Sendable {
 
     /// Assembles the result: fragments restored, the locale-rule additions,
     /// the split by severity, the check and the diff.
+    ///
+    /// `maskedText` -- the blocks the model actually saw, sentinels and all
+    /// -- is what the locale-rule scan reads, never `original.value`: see
+    /// `localeRuleErrors` for why.
     private func result(
         _ original: UserText, _ corrected: String, _ items: [CorrectionError],
-        _ reference: ProtectedText?, _ problems: [ProtectionProblem], _ context: Context
+        _ reference: ProtectedText?, _ problems: [ProtectionProblem], _ context: Context,
+        _ maskedText: String
     ) -> CorrectionResult {
-        var restored = items.map { restore($0, reference) }
-        restored += localeRuleErrors(in: original.value, context.language)
+        let rules = context.language.localeRules
+        var restored = items.map { restore($0, reference, rules) }
+        restored += localeRuleErrors(in: maskedText, existing: restored, language: context.language)
         let verdict = CorrectionCheck.check(
-            original: original.value, corrected: corrected, items: restored,
-            rules: context.language.localeRules)
+            original: original.value, corrected: corrected, items: restored, rules: rules)
         return CorrectionResult(
             original: original,
             corrected: UserText(corrected),
@@ -205,25 +211,59 @@ public struct Corrector: Sendable {
     /// Sentinels inside a fragment come back as their terms. Every block is
     /// masked with the same ordered term list, so any one block's
     /// `ProtectedText` restores sentinels from all of them.
-    private func restore(_ item: CorrectionError, _ reference: ProtectedText?) -> CorrectionError {
-        guard let reference else { return item }
+    ///
+    /// `corrected` is then run through the locale rules for display:
+    /// `PostProcessor` already applies them to the pasted text itself, so a
+    /// listed fix whose fragment still shows the pre-rule spelling (an
+    /// eszett `PostProcessor` already turned into `ss`) would read as if the
+    /// fix was never made. `original` is left exactly as the user wrote it.
+    private func restore(
+        _ item: CorrectionError, _ reference: ProtectedText?, _ rules: [LocaleRule]
+    ) -> CorrectionError {
+        let original = unmasked(item.original, reference)
+        let corrected = LocaleRuleApplier.apply(rules, to: unmasked(item.corrected, reference), protecting: [])
         return CorrectionError(
-            original: TokenProtector.restore(item.original, from: reference).text,
-            corrected: TokenProtector.restore(item.corrected, from: reference).text,
+            original: original, corrected: corrected,
             category: item.category, explanationEn: item.explanationEn,
             severity: item.severity)
+    }
+
+    private func unmasked(_ fragment: String, _ reference: ProtectedText?) -> String {
+        guard let reference else { return fragment }
+        return TokenProtector.restore(fragment, from: reference).text
     }
 
     /// A locale rule that rewrites the user's own text is a real correction,
     /// so it is listed and explained, never left as an unexplained change in
     /// the diff. For de-CH: the eszett.
-    private func localeRuleErrors(in text: String, _ language: LanguageConfig) -> [CorrectionError] {
-        language.localeRules.filter { text.contains($0.replace) }.map { rule in
+    ///
+    /// Scans the masked text -- the blocks actually sent, sentinels in place
+    /// of every protected term -- rather than the raw original. A do-not-
+    /// translate term is never rewritten (`PostProcessor.finish` leaves a
+    /// restored protected span untouched), so a rule character sitting
+    /// inside one, such as the eszett in "Weissenburg", must never be read
+    /// as the user's own spelling: the sentinel hides it from this scan the
+    /// same way it hides the term from the model.
+    ///
+    /// Skips a rule the model's own listed fixes already cover -- an item
+    /// whose `original` contains the rule's character and whose `corrected`
+    /// (already run through `restore` above) contains its replacement --
+    /// so the same fix is never listed twice.
+    private func localeRuleErrors(
+        in maskedText: String, existing: [CorrectionError], language: LanguageConfig
+    ) -> [CorrectionError] {
+        language.localeRules.filter { rule in
+            maskedText.contains(rule.replace) && !alreadyListed(rule, in: existing)
+        }.map { rule in
             CorrectionError(
                 original: rule.replace, corrected: rule.with, category: .spelling,
                 explanationEn: "\(language.displayName) writes \"\(rule.with)\", never \"\(rule.replace)\".",
                 severity: .error)
         }
+    }
+
+    private func alreadyListed(_ rule: LocaleRule, in items: [CorrectionError]) -> Bool {
+        items.contains { $0.original.contains(rule.replace) && $0.corrected.contains(rule.with) }
     }
 
     private func warnings(_ problems: [ProtectionProblem]) -> [String] {
