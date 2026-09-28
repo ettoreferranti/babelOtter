@@ -13,6 +13,17 @@ public struct CorrectionVerdict: Sendable, Equatable {
 /// This is where that request is verified. Anything inconsistent becomes a
 /// warning the user sees, because a correction that silently "fixed" its own
 /// inconsistencies would be the model's guess presented as fact.
+///
+/// The "text changed but nothing is listed" rule below compares `original`
+/// and `corrected` exactly as given, with no locale-rule normalisation: it
+/// relies on the caller having already turned any locale-rule rewrite of the
+/// user's own text into a listed error (`Corrector` does this for the
+/// eszett), so that a rule-only change is never reported as "unexplained".
+///
+/// Known limitation: every presence check here is text-wide, not positional
+/// -- a fragment that also happens to occur elsewhere in the text can
+/// satisfy a check that was really about a different occurrence. The diff
+/// remains the ground truth of what is actually pasted.
 public enum CorrectionCheck {
 
     public static func check(
@@ -23,6 +34,13 @@ public enum CorrectionCheck {
         for item in items {
             if item.severity == .error {
                 errorCount += 1
+                // Compared as written: the raw user text, never normalised
+                // with the locale rules, since it is what the user actually
+                // typed.
+                if !item.original.isEmpty && !original.contains(item.original) {
+                    warnings.append(
+                        "A listed error is not in your text: \"\(item.original)\".")
+                }
                 let fragment = normalised(item.corrected, rules)
                 if !fragment.isEmpty && !corrected.contains(fragment) {
                     warnings.append(

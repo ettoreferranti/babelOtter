@@ -85,5 +85,14 @@ struct CorrectionCheckTests {
             original: "mit dem Kollegen", corrected: "mit dem Kollegen",
             items: [item("der", "dem", .error)], rules: swiss)
         #expect(!verdict.hasNoErrors)
+        #expect(verdict.warnings.contains { $0.contains("der") })
+    }
+
+    @Test("a legitimate error whose fragment is present in the original is not reported as missing")
+    func errorFragmentPresentInOriginal() {
+        let verdict = CorrectionCheck.check(
+            original: "mit der Kollege", corrected: "mit dem Kollegen",
+            items: [item("der Kollege", "dem Kollegen", .error)], rules: swiss)
+        #expect(!verdict.warnings.contains { $0.contains("A listed error is not in your text") })
     }
 }
