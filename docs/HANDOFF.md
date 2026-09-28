@@ -1,6 +1,33 @@
-# Handoff — state as of 2026-09-25
+# Handoff — state as of 2026-09-28
 
 Read this first if you are picking babelOtter up in a new session.
+
+## Update 2026-09-28: the prototype is on `main`, and it works where it matters
+
+**#85 (Translate prototype) and #86 (audience picker and instruction field)
+are merged.** Both passed CI, the mutation gate included (81.9% on #85 -- the
+first scored run since the M1a shell; see the muter trap about `guard` inside
+a `Task` closure below for why every earlier run was cancelled).
+
+**Manual verification passed, 2026-09-28**, in the apps used daily:
+
+- **Teams:** capture, streaming translation, Escape stopping Ollama, Replace,
+  the user's clipboard restored afterwards, Sie/du switching, and an
+  instruction plus Return re-running without pasting.
+- **Word:** capture and Replace; the translation (not the old clipboard) was
+  pasted, so the 0.8s settle is long enough there.
+- **Outlook:** capture and Replace in a message being composed.
+
+Recorded as measurements in `docs/architecture.md` section 7. **Not yet
+exercised:** OneNote, Chrome, Safari, Mail, TextEdit, VS Code; the short-text
+direction picker, bullet-list structure, and "Ollama not running". The tables
+further down still list them.
+
+**Parked, small:** `PopupPanel.makeKeyNow()` should do nothing when the panel
+is hidden (clicking Dismiss during the fraction of a second a capture takes
+could otherwise leave an invisible key panel). The preview parser
+(`PartialTranslateBlocks`) holds 7 of the 15 surviving mutants; tightening its
+tests would lift the score clear of 80%.
 
 ## Update 2026-09-25: testing stops, prototyping starts
 
@@ -43,7 +70,7 @@ Return or Regenerate, to this invocation only, and is never saved. The last
 audience chosen is remembered (its id only, in UserDefaults). While the
 instruction field has focus, Return means Regenerate, not Replace.
 
-Manual checks for it, not yet run:
+Manual checks for it -- passed in Teams on 2026-09-28:
 
 | Do | Expected |
 |---|---|
@@ -73,8 +100,9 @@ bug to fix here.
 
 `swift test && Tools/make-app.sh --run`, grant Accessibility when prompted
 (menu bar icon shows the status; *Check Again* rereads it), then work
-through these. They come from tasks 5, 6 and 7 of the prototype plan and
-none of them have been run yet.
+through these. They come from tasks 5, 6 and 7 of the prototype plan. The
+Teams, Word and Outlook rows, Escape, and clipboard restore passed on
+2026-09-28 (see the update at the top); the rest have not been run.
 
 **Capture** -- select text in each app, then press Control-Option-T:
 

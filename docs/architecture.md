@@ -522,6 +522,19 @@ Word and OneNote; whether Outlook's message body accepts an Accessibility write
 prototype will show the first and third in daily use; if it contradicts this
 section, record it here plainly.
 
+**Measured in daily use, 2026-09-28, with the Translate prototype.**
+
+| App | Capture | Replace | Notes |
+|---|---|---|---|
+| Teams | works (clipboard tier) | works | user's clipboard restored afterwards; Escape mid-stream stops Ollama generating |
+| Word | works (clipboard tier) | works | the 0.8s settle was long enough: the translation, not the old clipboard, was pasted |
+| Outlook (compose body) | works | works | replacement through the clipboard |
+
+This answers the first open question for Teams and Word: clipboard capture
+works there, and the clipboard replacement lands before the restore. OneNote,
+Chrome, Safari, Mail, TextEdit and VS Code were not exercised in this round.
+Outlook's Accessibility write stays moot: replacement never uses it.
+
 ### Universal Clipboard transfers at paste time, not at copy time
 
 Two measurements, 2026-09-20, across two Macs on one account. Together they

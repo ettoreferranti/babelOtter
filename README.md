@@ -7,19 +7,19 @@ Highlight text anywhere in macOS, hit a hotkey, and get a translation,
 a correction, or an explanation — without a single byte of your writing
 leaving your machine.
 
-> **Status: M1a done; a Translate prototype is built, and awaiting manual
-> verification.** M1a's pipeline — capture, language detection, structure
+> **Status: M1a done; a Translate prototype is on `main`, verified by hand in
+> Teams, Word and Outlook.** M1a's pipeline — capture, language detection, structure
 > preservation, prompt building, streaming, response parsing, config — is
 > merged to `main`, with the privacy mechanisms below and a CI pipeline that
 > gates on all of them plus mutation testing of `BabelOtterKit` at ≥80%.
 >
-> On top of that, `feat/translate-prototype` (not yet merged) adds a thin,
-> working slice of M1b: a menu bar app, a global hotkey
+> On top of that, a thin slice of M1b is merged: a menu bar app, a global hotkey
 > (**Control-Option-T**), selection capture, a streaming popup, and
-> **Replace** / **Copy**. `swift test` on this branch runs 409 tests in 43
-> suites, all green; the manual checklist in
-> [`docs/HANDOFF.md`](docs/HANDOFF.md) — capture, translation, replace, across
-> real applications — has not been run yet. Translate is the only action
+> **Replace** / **Copy**, plus an audience picker (du/Sie) and a one-line
+> instruction field. `swift test` runs 412 tests in 43 suites, all green. It
+> has been checked by hand in Teams, Word and Outlook; the full per-app
+> checklist in [`docs/HANDOFF.md`](docs/HANDOFF.md) says which apps are still
+> unexercised. Translate is the only action
 > implemented; **Correct**, **Explain** and **Re-pitch** below are not built
 > yet, and neither are audience inference, a settings window,
 > onboarding or history — see [`docs/HANDOFF.md`](docs/HANDOFF.md) for exactly
