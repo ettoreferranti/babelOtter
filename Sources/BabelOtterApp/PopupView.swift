@@ -18,7 +18,7 @@ struct PopupView: View {
             // Translate's finished text -- where `model.correction` is
             // always nil -- reaches this one.
             if model.correction == nil {
-                ForEach(model.warnings, id: \.self) { warning in
+                ForEach(Array(model.warnings.enumerated()), id: \.offset) { _, warning in
                     Label(warning, systemImage: "exclamationmark.triangle")
                         .font(.caption).foregroundStyle(.orange)
                 }
@@ -119,7 +119,7 @@ struct PopupView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
                 DiffText(segments: correction.diff)
-                ForEach(correction.warnings, id: \.self) { warning in
+                ForEach(Array(correction.warnings.enumerated()), id: \.offset) { _, warning in
                     Label(warning, systemImage: "exclamationmark.triangle")
                         .font(.caption).foregroundStyle(.orange)
                 }

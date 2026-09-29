@@ -289,9 +289,10 @@ final class PopupModel {
         // `run()`, rather than through `self.consumer` / `self.watchdog`. A
         // cancelled `AsyncThrowingStream` iterator returns nil rather than
         // throwing, so a stale consumer -- cancelled by `stop()` because a
-        // later `run()` (Swap, a retry) already replaced both properties --
-        // can still reach the code after the loop. Reading `self.watchdog`
-        // there would hand it whichever watchdog happens to be current by
+        // later run of either action (Swap, Regenerate, a new audience)
+        // already replaced both properties -- can still reach the code after
+        // the loop. Reading `self.watchdog` there would hand it whichever
+        // watchdog happens to be current by
         // then, i.e. the new run's; `pair` is this run's own, so a stale
         // consumer only ever cancels the watchdog it was started alongside.
         // (A plain local `var` captured directly by both closures hits
@@ -423,6 +424,6 @@ final class PopupModel {
         if error is OllamaTransportError || error is URLError {
             return "Ollama could not be reached. Is it running?"
         }
-        return "The translation failed: \(error.localizedDescription)"
+        return "The request failed: \(error.localizedDescription)"
     }
 }
