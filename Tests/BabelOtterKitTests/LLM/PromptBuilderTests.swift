@@ -170,6 +170,22 @@ struct PromptBuilderTests {
         #expect(prompt.contains("Quote each original fragment exactly"))
     }
 
+    @Test("Correct's audience section is the register only")
+    func correctAudienceIsRegisterOnly() {
+        let prompt = builder.build(request(action: .correct, profile: .administration))
+        #expect(prompt.contains(
+            #"The text is addressed to Administration, who should be addressed as "Sie"."#))
+        #expect(prompt.contains("A mismatch is a register error."))
+        #expect(!prompt.contains("Tone:"))
+    }
+
+    @Test("Translate keeps the tone line; Correct's meaning rule does not leak into it")
+    func translateAudienceUnchanged() {
+        let prompt = builder.build(request(action: .translate, profile: .administration))
+        #expect(!prompt.contains("exchanging the noun"))
+        #expect(prompt.contains("Tone:"))
+    }
+
     @Test("a prompt has no blank section left by an omitted part")
     func noDoubleBlankLines() {
         #expect(!builder.build(request()).contains("\n\n\n"))

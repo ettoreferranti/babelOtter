@@ -129,17 +129,25 @@ public struct PromptBuilder: Sendable {
             .joined(separator: "\n")
     }
 
+    /// Written as a guard rather than a ternary on `request.action`: muter's
+    /// ternary operator mis-parses a condition ending in an enum member (see
+    /// the comment on `languages(_:)` above).
     private func audience(_ request: PromptRequest) -> String? {
         let profile = request.profile
-        var lines = [
-            "Audience: \(profile.name).",
-            #"Address the reader as "\#(profile.register.rawValue)"."#,
-            "Tone: \(profile.toneGuidance)",
-        ]
-        if !profile.glossaryBias.isEmpty {
-            lines.append("Prefer these terms where natural: \(profile.glossaryBias.joined(separator: ", ")).")
+        guard request.action == .correct else {
+            var lines = [
+                "Audience: \(profile.name).",
+                #"Address the reader as "\#(profile.register.rawValue)"."#,
+                "Tone: \(profile.toneGuidance)",
+            ]
+            if !profile.glossaryBias.isEmpty {
+                lines.append("Prefer these terms where natural: \(profile.glossaryBias.joined(separator: ", ")).")
+            }
+            return lines.joined(separator: "\n")
         }
-        return lines.joined(separator: "\n")
+        return
+            #"The text is addressed to \#(profile.name), who should be addressed as "\#(profile.register.rawValue)". "#
+            + "A mismatch is a register error."
     }
 
     private func glossarySection(_ request: PromptRequest) -> String? {
