@@ -131,8 +131,9 @@ public struct Corrector: Sendable {
         }
     }
 
-    /// Refuses only a confident "this is another language". "Can't tell"
-    /// goes through: short German fragments are common.
+    /// Refuses any guess that is not German, confident or below the floor.
+    /// "Can't tell" -- too short to judge, or no hypothesis at all -- goes
+    /// through: short German fragments are common.
     private func gate(_ text: UserText) throws {
         guard let guess = detector.detect(text.value).languageCode else { return }
         guard guess.baseSubtag == Self.german else { throw CorrectionFailure.notGerman }
@@ -262,15 +263,23 @@ public struct Corrector: Sendable {
     /// as the user's own spelling: the sentinel hides it from this scan the
     /// same way it hides the term from the model.
     ///
-    /// Skips a rule the model's own listed fixes already cover -- an item
-    /// whose `original` contains the rule's character and whose `corrected`
-    /// (already run through `restore` above) contains its replacement --
-    /// so the same fix is never listed twice.
+    /// Skips the kit's row only when the model's own listed items, between
+    /// them, removed at least as many occurrences of the rule's character as
+    /// the masked text contains. Counting occurrences rather than checking
+    /// mere containment matters: an item can easily contain both the rule's
+    /// character -- in a word it left untouched -- and its replacement --
+    /// inside some other word entirely, such as "besser" -- and containment
+    /// alone would then treat an unrelated item as already explaining an
+    /// eszett it never touched, silently dropping the kit's only
+    /// explanation for a change `PostProcessor` still makes.
     private func localeRuleErrors(
         in maskedText: String, existing: [CorrectionError], language: LanguageConfig
     ) -> [CorrectionError] {
         language.localeRules.filter { rule in
-            maskedText.contains(rule.replace) && !alreadyListed(rule, in: existing)
+            let total = occurrences(of: rule.replace, in: maskedText)
+            guard total > 0 else { return false }
+            let removed = existing.reduce(0) { $0 + removedOccurrences(of: rule, by: $1) }
+            return removed < total
         }.map { rule in
             CorrectionError(
                 original: rule.replace, corrected: rule.with, category: .spelling,
@@ -279,8 +288,26 @@ public struct Corrector: Sendable {
         }
     }
 
-    private func alreadyListed(_ rule: LocaleRule, in items: [CorrectionError]) -> Bool {
-        items.contains { $0.original.contains(rule.replace) && $0.corrected.contains(rule.with) }
+    /// How many occurrences of the rule's character one item actually
+    /// removed: the drop between its `original` and its displayed
+    /// `corrected`, floored at zero so an item that left the character
+    /// alone, or added one, is never counted as negative coverage.
+    private func removedOccurrences(of rule: LocaleRule, by item: CorrectionError) -> Int {
+        let before = occurrences(of: rule.replace, in: item.original)
+        guard before > 0 else { return 0 }
+        let after = occurrences(of: rule.replace, in: item.corrected)
+        return max(0, before - after)
+    }
+
+    private func occurrences(of substring: String, in text: String) -> Int {
+        guard !substring.isEmpty else { return 0 }
+        var count = 0
+        var searchStart = text.startIndex
+        while let found = text.range(of: substring, range: searchStart..<text.endIndex) {
+            count += 1
+            searchStart = found.upperBound
+        }
+        return count
     }
 
     private func warnings(_ problems: [ProtectionProblem]) -> [String] {

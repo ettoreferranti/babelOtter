@@ -227,6 +227,37 @@ struct CorrectorTests {
         #expect(done.errors.first?.original == "Stra\u{00DF}e")
     }
 
+    @Test("an unrelated item that merely contains \"ss\" does not suppress the eszett row")
+    func unrelatedItemDoesNotSuppressEszettRow() async throws {
+        let text = "mit der Stra\u{00DF}e ist gut und der Baum ist gro\u{00DF}."
+        let unrelatedFix = """
+            [{"original": "mit der Stra\u{00DF}e ist gut", \
+            "corrected": "mit der Stra\u{00DF}e ist besser", "category": "register", \
+            "explanation_en": "more natural wording", "severity": "error"}]
+            """
+        let chat = ScriptedChat([reply(
+            ["mit der Stra\u{00DF}e ist besser und der Baum ist gro\u{00DF}."], unrelatedFix)])
+        let done = try #require(result(try await collect(
+            corrector(chat).correct(UserText(text), profile: .colleagues))))
+        #expect(done.errors.count == 2)
+        #expect(done.errors.contains { $0.category == .spelling && $0.original == "\u{00DF}" })
+    }
+
+    @Test("only one of two eszett words fixed still adds the row for the other")
+    func partialEszettFixStillAddsRow() async throws {
+        let text = "Die Stra\u{00DF}e ist alt und der Baum ist gro\u{00DF}."
+        let ownFix = """
+            [{"original": "Stra\u{00DF}e", "corrected": "Strasse", "category": "spelling", \
+            "explanation_en": "Swiss orthography", "severity": "error"}]
+            """
+        let chat = ScriptedChat([reply(
+            ["Die Strasse ist alt und der Baum ist gro\u{00DF}."], ownFix)])
+        let done = try #require(result(try await collect(
+            corrector(chat).correct(UserText(text), profile: .colleagues))))
+        #expect(done.errors.count == 2)
+        #expect(done.errors.contains { $0.category == .spelling && $0.original == "\u{00DF}" })
+    }
+
     @Test("a listed fix's corrected fragment is shown without the eszett")
     func fixDisplaysWithoutEszett() async throws {
         let text = "Der Baum ist gross."
