@@ -28,9 +28,9 @@ struct PopupView: View {
 
     private var header: some View {
         HStack {
-            Text("\u{1F9A6} babelOtter").font(.headline)
+            Text(headerTitle).font(.headline)
             Spacer()
-            if let direction = model.direction {
+            if model.action != .correct, let direction = model.direction {
                 Text("\(model.displayName(direction.source)) \u{2192} \(model.displayName(direction.target))")
                     .font(.caption).foregroundStyle(.secondary)
                 Button("Swap", systemImage: "arrow.left.arrow.right") { model.swap() }
@@ -38,6 +38,11 @@ struct PopupView: View {
                     .disabled(model.phase == .capturing)
             }
         }
+    }
+
+    private var headerTitle: String {
+        if model.action == .correct { return "\u{1F9A6} Correct" }
+        return "\u{1F9A6} babelOtter"
     }
 
     /// Audience and a one-off instruction. Both re-run the translation.
@@ -78,19 +83,58 @@ struct PopupView: View {
                     Button(model.displayName(code)) { model.choose(target: code) }
                 }
             }
-        case .translating, .finished:
-            ScrollView {
-                Text(model.text.isEmpty ? " " : model.text)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .frame(minHeight: 40, maxHeight: 320)
-            if model.phase == .translating {
-                ProgressView().controlSize(.small)
+        case .translating:
+            plainText
+            ProgressView().controlSize(.small)
+        case .finished:
+            if let correction = model.correction {
+                correctionContent(correction)
+            } else {
+                plainText
             }
         case .failed(let reason):
             Text(reason).foregroundStyle(.secondary)
         }
+    }
+
+    private var plainText: some View {
+        ScrollView {
+            Text(model.text.isEmpty ? " " : model.text)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(minHeight: 40, maxHeight: 320)
+    }
+
+    /// The diff, the errors and the (unapplied) suggestions, for a finished
+    /// Correct. `correction.corrected` -- what Replace pastes -- is exactly
+    /// `same` plus `added` from `correction.diff`.
+    private func correctionContent(_ correction: CorrectionResult) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 10) {
+                DiffText(segments: correction.diff)
+                if correction.hasNoErrors {
+                    Label("No errors found", systemImage: "checkmark.circle")
+                        .foregroundStyle(.green)
+                }
+                if !correction.errors.isEmpty {
+                    Text("Errors").font(.caption).foregroundStyle(.secondary)
+                    ForEach(Array(correction.errors.enumerated()), id: \.offset) { _, item in
+                        CorrectionRow(item: item)
+                    }
+                }
+                if !correction.suggestions.isEmpty {
+                    Text("Suggestions (not applied)").font(.caption).foregroundStyle(.secondary)
+                    ForEach(Array(correction.suggestions.enumerated()), id: \.offset) { _, item in
+                        CorrectionRow(item: item, dimmed: true) {
+                            SystemPasteboard().write(item.corrected, concealed: false)
+                        }
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(maxHeight: 420)
     }
 
     private var actions: some View {
@@ -100,13 +144,13 @@ struct PopupView: View {
             // first and paste into the user's document mid-edit.
             Button("Replace") { model.replace() }
                 .keyboardShortcut(instructionFocused ? nil : .defaultAction)
-                .disabled(model.phase != .finished)
+                .disabled(!model.canReplace)
             // Not Command-C: the result text is selectable, and a user
             // copying part of it with Command-C must not have that hijacked
             // into copying (and dismissing over) the whole translation.
             Button("Copy") { model.copy() }
                 .keyboardShortcut("c", modifiers: [.command, .shift])
-                .disabled(model.phase != .finished)
+                .disabled(!model.canReplace)
             Spacer()
             Button("Dismiss") { model.dismiss() }
                 .keyboardShortcut(.cancelAction)
