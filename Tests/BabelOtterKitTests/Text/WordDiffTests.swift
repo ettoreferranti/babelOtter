@@ -100,11 +100,18 @@ struct WordDiffTests {
     /// used to be quadratic in the merge step even though the LCS table
     /// itself stayed small, because merging built each run by re-concatenating
     /// `x + y` one token at a time. The size fallback plus the amortised
-    /// accumulator both keep this linear; the suite's one-minute time limit
-    /// turns a regression back to that quadratic cost into a failure instead
-    /// of a stall.
+    /// accumulator both keep this linear.
+    ///
+    /// The suite's one-minute time limit alone does not discriminate here: a
+    /// reintroduced quadratic merge still finishes well under a minute at a
+    /// merely large size, so it would pass, slowly, instead of failing. The
+    /// explicit five-second bound below is the actual tripwire; 1,000,000 is
+    /// chosen so the old, quadratic merge clears neither that bound nor the
+    /// suite limit (see the fix round 2 report for measured timings).
     @Test("a lopsided diff against a huge side stays fast")
     func lopsided() {
-        expectRoundTrips("x", String(repeating: "y ", count: 200_000))
+        let start = ContinuousClock.now
+        expectRoundTrips("x", String(repeating: "y ", count: 1_000_000))
+        #expect(start.duration(to: .now) < .seconds(5))
     }
 }
