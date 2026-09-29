@@ -121,5 +121,6 @@ struct OllamaIntegrationTests {
         #expect(!result.errors.isEmpty, "the gender/case error was not itemised")
         #expect(result.errors.contains { [.gender, .grammaticalCase].contains($0.category) })
         #expect(result.warnings.isEmpty, "inconsistent correction: \(result.warnings)")
+        #expect(result.corrected.value.contains("dem Kollegen"), "meaning changed: \(result.corrected.value)")
     }
 }
