@@ -300,6 +300,29 @@ struct CorrectorTests {
         #expect(!chat.prompts[0].contains("Otterbach hat"))
     }
 
+    @Test("a fragment restores a protected term even when it comes from a later block")
+    func fragmentRestoresTermFromAnyBlock() async throws {
+        // The term appears only in the second block; the first block's own
+        // masking never sees it. `result(_:)` restores every item's fragment
+        // against `masked.first`, so this guards the assumption that every
+        // block shares the same ordered term list -- and so the same
+        // sentinel numbering -- regardless of which block actually contains
+        // the term.
+        let text = "Ich habe gestern mit der Kollege gesprochen.\nIch habe Otterbach besucht."
+        let error = """
+            [{"original": "\u{27E6}DNT0\u{27E7} besucht", \
+            "corrected": "\u{27E6}DNT0\u{27E7} gut besucht", "category": "other", \
+            "explanation_en": "clarity", "severity": "error"}]
+            """
+        let chat = ScriptedChat([reply(
+            ["Ich habe gestern mit dem Kollegen gesprochen.", "Ich habe Otterbach gut besucht."],
+            error)])
+        let done = try #require(result(try await collect(
+            corrector(chat).correct(UserText(text), profile: .colleagues))))
+        #expect(done.errors.first?.original == "Otterbach besucht")
+        #expect(done.errors.first?.corrected == "Otterbach gut besucht")
+    }
+
     @Test("the preview is post-processed")
     func preview() async throws {
         let chat = ScriptedChat([[
