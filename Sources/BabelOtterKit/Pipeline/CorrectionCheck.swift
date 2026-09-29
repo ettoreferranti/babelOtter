@@ -34,10 +34,15 @@ public enum CorrectionCheck {
         for item in items {
             if item.severity == .error {
                 errorCount += 1
-                // Compared as written: the raw user text, never normalised
-                // with the locale rules, since it is what the user actually
-                // typed.
-                if !item.original.isEmpty && !original.contains(item.original) {
+                // Compared both as written -- the raw user text, since it is
+                // what the user actually typed -- and after the locale
+                // rules, so a model that quotes a fragment in the target
+                // spelling rather than the user's own (an eszett normalised
+                // to "ss", say) is not accused of misquoting a fragment that
+                // is really just the same word in the other spelling.
+                if !item.original.isEmpty && !original.contains(item.original)
+                    && !normalised(original, rules).contains(normalised(item.original, rules))
+                {
                     warnings.append(
                         "A listed error is not in your text: \"\(item.original)\".")
                 }

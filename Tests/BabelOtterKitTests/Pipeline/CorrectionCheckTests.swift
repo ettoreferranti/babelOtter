@@ -95,4 +95,13 @@ struct CorrectionCheckTests {
             items: [item("der Kollege", "dem Kollegen", .error)], rules: swiss)
         #expect(!verdict.warnings.contains { $0.contains("A listed error is not in your text") })
     }
+
+    @Test("a locale-rule spelling difference is not reported as a misquote")
+    func localeRuleDifferenceIsNotAMisquote() {
+        let verdict = CorrectionCheck.check(
+            original: "Das Auto ist wei\u{00DF}.", corrected: "Das Auto ist weiss.",
+            items: [item("weiss", "weiss", .error)], rules: swiss)
+        #expect(!verdict.warnings.contains { $0.contains("A listed error is not in your text") })
+        #expect(verdict.warnings.isEmpty)
+    }
 }
