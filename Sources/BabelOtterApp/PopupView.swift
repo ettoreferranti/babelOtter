@@ -13,9 +13,15 @@ struct PopupView: View {
                 controls
             }
             content
-            ForEach(model.warnings, id: \.self) { warning in
-                Label(warning, systemImage: "exclamationmark.triangle")
-                    .font(.caption).foregroundStyle(.orange)
+            // Correct renders its own warnings inside `correctionContent`,
+            // above the lists they qualify (design spec section 4). Only
+            // Translate's finished text -- where `model.correction` is
+            // always nil -- reaches this one.
+            if model.correction == nil {
+                ForEach(model.warnings, id: \.self) { warning in
+                    Label(warning, systemImage: "exclamationmark.triangle")
+                        .font(.caption).foregroundStyle(.orange)
+                }
             }
             if let message = model.message {
                 Text(message).font(.caption).foregroundStyle(.secondary)
@@ -113,6 +119,10 @@ struct PopupView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
                 DiffText(segments: correction.diff)
+                ForEach(correction.warnings, id: \.self) { warning in
+                    Label(warning, systemImage: "exclamationmark.triangle")
+                        .font(.caption).foregroundStyle(.orange)
+                }
                 if correction.hasNoErrors {
                     Label("No errors found", systemImage: "checkmark.circle")
                         .foregroundStyle(.green)
