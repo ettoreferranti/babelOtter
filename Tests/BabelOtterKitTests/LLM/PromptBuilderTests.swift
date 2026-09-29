@@ -162,6 +162,14 @@ struct PromptBuilderTests {
         #expect(prompt.contains("no errors"))
     }
 
+    @Test("correction keeps the author's meaning and quotes originals exactly")
+    func correctionKeepsMeaning() {
+        let prompt = builder.build(request(action: .correct))
+        #expect(prompt.contains("keeps the author's meaning"))
+        #expect(prompt.contains("not by exchanging the noun"))
+        #expect(prompt.contains("Quote each original fragment exactly"))
+    }
+
     @Test("a prompt has no blank section left by an omitted part")
     func noDoubleBlankLines() {
         #expect(!builder.build(request()).contains("\n\n\n"))

@@ -79,7 +79,16 @@ public struct PromptBuilder: Sendable {
             return """
                 You are a patient language tutor. Correct the numbered blocks below, \
                 preserving the author's intent, structure and voice. Correct the \
-                language, do not rewrite the message. If there are no errors, return \
+                language, do not rewrite the message. Fix each error with the \
+                smallest change that keeps the author's meaning. Resolve agreement \
+                and case errors by changing articles, pronouns and endings, not by \
+                exchanging the noun: "mit der Lehrer" becomes "mit dem Lehrer", not \
+                "mit der Lehrerin". Never change a person's gender, the number of \
+                people or things, the tense, who the text is about, or any fact. \
+                Quote each original fragment exactly as the author wrote it, \
+                character for character, even where it breaks the orthography \
+                rules; those rules apply to corrected_blocks and corrected only. \
+                If there are no errors, return \
                 the text unchanged and an empty error list. corrected_blocks applies \
                 only changes whose severity is "error". List stylistic suggestions in \
                 errors with severity "suggestion", and do not apply them to \
