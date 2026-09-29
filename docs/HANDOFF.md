@@ -1,6 +1,46 @@
-# Handoff — state as of 2026-09-28
+# Handoff — state as of 2026-09-29
 
 Read this first if you are picking babelOtter up in a new session.
+
+## Update 2026-09-29: Correct is built; the live model check passes, the manual ones don't yet
+
+**Correct is implemented, on `feat/correct`, behind its own hotkey:
+Control-Option-C.** Select German text anywhere and press it. A popup near
+the cursor streams the corrected text, then shows an inline word-level diff
+(removed struck through in red, added in green, the rest plain), every error
+itemised with a category chip and an English explanation, and any stylistic
+suggestions listed but not applied -- dimmed rows, each with its own Copy
+button for the suggested fragment. **Replace** pastes only the errors-fixed
+text; a suggestion never reaches the document unless adopted by hand.
+Non-German text gets "Correct works on German text." and nothing is sent.
+Text that is already correct shows "No errors found ✓" with Replace
+disabled. Full design: `docs/superpowers/specs/2026-09-28-correct-design.md`.
+
+**The live integration test passes**
+(`BABELOTTER_INTEGRATION=1 swift test --filter OllamaIntegrationTests`,
+against `mistral-small3.2:24b`, ~8-24s depending on load): "Ich habe gestern
+mit der Kollege gesprochen." came back as "Ich habe gestern mit der Kollegin
+gesprochen.", itemised as one `gender` error (`Kollege` -> `Kollegin`), no
+suggestions, no `CorrectionCheck` warnings. Worth knowing: the model resolved
+the article/noun mismatch by changing the noun's gender (to a female
+colleague) rather than fixing the case ending on the masculine noun (`dem
+Kollegen`) -- both are grammatically valid resolutions of the same mismatch,
+but they are not the same sentence. Nothing to fix here -- the contract only
+asks that a gender/case error is itemised and the result is self-consistent,
+and it is -- but worth knowing before trusting that a correction preserves
+who the sentence is about.
+
+**Not yet run -- the manual checks, yours to do in the apps used daily:**
+
+| Do | Expected |
+|---|---|
+| Control-Option-C on German with a deliberate mistake in Word | diff shows the fix; the error is listed with a category and an English explanation |
+| Same in Teams and Outlook | same |
+| Control-Option-C on correct German | "No errors found"; Replace disabled |
+| Control-Option-C on English | "Correct works on German text."; nothing sent |
+| Replace after a correction with suggestions | only the error fixes are pasted |
+| A suggestion's Copy button | copies the suggested fragment |
+| Switch the audience to "Students (Sie)" on text addressing the reader as du | a register error appears |
 
 ## Update 2026-09-28: the prototype is on `main`, and it works where it matters
 

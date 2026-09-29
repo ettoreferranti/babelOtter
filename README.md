@@ -16,14 +16,16 @@ leaving your machine.
 > On top of that, a thin slice of M1b is merged: a menu bar app, a global hotkey
 > (**Control-Option-T**), selection capture, a streaming popup, and
 > **Replace** / **Copy**, plus an audience picker (du/Sie) and a one-line
-> instruction field. `swift test` runs 412 tests in 43 suites, all green. It
+> instruction field. `swift test` runs 466 tests in 47 suites, all green. It
 > has been checked by hand in Teams, Word and Outlook; the full per-app
 > checklist in [`docs/HANDOFF.md`](docs/HANDOFF.md) says which apps are still
-> unexercised. Translate is the only action
-> implemented; **Correct**, **Explain** and **Re-pitch** below are not built
-> yet, and neither are audience inference, a settings window,
-> onboarding or history — see [`docs/HANDOFF.md`](docs/HANDOFF.md) for exactly
-> what the prototype does and skips.
+> unexercised. **Correct** (**Control-Option-C**) is also built — a streamed
+> correction with an inline diff, itemised errors and unapplied suggestions —
+> checked live against the local model, with the manual per-app checks still
+> to run; see [`docs/HANDOFF.md`](docs/HANDOFF.md). **Explain** and
+> **Re-pitch** below are not built yet, and neither are audience inference, a
+> settings window, onboarding or history — see
+> [`docs/HANDOFF.md`](docs/HANDOFF.md) for exactly what is done and skipped.
 >
 > **To build and run it:**
 >

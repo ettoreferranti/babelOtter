@@ -105,4 +105,21 @@ struct OllamaIntegrationTests {
         #expect(!response.blocks.contains { $0.contains("\u{00DF}") },
             "FR-TRN-05: eszett must not survive to a de-CH target")
     }
+
+    /// Correct's contract against a real model: errors itemised, the answer
+    /// consistent with itself.
+    @Test("a German sentence with a gender error is corrected and itemised")
+    func correctRoundTrip() async throws {
+        let corrector = Corrector(configuration: .default, chat: client)
+        var finished: CorrectionResult?
+        for try await event in corrector.correct(
+            UserText("Ich habe gestern mit der Kollege gesprochen."), profile: .colleagues)
+        {
+            if case .finished(let result) = event { finished = result }
+        }
+        let result = try #require(finished)
+        #expect(!result.errors.isEmpty, "the gender/case error was not itemised")
+        #expect(result.errors.contains { [.gender, .grammaticalCase].contains($0.category) })
+        #expect(result.warnings.isEmpty, "inconsistent correction: \(result.warnings)")
+    }
 }
