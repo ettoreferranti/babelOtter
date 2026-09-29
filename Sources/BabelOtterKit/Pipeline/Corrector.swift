@@ -195,8 +195,9 @@ public struct Corrector: Sendable {
         _ maskedText: String
     ) -> CorrectionResult {
         let rules = context.language.localeRules
-        var restored = items.map { restore($0, reference, context) }
-        restored += localeRuleErrors(in: maskedText, existing: restored, language: context.language)
+        let fixes = items.map { restore($0, reference, context) }
+        var restored = fixes.map(\.displayed)
+        restored += localeRuleErrors(in: maskedText, fixes: fixes, language: context.language)
         let verdict = CorrectionCheck.check(
             original: original.value, corrected: corrected, items: restored, rules: rules)
         return CorrectionResult(
@@ -209,29 +210,45 @@ public struct Corrector: Sendable {
             hasNoErrors: verdict.hasNoErrors)
     }
 
+    /// One item, restored, in both the form the user sees and the form
+    /// coverage counting reads. Kept apart because they must never be
+    /// conflated: `correctedUnnormalised` is what the model actually wrote,
+    /// sentinels restored and nothing else, while `displayed.corrected` has
+    /// also been through the locale rules -- see `restore` below.
+    private struct RestoredFix {
+        let displayed: CorrectionError
+        let correctedUnnormalised: String
+    }
+
     /// Sentinels inside a fragment come back as their terms. Every block is
     /// masked with the same ordered term list, so any one block's
     /// `ProtectedText` restores sentinels from all of them.
     ///
-    /// `corrected` then goes through `context.processor.finish` -- the same
-    /// function the pasted text itself goes through -- rather than a bare
-    /// sentinel restore. That is what makes the two consistent: a listed fix
-    /// is never shown with a spelling the corrected text no longer has (an
-    /// eszett `PostProcessor` already turned into `ss`), and a restored
-    /// do-not-translate term's own spelling is never rewritten either,
-    /// because `finish` protects exactly the ranges restoration produced.
-    /// Rewriting the fragment with `LocaleRuleApplier` alone, and no
-    /// protected ranges, would fix the first problem by reintroducing the
-    /// second. `original` is left exactly as the user wrote it.
+    /// `corrected` is restored once, then two things are built from that one
+    /// restored value: the locale rules are applied for `displayed` -- the
+    /// same protected ranges `context.processor.finish` would use, so a
+    /// listed fix is never shown with a spelling the corrected text no
+    /// longer has, and a restored do-not-translate term's own spelling is
+    /// never rewritten -- while `correctedUnnormalised` is kept exactly as
+    /// restored, with no rule pass, for `localeRuleErrors` to count against.
+    /// That split matters: the locale rules rewrite every unprotected span
+    /// regardless of whether the model's own edit touched it, so counting
+    /// coverage against the *displayed* value would credit an item that
+    /// merely quotes an untouched word with having fixed it.
+    /// `original` is left exactly as the user wrote it.
     private func restore(
         _ item: CorrectionError, _ reference: ProtectedText?, _ context: Context
-    ) -> CorrectionError {
+    ) -> RestoredFix {
         let original = unmasked(item.original, reference)
-        let corrected = displayCorrected(item.corrected, reference, context)
-        return CorrectionError(
-            original: original, corrected: corrected,
+        let correctedRestored = unmaskedWithRanges(item.corrected, reference)
+        let displayCorrected = LocaleRuleApplier.apply(
+            context.language.localeRules, to: correctedRestored.text,
+            protecting: correctedRestored.ranges)
+        let displayed = CorrectionError(
+            original: original, corrected: displayCorrected,
             category: item.category, explanationEn: item.explanationEn,
             severity: item.severity)
+        return RestoredFix(displayed: displayed, correctedUnnormalised: correctedRestored.text)
     }
 
     private func unmasked(_ fragment: String, _ reference: ProtectedText?) -> String {
@@ -239,16 +256,16 @@ public struct Corrector: Sendable {
         return TokenProtector.restore(fragment, from: reference).text
     }
 
-    /// No reference means no protected term was ever in play (an empty
-    /// selection produces zero blocks), so the locale rules alone are the
-    /// whole of post-processing in that case.
-    private func displayCorrected(
-        _ fragment: String, _ reference: ProtectedText?, _ context: Context
-    ) -> String {
-        guard let reference else {
-            return LocaleRuleApplier.apply(context.language.localeRules, to: fragment, protecting: [])
-        }
-        return context.processor.finish(fragment, protected: reference).text
+    /// As `unmasked`, but also returns the ranges the restored term(s) landed
+    /// at, so the locale rules can be applied to the same fragment while
+    /// protecting them -- exactly what `PostProcessor.finish` does, except
+    /// this also hands back the pre-rule text for coverage counting.
+    private func unmaskedWithRanges(
+        _ fragment: String, _ reference: ProtectedText?
+    ) -> (text: String, ranges: [Range<String.Index>]) {
+        guard let reference else { return (fragment, []) }
+        let restored = TokenProtector.restore(fragment, from: reference)
+        return (restored.text, restored.protectedRanges)
     }
 
     /// A locale rule that rewrites the user's own text is a real correction,
@@ -273,12 +290,12 @@ public struct Corrector: Sendable {
     /// eszett it never touched, silently dropping the kit's only
     /// explanation for a change `PostProcessor` still makes.
     private func localeRuleErrors(
-        in maskedText: String, existing: [CorrectionError], language: LanguageConfig
+        in maskedText: String, fixes: [RestoredFix], language: LanguageConfig
     ) -> [CorrectionError] {
         language.localeRules.filter { rule in
             let total = occurrences(of: rule.replace, in: maskedText)
             guard total > 0 else { return false }
-            let removed = existing.reduce(0) { $0 + removedOccurrences(of: rule, by: $1) }
+            let removed = fixes.reduce(0) { $0 + removedOccurrences(of: rule, by: $1) }
             return removed < total
         }.map { rule in
             CorrectionError(
@@ -289,13 +306,15 @@ public struct Corrector: Sendable {
     }
 
     /// How many occurrences of the rule's character one item actually
-    /// removed: the drop between its `original` and its displayed
-    /// `corrected`, floored at zero so an item that left the character
-    /// alone, or added one, is never counted as negative coverage.
-    private func removedOccurrences(of rule: LocaleRule, by item: CorrectionError) -> Int {
-        let before = occurrences(of: rule.replace, in: item.original)
+    /// removed: the drop between its `original` and its restored-but-
+    /// unnormalised `corrected` -- what the model itself wrote, not what
+    /// `LocaleRuleApplier` would make of it -- floored at zero so an item
+    /// that left the character alone, or added one, is never counted as
+    /// negative coverage.
+    private func removedOccurrences(of rule: LocaleRule, by fix: RestoredFix) -> Int {
+        let before = occurrences(of: rule.replace, in: fix.displayed.original)
         guard before > 0 else { return 0 }
-        let after = occurrences(of: rule.replace, in: item.corrected)
+        let after = occurrences(of: rule.replace, in: fix.correctedUnnormalised)
         return max(0, before - after)
     }
 

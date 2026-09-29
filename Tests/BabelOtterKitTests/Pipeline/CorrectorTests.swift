@@ -229,14 +229,13 @@ struct CorrectorTests {
 
     @Test("an unrelated item that merely contains \"ss\" does not suppress the eszett row")
     func unrelatedItemDoesNotSuppressEszettRow() async throws {
-        let text = "mit der Stra\u{00DF}e ist gut und der Baum ist gro\u{00DF}."
+        let text = "Die Stra\u{00DF}e ist gut."
         let unrelatedFix = """
-            [{"original": "mit der Stra\u{00DF}e ist gut", \
-            "corrected": "mit der Stra\u{00DF}e ist besser", "category": "register", \
+            [{"original": "Stra\u{00DF}e ist gut", \
+            "corrected": "Stra\u{00DF}e ist besser", "category": "register", \
             "explanation_en": "more natural wording", "severity": "error"}]
             """
-        let chat = ScriptedChat([reply(
-            ["mit der Stra\u{00DF}e ist besser und der Baum ist gro\u{00DF}."], unrelatedFix)])
+        let chat = ScriptedChat([reply(["Die Stra\u{00DF}e ist besser."], unrelatedFix)])
         let done = try #require(result(try await collect(
             corrector(chat).correct(UserText(text), profile: .colleagues))))
         #expect(done.errors.count == 2)
