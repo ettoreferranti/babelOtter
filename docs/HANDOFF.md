@@ -13,22 +13,26 @@ suggestions listed but not applied -- dimmed rows, each with its own Copy
 button for the suggested fragment. **Replace** pastes only the errors-fixed
 text; a suggestion never reaches the document unless adopted by hand.
 Non-German text gets "Correct works on German text." and nothing is sent.
-Text that is already correct shows "No errors found ✓" with Replace
-disabled. Full design: `docs/superpowers/specs/2026-09-28-correct-design.md`.
+Text that is already correct shows "No errors found" with a checkmark icon;
+Replace and Copy are both disabled (nothing corrected to paste or copy).
+Full design: `docs/superpowers/specs/2026-09-28-correct-design.md`.
 
 **The live integration test passes**
 (`BABELOTTER_INTEGRATION=1 swift test --filter OllamaIntegrationTests`,
-against `mistral-small3.2:24b`, ~8-24s depending on load): "Ich habe gestern
-mit der Kollege gesprochen." came back as "Ich habe gestern mit der Kollegin
-gesprochen.", itemised as one `gender` error (`Kollege` -> `Kollegin`), no
-suggestions, no `CorrectionCheck` warnings. Worth knowing: the model resolved
-the article/noun mismatch by changing the noun's gender (to a female
-colleague) rather than fixing the case ending on the masculine noun (`dem
-Kollegen`) -- both are grammatically valid resolutions of the same mismatch,
-but they are not the same sentence. Nothing to fix here -- the contract only
-asks that a gender/case error is itemised and the result is self-consistent,
-and it is -- but worth knowing before trusting that a correction preserves
-who the sentence is about.
+against `mistral-small3.2:24b`, ~6-19s depending on load). Its first run,
+before the fix below, had "Ich habe gestern mit der Kollege gesprochen."
+come back as "Ich habe gestern mit der Kollegin gesprochen." -- the model
+resolved the article/noun mismatch by changing the noun's gender (to a
+female colleague) rather than fixing the case ending on the masculine noun
+(`dem Kollegen`). Both are grammatically valid resolutions of the same
+mismatch, but not the same sentence, so `PromptBuilder`'s Correct
+instruction gained a meaning rule: fix each error with the smallest change
+that keeps the author's meaning, resolve agreement/case errors by changing
+articles, pronouns and endings rather than the noun, and never change a
+person's gender, a count, the tense, or who the text is about. Run three
+times after that change, against the same sentence: "Ich habe gestern mit
+dem Kollegen gesprochen." every time, itemised as one `case` error, no
+warnings. Never `Kollegin` again.
 
 **Not yet run -- the manual checks, yours to do in the apps used daily:**
 
@@ -36,8 +40,9 @@ who the sentence is about.
 |---|---|
 | Control-Option-C on German with a deliberate mistake in Word | diff shows the fix; the error is listed with a category and an English explanation |
 | Same in Teams and Outlook | same |
-| Control-Option-C on correct German | "No errors found"; Replace disabled |
+| Control-Option-C on correct German | "No errors found"; Replace disabled (Copy is disabled too, by design: there is nothing corrected to copy) |
 | Control-Option-C on English | "Correct works on German text."; nothing sent |
+| Control-Option-C on a 5-sentence paragraph with several errors | finishes without timing out |
 | Replace after a correction with suggestions | only the error fixes are pasted |
 | A suggestion's Copy button | copies the suggested fragment |
 | Switch the audience to "Students (Sie)" on text addressing the reader as du | a register error appears |

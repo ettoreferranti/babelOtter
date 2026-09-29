@@ -53,7 +53,9 @@ public enum WordDiff {
 ### 3.2 Prompt changes — `PromptBuilder`
 
 - Correct's instruction gains the rule: *"`corrected_blocks` applies only changes whose severity is `error`. List stylistic suggestions in `errors` with severity `suggestion`, and do not apply them to `corrected_blocks`."*
-- Correct's prompt includes the chosen audience's register ("du" or "Sie"), so `register` errors are judged against it. The existing audience section already does this; Correct must include it.
+- Correct's instruction also gains the **meaning rule**: fix each error with the smallest change that keeps the author's meaning; resolve agreement and case errors by changing articles, pronouns and endings, not by exchanging the noun (the prompt's own example: *"mit der Lehrer"* becomes *"mit dem Lehrer"*, not *"mit der Lehrerin"*); never change a person's gender, the number of people or things, the tense, who the text is about, or any fact. This exists because the model, left to resolve a der/dem case mismatch on its own, was observed swapping the noun's gender instead of fixing the article — grammatically valid, but not the same sentence.
+- The instruction also requires **exact quoting**: each original fragment must be quoted character for character as the author wrote it, even where it breaks the orthography rules -- those rules apply to `corrected_blocks` and `corrected` only, never to how a fragment is quoted.
+- Correct's audience section is **register-only**, not the full section Translate gets: *"The text is addressed to `<name>`, who should be addressed as `<du|Sie>`. A mismatch is a register error."* No `Tone:` line and no glossary-bias line -- both steer wording, not a register check. Translate and the other actions keep the full audience section (name, register, tone guidance, glossary bias).
 - The per-invocation style note is supported, exactly as for Translate.
 
 ### 3.3 `CorrectionCheck` — `Sources/BabelOtterKit/Pipeline/CorrectionCheck.swift`
@@ -62,11 +64,16 @@ A pure function of the original text, the corrected text and the itemised list. 
 
 | Rule | Warning when violated |
 |---|---|
+| Each `error`'s `original` fragment appears in your text, as written or after the locale rules | "A listed error is not in your text: …" |
 | Each `error`'s `corrected` fragment appears in the corrected text | "A listed correction is missing from the corrected text: …" |
 | Each `suggestion`'s `original` fragment still appears in the corrected text | "A suggestion was applied although it should not have been: …" |
 | The text changed, but no errors are listed | "The text was changed, but no errors are listed." |
 
+The "not in your text" rule is checked twice -- the fragment as written, and both sides after the locale rules -- so a fragment the model quotes in the target spelling (say "weiss") for a user text that used the other spelling for the same word (an eszett) is not flagged as a misquote.
+
 It also decides the **"no errors" result** (`FR-COR-06`): the corrected text equals the original (after post-processing) *and* there are no `error` items. Suggestions alone do not make a text wrong.
+
+**Known limitation:** every presence check here is text-wide, not positional -- a fragment that also happens to occur elsewhere in the text can satisfy a check that was really about a different occurrence. The diff remains the ground truth of what is actually pasted.
 
 ### 3.4 `Corrector` — `Sources/BabelOtterKit/Pipeline/Corrector.swift`
 
@@ -109,7 +116,7 @@ The pipeline, in order:
 4. **Parse strictly.** `ResponseParser.parseCorrect`. A failure throws `unreadableReply`, with no degraded raw-text fallback. This asymmetry with Translate is deliberate (`FR-COR-06`).
 5. **Block count.** `BlockCountPolicy`: one retry with the whole text as a single block. A second mismatch throws `structureLost`, again with no stitching.
 6. **Post-process.** `PostProcessor.finish` on each block restores the terms and applies the Swiss rules. Protection problems become warnings.
-7. **ß in the user's own text.** If the *original* contains `ß`, the kit appends a `spelling` error: "Swiss Standard German writes ss, never ß." The diff will show that change, and every change in the diff must be explained.
+7. **ß in the user's own text.** The scan reads the *masked* blocks actually sent to the model (sentinels in place of every protected term, so a ß inside a do-not-translate term such as "Weissenburg" is never read as the user's own spelling), and counts occurrences rather than checking mere presence. The kit's own `spelling` error ("Swiss Standard German writes ss, never ß.") is skipped only when the model's own listed items, between them, removed *every* occurrence of ß that the masked text contains -- counted against what the model actually wrote, not what `LocaleRuleApplier` would make of it, so containing ß in an untouched word and its replacement "ss" in some unrelated word never counts as coverage. Any occurrence the model's items didn't remove still gets the kit's row. The diff will show every ß-to-ss change, and every change in the diff must be explained.
 8. **Reassemble** with `StructureExtractor.reapply`. Restore any sentinels inside the error and suggestion fragments.
 9. **Check** with `CorrectionCheck`, **diff** with `WordDiff(original, corrected)`, then emit `finished`.
 
@@ -128,7 +135,7 @@ The pipeline, in order:
   - **Warnings,** if any, above the lists.
   - **Errors:** one row each, with a category chip, `original → corrected` and the explanation beneath.
   - **Suggestions (not applied):** the same rows, dimmed, each with a small Copy button for the suggested fragment.
-  - **No errors:** "No errors found ✓", with Replace disabled.
+  - **No errors:** "No errors found ✓", with Replace disabled. Copy is also disabled: there is nothing to fix over the original, so nothing corrected to paste or copy.
 - **Actions:** Replace pastes `corrected`. Copy (Command-Shift-C) copies `corrected`. Dismiss (Escape).
 - **Size:** the popup allows a taller body for Correct, and the lists scroll.
 - **Failures** map to plain messages:
