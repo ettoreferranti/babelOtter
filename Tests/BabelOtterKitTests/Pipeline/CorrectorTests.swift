@@ -51,7 +51,7 @@ private func reply(_ blocks: [String], _ errors: String = "[]") -> [String] {
 }
 
 private let genderError = """
-    [{"original": "der Kollege", "corrected": "dem Kollegen", "category": "gender", \
+    [{"original": "der Kollege", "corrected": "dem Kollegen", "category": "case", \
     "explanation_en": "mit takes the dative", "severity": "error"}]
     """
 
@@ -79,7 +79,7 @@ struct CorrectorTests {
         #expect(events.first == .started)
         let done = try #require(result(events))
         #expect(done.corrected == UserText("Ich habe gestern mit dem Kollegen gesprochen."))
-        #expect(done.errors.map(\.category) == [.gender])
+        #expect(done.errors.map(\.category) == [.grammaticalCase])
         #expect(done.suggestions.isEmpty)
         #expect(done.warnings.isEmpty)
         #expect(!done.hasNoErrors)
