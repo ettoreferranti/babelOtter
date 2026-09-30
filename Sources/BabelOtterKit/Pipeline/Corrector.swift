@@ -2,6 +2,10 @@ import Foundation
 
 public enum CorrectionEvent: Sendable, Equatable {
     case started
+    /// The model sent another piece of its reply. Carries nothing; the errors
+    /// list streams after the corrected text with no preview change for its
+    /// whole length, so this is what tells an idle timeout the reply is live.
+    case progress
     /// The corrected text so far, post-processed. Never the result.
     case preview(UserText)
     case finished(CorrectionResult)
@@ -159,6 +163,7 @@ public struct Corrector: Sendable {
             styleNote: context.styleNote, blocks: blocks.map(\.text)))
         let raw = try await ReplyStream.collect(
             chat: chat, model: context.model, prompt: prompt, key: "corrected_blocks",
+            onDelta: { emit(.progress) },
             onPartial: { emit(.preview(UserText(preview($0, blocks, context)))) })
         guard !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw CorrectionFailure.emptyResponse

@@ -348,6 +348,17 @@ struct CorrectorTests {
         #expect(chat.prompts[0].contains("corrected_blocks applies only"))
     }
 
+    /// The errors list streams after the corrected text, with no preview
+    /// change for its whole length; progress is what keeps an idle timeout
+    /// from firing in the middle of a healthy reply.
+    @Test("every piece of the reply is reported as progress")
+    func progress() async throws {
+        let pieces = ["{\"corrected_blocks\": [\"\(long)\"]", ", \"errors\": ", "[]}"]
+        let chat = ScriptedChat([pieces])
+        let events = try await collect(corrector(chat).correct(UserText(long), profile: .colleagues))
+        #expect(events.filter { $0 == .progress }.count == 3)
+    }
+
     @Test("the configured correct model is the one asked")
     func model() async throws {
         let chat = ScriptedChat([reply([long])])

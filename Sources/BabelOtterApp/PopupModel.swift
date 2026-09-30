@@ -270,6 +270,9 @@ final class PopupModel {
     private final class RunTasks {
         var consumer: Task<Void, Never>?
         var watchdog: Task<Void, Never>?
+        /// When this run last heard from the model. The watchdog measures
+        /// silence from here, not time since the run began.
+        var lastActivity = ContinuousClock.now
     }
 
     /// Starts consuming `stream`, with the timeout watchdog and the stale-
@@ -309,6 +312,7 @@ final class PopupModel {
                     // consumer is stale; they would overwrite the new run's
                     // text and phase with the old run's.
                     guard !Task.isCancelled else { return }
+                    pair.lastActivity = .now
                     if let self { apply(self, event) }
                 }
             } catch {
@@ -321,9 +325,22 @@ final class PopupModel {
             guard !Task.isCancelled else { return }
             pair.watchdog?.cancel()
         }
+        // Idle, not total: the run fails only after `timeout` seconds with no
+        // event at all. A slow model streaming a long reply (measured
+        // 2026-09-30: five short paragraphs took 59.9 s on the default 24B
+        // model) is alive and must not be cut off; a stalled one still is.
+        // Every text piece arrives as a `.progress` event, so silence here
+        // means the model really has stopped sending.
         let watchdog = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(timeout))
-            guard !Task.isCancelled, let self, self.phase == .translating else { return }
+            while true {
+                let deadline = pair.lastActivity.advanced(by: .seconds(timeout))
+                try? await Task.sleep(until: deadline, clock: .continuous)
+                guard !Task.isCancelled else { return }
+                if ContinuousClock.now >= pair.lastActivity.advanced(by: .seconds(timeout)) {
+                    break
+                }
+            }
+            guard let self, self.phase == .translating else { return }
             pair.consumer?.cancel()
             self.phase = .failed(
                 ResultCustody.afterCancellation(.timedOut).message ?? "Timed out.")
@@ -354,6 +371,8 @@ final class PopupModel {
         switch event {
         case .started(let direction):
             self.direction = direction
+        case .progress:
+            break
         case .preview(let partial):
             text = partial.value
         case .finished(let result):
@@ -379,7 +398,7 @@ final class PopupModel {
 
     private func applyCorrection(_ event: CorrectionEvent) {
         switch event {
-        case .started:
+        case .started, .progress:
             break
         case .preview(let partial):
             text = partial.value

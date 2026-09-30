@@ -42,7 +42,7 @@ warnings. Never `Kollegin` again.
 | Same in Teams and Outlook | same |
 | Control-Option-C on correct German | "No errors found"; Replace disabled (Copy is disabled too, by design: there is nothing corrected to copy) |
 | Control-Option-C on English | "Correct works on German text."; nothing sent |
-| Control-Option-C on a 5-sentence paragraph with several errors | finishes without timing out |
+| Control-Option-C on a 5-sentence paragraph with several errors | finishes without timing out (it can take a minute or more; the timeout now only fires on silence) |
 | Replace after a correction with suggestions | only the error fixes are pasted |
 | A suggestion's Copy button | copies the suggested fragment |
 | Switch the audience to "Students (Sie)" on text addressing the reader as du | a register error appears |
@@ -132,14 +132,16 @@ after three runs were cancelled at the hour.
 
 **Default model:** `mistral-small3.2:24b`, pulled locally.
 
-**Watchdog budget.** The 60s timeout (`timeoutSeconds`) budgets the *whole*
-translation -- including the one retry on a bad block count, and Ollama
-loading the 24B model from disk if it is not already resident. A first
-translation right after a reboot, or after Ollama has unloaded the model from
-being idle, can plausibly hit that budget while the model is still loading and
-show as a timeout rather than a slow success. If that happens often, raise
-`timeoutSeconds` in `config.json`; this is a known, accepted trade-off, not a
-bug to fix here.
+**Watchdog: idle, not total (changed 2026-09-30).** `timeoutSeconds` (60)
+now measures *silence*: a run fails only after that long with nothing at all
+from the model. It used to budget the whole run, and a five-paragraph
+correction measured 59.9 s on the default 24B model, warm -- a healthy reply
+cut off at the line. Translate and Correct now report a `progress` event for
+every piece of text the model sends, because Correct's error list streams
+with no preview change for its whole length. A cold model load (roughly 25 s
+for the 24B model) still counts against the silence budget before the first
+token, which fits within 60 s; if it does not, raise `timeoutSeconds` in
+`config.json`.
 
 ### Outstanding manual checks (yours -- nothing here can be pressed or watched from a coding session)
 

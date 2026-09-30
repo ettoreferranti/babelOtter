@@ -84,6 +84,10 @@ struct GenerationTimeoutTests {
         // Case-insensitive: these are sentences shown to a person, and the
         // assertion is about what they say, not how they are capitalised.
         #expect(CancellationReason.timedOut.detail.lowercased().contains("timed out"))
+        // There is no Settings window yet; the message must point at
+        // something the user can actually change.
+        #expect(!CancellationReason.timedOut.detail.contains("Settings"))
+        #expect(CancellationReason.timedOut.detail.contains("timeoutSeconds"))
         #expect(CancellationReason.userRequested.detail.lowercased().contains("cancelled"))
         for reason in CancellationReason.allCases {
             #expect(!reason.detail.isEmpty)

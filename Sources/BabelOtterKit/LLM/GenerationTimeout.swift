@@ -10,7 +10,9 @@ public enum CancellationReason: String, Sendable, Equatable, CaseIterable {
         switch self {
         case .timedOut:
             return
-                "The model timed out. Try again, or choose a smaller model in Settings."
+                "The model timed out: it sent nothing for too long. Try again; if it "
+                + "keeps happening, raise timeoutSeconds in config.json or use a "
+                + "smaller model."
         case .userRequested:
             return "Cancelled."
         }

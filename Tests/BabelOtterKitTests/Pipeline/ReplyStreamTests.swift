@@ -47,6 +47,18 @@ struct ReplyStreamTests {
         #expect(seen == [["a"]])
     }
 
+    /// The popup's timeout is idle-based: it needs to hear about every piece
+    /// of text, not only the ones that change the preview.
+    @Test("every delta is reported as activity; malformed lines are not")
+    func activity() async throws {
+        let chat = Scripted(["{\"blocks\": [", "\"a", "\"", "]}"])
+        var deltas = 0
+        _ = try await ReplyStream.collect(
+            chat: chat, model: "m", prompt: "p", key: "blocks",
+            onDelta: { deltas += 1 }, onPartial: { _ in })
+        #expect(deltas == 4)
+    }
+
     @Test("an empty reply comes back empty; the caller decides what that means")
     func empty() async throws {
         let raw = try await ReplyStream.collect(

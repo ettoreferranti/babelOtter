@@ -22,6 +22,10 @@ extension OllamaClient: ChatStreaming {}
 
 public enum TranslationEvent: Sendable, Equatable {
     case started(Direction)
+    /// The model sent another piece of its reply. Carries nothing; it exists
+    /// so an idle timeout can tell a slow but live reply from a stalled one,
+    /// even while the preview is not changing.
+    case progress
     /// The translation so far, post-processed. Never the result.
     case preview(UserText)
     case finished(TranslationResult)
@@ -212,6 +216,7 @@ public struct Translator: Sendable {
             blocks: blocks.map(\.text)))
         let raw = try await ReplyStream.collect(
             chat: chat, model: context.model, prompt: prompt, key: "blocks",
+            onDelta: { emit(.progress) },
             onPartial: { emit(.preview(UserText(preview($0, blocks, context)))) })
         guard !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw TranslationError.emptyResponse
