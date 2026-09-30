@@ -38,6 +38,17 @@ struct CorrectionCheckTests {
         #expect(verdict.warnings.contains { $0.contains("gut") })
     }
 
+    /// Mutation found the "applied suggestion" rule's two conditions were
+    /// never told apart: the proposal being present elsewhere is not an
+    /// application while the original wording is still there.
+    @Test("a suggestion's wording elsewhere in the text is not an application")
+    func proposalElsewhere() {
+        let verdict = CorrectionCheck.check(
+            original: "Das ist gut und hervorragend.", corrected: "Das ist gut und hervorragend.",
+            items: [item("gut", "hervorragend", .suggestion)], rules: swiss)
+        #expect(verdict.warnings.isEmpty)
+    }
+
     @Test("a changed text with nothing listed is reported")
     func unexplainedChange() {
         let verdict = CorrectionCheck.check(
