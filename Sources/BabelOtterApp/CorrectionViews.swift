@@ -13,7 +13,19 @@ struct DiffText: View {
 
     private var attributed: AttributedString {
         var result = AttributedString()
+        var previousWasRemoval = false
         for segment in segments {
+            // A replacement shows as removal-then-addition with nothing
+            // between them ("jetzjetzt"). A thin space, display-only, keeps
+            // the two words apart; the pasted text never passes through here.
+            if case .added = segment, previousWasRemoval {
+                result += AttributedString("\u{2009}")
+            }
+            if case .removed = segment {
+                previousWasRemoval = true
+            } else {
+                previousWasRemoval = false
+            }
             switch segment {
             case .same(let text):
                 result += AttributedString(text)
