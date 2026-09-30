@@ -88,6 +88,11 @@ public struct PromptBuilder: Sendable {
                 Quote each original fragment exactly as the author wrote it, \
                 character for character, even where it breaks the orthography \
                 rules; those rules apply to corrected_blocks and corrected only. \
+                Each explanation_en names the specific rule that was broken and the \
+                words it connects, for example: "Leiterin refers to Anna, a woman, \
+                so the noun takes its feminine form" or "mit takes the dative, so der \
+                becomes dem". Personal pronouns such as du, ich and wir have no \
+                grammatical gender; never give a pronoun's gender as the reason. \
                 If there are no errors, return \
                 the text unchanged and an empty error list. corrected_blocks applies \
                 only changes whose severity is "error". List stylistic suggestions in \

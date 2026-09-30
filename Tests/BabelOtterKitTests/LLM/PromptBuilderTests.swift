@@ -202,6 +202,26 @@ struct PromptBuilderTests {
         #expect(prompt.contains("streng"))
     }
 
+    /// A tutoring explanation that names the wrong rule teaches the wrong
+    /// rule. Measured 2026-09-30: a correct fix explained as "the gender of
+    /// the pronoun du", which has no gender.
+    @Test("Correct's explanations must name the rule that was broken")
+    func correctExplanationsNameTheRule() {
+        let prompt = builder.build(PromptRequest(
+            action: .correct, source: .swissGerman, target: .swissGerman,
+            profile: .colleagues, blocks: ["Ich habe"]))
+        #expect(prompt.contains("names the specific rule that was broken"))
+        #expect(prompt.contains("have no grammatical gender"))
+    }
+
+    @Test("the explanation rule is Correct's alone")
+    func explanationRuleIsCorrectOnly() {
+        let prompt = builder.build(PromptRequest(
+            action: .translate, source: .english, target: .swissGerman,
+            profile: .colleagues, blocks: ["x"]))
+        #expect(!prompt.contains("names the specific rule that was broken"))
+    }
+
     @Test("the errors-only rule is Correct's alone")
     func errorsOnlyRuleIsCorrectOnly() {
         let prompt = builder.build(PromptRequest(
