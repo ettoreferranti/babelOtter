@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 
 @testable import BabelOtterKit
@@ -108,7 +109,16 @@ struct WordDiffTests {
     /// explicit five-second bound below is the actual tripwire; 1,000,000 is
     /// chosen so the old, quadratic merge clears neither that bound nor the
     /// suite limit (see the fix round 2 report for measured timings).
-    @Test("a lopsided diff against a huge side stays fast")
+    ///
+    /// Skipped under muter: its mutant schemata put an environment lookup
+    /// inside every rewritten function, so the instrumented diff is slower
+    /// than the real one by an order of magnitude (47 s on CI against 0.16 s
+    /// locally), and a wall-clock bound cannot mean anything there. The
+    /// diff's behaviour stays covered under mutation by every other test in
+    /// this suite; only the timing is left out.
+    @Test(
+        "a lopsided diff against a huge side stays fast",
+        .disabled(if: ProcessInfo.processInfo.environment["IS_MUTER_RUNNING"] != nil))
     func lopsided() {
         let start = ContinuousClock.now
         expectRoundTrips("x", String(repeating: "y ", count: 1_000_000))
