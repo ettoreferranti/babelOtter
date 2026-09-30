@@ -90,6 +90,32 @@ struct WordDiffTests {
         expectRoundTrips(original, revised)
     }
 
+    /// Trimming the shared start and end is more than a speed-up: without
+    /// it, a long text with one change exceeds `maximumTokens` and collapses
+    /// into a single replacement. These pin that the trimming happens.
+    /// (Mutation found no test distinguishing trimmed from untrimmed.)
+    @Test("a long shared start still yields a precise diff")
+    func longSharedPrefix() {
+        let shared = String(repeating: "w ", count: WordDiff.maximumTokens)
+        #expect(WordDiff.diff(shared + "x", shared + "y") == [
+            .same(shared), .removed("x"), .added("y"),
+        ])
+    }
+
+    @Test("a long shared end still yields a precise diff")
+    func longSharedSuffix() {
+        let shared = String(repeating: " w", count: WordDiff.maximumTokens)
+        #expect(WordDiff.diff("x" + shared, "y" + shared) == [
+            .removed("x"), .added("y"), .same(shared),
+        ])
+    }
+
+    @Test("a middle longer than the token cap falls back to one replacement, however small the other side")
+    func tokenCapFallback() {
+        let long = "b q " + String(repeating: "z ", count: WordDiff.maximumTokens)
+        #expect(WordDiff.diff("a q", long) == [.removed("a q"), .added(long)])
+    }
+
     @Test("adjacent segments of the same kind are merged")
     func merged() {
         // No token in common: one removal, and the three added tokens
