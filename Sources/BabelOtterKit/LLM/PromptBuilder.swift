@@ -184,10 +184,16 @@ public struct PromptBuilder: Sendable {
         case .translate, .repitch:
             shape = #"{"detected_source": "...", "detected_audience": "...", "blocks": ["..."]}"#
         case .correct:
+            // Allowed values as prose, never "a|b": the model copied that
+            // notation into its answers (measured 2026-09-30).
             shape = """
                 {"corrected_blocks": ["..."], "errors": [{"original": "...", "corrected": "...", \
-                "category": "case|word order|gender|agreement|false friend|spelling|register|\
-                preposition|other", "explanation_en": "...", "severity": "error|suggestion"}]}
+                "category": "...", "explanation_en": "...", "severity": "..."}]}
+                category is exactly one of: case, word order, gender, agreement, false friend, \
+                spelling, register, preposition, other. severity is exactly one of: error, \
+                suggestion. One item per error: if a sentence has two errors, list two items. \
+                Quote the shortest fragment that contains the error, not the whole sentence. \
+                Never add empty items; if there are no errors, errors is [].
                 """
         case .explain:
             shape = #"{"summary_en": "...", "notes": [{"phrase": "...", "explanation_en": "..."}]}"#

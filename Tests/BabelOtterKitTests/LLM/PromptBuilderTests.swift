@@ -214,6 +214,21 @@ struct PromptBuilderTests {
         #expect(prompt.contains("have no grammatical gender"))
     }
 
+    /// The schema used to show "case|word order|..." and the model copied the
+    /// pipe notation into its answer. Allowed values are listed as prose.
+    @Test("Correct's schema lists allowed values without pipe notation")
+    func correctSchemaAllowedValues() {
+        let prompt = builder.build(PromptRequest(
+            action: .correct, source: .swissGerman, target: .swissGerman,
+            profile: .colleagues, blocks: ["Ich habe"]))
+        #expect(!prompt.contains("case|word order"))
+        #expect(!prompt.contains("error|suggestion"))
+        #expect(prompt.contains("exactly one of: case, word order, gender, agreement, false friend, spelling, register, preposition, other"))
+        #expect(prompt.contains("One item per error"))
+        #expect(prompt.contains("shortest fragment that contains the error"))
+        #expect(prompt.contains("Never add empty items"))
+    }
+
     @Test("the explanation rule is Correct's alone")
     func explanationRuleIsCorrectOnly() {
         let prompt = builder.build(PromptRequest(
