@@ -15,11 +15,15 @@ final class PopupModel {
         case failed(String)
     }
 
+    let action: Action
     private(set) var phase: Phase = .capturing
     private(set) var direction: Direction?
     private(set) var text = ""
     private(set) var warnings: [String] = []
     private(set) var message: String?
+    /// Set only by Correct, once its stream finishes. Never mutated by
+    /// Translate.
+    private(set) var correction: CorrectionResult?
     /// The audience profile, which carries the register (du/Sie). Starts at
     /// the one last chosen, so a user who writes to one audience all day
     /// picks it once.
@@ -30,6 +34,7 @@ final class PopupModel {
 
     let configuration: Configuration
     private let translator: Translator
+    private let corrector: Corrector
     private let close: @MainActor () -> Void
     private let reopen: @MainActor (PopupModel) -> Void
     private(set) var snapshot: SelectionSnapshot?
@@ -51,11 +56,13 @@ final class PopupModel {
     private(set) var isReplacing = false
 
     init(
-        environment: AppEnvironment, close: @escaping @MainActor () -> Void,
+        action: Action, environment: AppEnvironment, close: @escaping @MainActor () -> Void,
         reopen: @escaping @MainActor (PopupModel) -> Void
     ) {
+        self.action = action
         self.configuration = environment.configuration
         self.translator = Translator(configuration: environment.configuration, chat: environment.client)
+        self.corrector = Corrector(configuration: environment.configuration, chat: environment.client)
         self.close = close
         self.reopen = reopen
         self.profileID = Self.initialProfileID(in: environment.configuration)
@@ -86,15 +93,27 @@ final class PopupModel {
         regenerate()
     }
 
-    /// Runs the translation again with the current audience and instruction.
-    /// Only once a direction exists: before that there is nothing to redo.
+    /// Runs the translation (or correction) again with the current audience
+    /// and instruction. Only once there is something to redo: a direction for
+    /// Translate, a snapshot for Correct.
     func regenerate() {
-        guard !isDismissed, !isReplacing, let direction else { return }
-        run(direction)
+        guard !isDismissed, !isReplacing else { return }
+        if action == .correct {
+            guard snapshot != nil else { return }
+            runCorrection()
+        } else {
+            guard let direction else { return }
+            run(direction)
+        }
     }
 
     var canRegenerate: Bool {
-        guard direction != nil, !isReplacing else { return false }
+        guard !isReplacing else { return false }
+        if action == .correct {
+            guard snapshot != nil else { return false }
+        } else {
+            guard direction != nil else { return false }
+        }
         switch phase {
         case .translating, .finished, .failed: return true
         case .capturing, .choosingDirection: return false
@@ -114,15 +133,19 @@ final class PopupModel {
             phase = .failed(refusal.detail)
         case .captured(let snapshot):
             self.snapshot = snapshot
-            switch translator.direction(for: snapshot.text) {
-            case .success(let direction):
-                run(direction)
-            case .failure(.directionUnknown(let candidates)):
-                phase = .choosingDirection(candidates)
-            case .failure(.languageNotConfigured(let code)):
-                phase = .failed("This looks like \(code), which is not one of your languages.")
-            case .failure(.emptyResponse):
-                phase = .failed("Nothing came back from the model.")
+            if action == .correct {
+                runCorrection()
+            } else {
+                switch translator.direction(for: snapshot.text) {
+                case .success(let direction):
+                    run(direction)
+                case .failure(.directionUnknown(let candidates)):
+                    phase = .choosingDirection(candidates)
+                case .failure(.languageNotConfigured(let code)):
+                    phase = .failed("This looks like \(code), which is not one of your languages.")
+                case .failure(.emptyResponse):
+                    phase = .failed("Nothing came back from the model.")
+                }
             }
         }
     }
@@ -134,7 +157,7 @@ final class PopupModel {
     }
 
     func swap() {
-        guard !isDismissed else { return }
+        guard !isDismissed, action != .correct else { return }
         guard let direction else { return }
         run(direction.swapped)
     }
@@ -143,8 +166,20 @@ final class PopupModel {
         configuration.language(for: code)?.displayName ?? code.description
     }
 
+    /// Whether there is a result worth keeping. For Translate this is just
+    /// "finished"; for Correct, a text with no errors has nothing to paste or
+    /// copy over the original (Replace stays disabled per the design: "No
+    /// errors found").
+    var canReplace: Bool {
+        guard phase == .finished else { return false }
+        if action == .correct {
+            return correction?.hasNoErrors == false
+        }
+        return true
+    }
+
     func copy() {
-        guard phase == .finished else { return }
+        guard canReplace else { return }
         SystemPasteboard().write(text, concealed: false)
         dismiss()
     }
@@ -160,10 +195,10 @@ final class PopupModel {
     /// message instead of losing the result behind a closed, dismissed
     /// popup.
     func replace() {
-        guard phase == .finished, let snapshot, !isReplacing else { return }
+        guard canReplace, let snapshot, !isReplacing else { return }
         isReplacing = true
         let result = GeneratedResult(
-            text: UserText(text), action: .translate,
+            text: UserText(text), action: action,
             capturedViaPasteboard: snapshot.usedPasteboard)
         let pid = snapshot.application.processIdentifier
 
@@ -228,25 +263,26 @@ final class PopupModel {
         configuration.profile(id: profileID) ?? .colleagues
     }
 
-    /// Holds one `run()`'s `consumer` and `watchdog` so each can cancel the
-    /// other without going through `self`. See the comment in `run(_:)`.
+    /// Holds one run's `consumer` and `watchdog` so each can cancel the
+    /// other without going through `self`. See the comment in
+    /// `consume(_:apply:fail:)`.
     @MainActor
     private final class RunTasks {
         var consumer: Task<Void, Never>?
         var watchdog: Task<Void, Never>?
+        /// When this run last heard from the model. The watchdog measures
+        /// silence from here, not time since the run began.
+        var lastActivity = ContinuousClock.now
     }
 
-    private func run(_ direction: Direction) {
-        guard !isDismissed, let snapshot else { return }
-        stop()
-        self.direction = direction
-        text = ""
-        warnings = []
-        message = nil
-        phase = .translating
-
-        let stream = translator.translate(
-            snapshot.text, direction: direction, profile: profile, styleNote: styleNote)
+    /// Starts consuming `stream`, with the timeout watchdog and the stale-
+    /// consumer protections described in the comment below. `apply` runs on
+    /// the main actor for each event; `fail` maps a thrown error to a message.
+    private func consume<Event: Sendable>(
+        _ stream: LazyStream<Event>,
+        apply: @escaping @MainActor (PopupModel, Event) -> Void,
+        fail: @escaping @MainActor (any Error) -> String
+    ) {
         let timeout = configuration.timeoutSeconds
 
         // Both tasks inherit the main actor, so they touch `self` directly.
@@ -256,9 +292,10 @@ final class PopupModel {
         // `run()`, rather than through `self.consumer` / `self.watchdog`. A
         // cancelled `AsyncThrowingStream` iterator returns nil rather than
         // throwing, so a stale consumer -- cancelled by `stop()` because a
-        // later `run()` (Swap, a retry) already replaced both properties --
-        // can still reach the code after the loop. Reading `self.watchdog`
-        // there would hand it whichever watchdog happens to be current by
+        // later run of either action (Swap, Regenerate, a new audience)
+        // already replaced both properties -- can still reach the code after
+        // the loop. Reading `self.watchdog` there would hand it whichever
+        // watchdog happens to be current by
         // then, i.e. the new run's; `pair` is this run's own, so a stale
         // consumer only ever cancels the watchdog it was started alongside.
         // (A plain local `var` captured directly by both closures hits
@@ -275,21 +312,35 @@ final class PopupModel {
                     // consumer is stale; they would overwrite the new run's
                     // text and phase with the old run's.
                     guard !Task.isCancelled else { return }
-                    self?.apply(event)
+                    pair.lastActivity = .now
+                    if let self { apply(self, event) }
                 }
             } catch {
                 // A cancelled request can surface as a URL error rather than
                 // CancellationError; either way the reason was set by
                 // whoever cancelled.
                 guard !Task.isCancelled else { return }
-                self?.phase = .failed(Self.describe(error))
+                self?.phase = .failed(fail(error))
             }
             guard !Task.isCancelled else { return }
             pair.watchdog?.cancel()
         }
+        // Idle, not total: the run fails only after `timeout` seconds with no
+        // event at all. A slow model streaming a long reply (measured
+        // 2026-09-30: five short paragraphs took 59.9 s on the default 24B
+        // model) is alive and must not be cut off; a stalled one still is.
+        // Every text piece arrives as a `.progress` event, so silence here
+        // means the model really has stopped sending.
         let watchdog = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(timeout))
-            guard !Task.isCancelled, let self, self.phase == .translating else { return }
+            while true {
+                let deadline = pair.lastActivity.advanced(by: .seconds(timeout))
+                try? await Task.sleep(until: deadline, clock: .continuous)
+                guard !Task.isCancelled else { return }
+                if ContinuousClock.now >= pair.lastActivity.advanced(by: .seconds(timeout)) {
+                    break
+                }
+            }
+            guard let self, self.phase == .translating else { return }
             pair.consumer?.cancel()
             self.phase = .failed(
                 ResultCustody.afterCancellation(.timedOut).message ?? "Timed out.")
@@ -300,10 +351,28 @@ final class PopupModel {
         self.watchdog = watchdog
     }
 
+    private func run(_ direction: Direction) {
+        guard !isDismissed, let snapshot else { return }
+        stop()
+        self.direction = direction
+        text = ""
+        warnings = []
+        message = nil
+        phase = .translating
+
+        consume(
+            translator.translate(
+                snapshot.text, direction: direction, profile: profile, styleNote: styleNote),
+            apply: { $0.apply($1) },
+            fail: Self.describe)
+    }
+
     private func apply(_ event: TranslationEvent) {
         switch event {
         case .started(let direction):
             self.direction = direction
+        case .progress:
+            break
         case .preview(let partial):
             text = partial.value
         case .finished(let result):
@@ -311,6 +380,47 @@ final class PopupModel {
             warnings = result.warnings
             phase = .finished
         }
+    }
+
+    private func runCorrection() {
+        guard !isDismissed, let snapshot else { return }
+        stop()
+        correction = nil
+        text = ""
+        warnings = []
+        message = nil
+        phase = .translating
+        consume(
+            corrector.correct(snapshot.text, profile: profile, styleNote: styleNote),
+            apply: { model, event in model.applyCorrection(event) },
+            fail: Self.describeCorrection)
+    }
+
+    private func applyCorrection(_ event: CorrectionEvent) {
+        switch event {
+        case .started, .progress:
+            break
+        case .preview(let partial):
+            text = partial.value
+        case .finished(let result):
+            correction = result
+            text = result.corrected.value
+            warnings = result.warnings
+            phase = .finished
+        }
+    }
+
+    private static func describeCorrection(_ error: any Error) -> String {
+        if let failure = error as? CorrectionFailure {
+            switch failure {
+            case .notGerman: return "Correct works on German text."
+            case .unreadableReply:
+                return "The model's reply couldn't be read as a correction. Try Regenerate."
+            case .structureLost: return "The model lost the text's structure. Try Regenerate."
+            case .emptyResponse: return "Nothing came back from the model."
+            }
+        }
+        return describe(error)
     }
 
     /// Names an error for what it is, rather than always blaming Ollama:
@@ -333,6 +443,6 @@ final class PopupModel {
         if error is OllamaTransportError || error is URLError {
             return "Ollama could not be reached. Is it running?"
         }
-        return "The translation failed: \(error.localizedDescription)"
+        return "The request failed: \(error.localizedDescription)"
     }
 }

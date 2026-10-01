@@ -1,6 +1,51 @@
-# Handoff — state as of 2026-09-28
+# Handoff — state as of 2026-09-29
 
 Read this first if you are picking babelOtter up in a new session.
+
+## Update 2026-09-29: Correct is built; the live model check passes, the manual ones don't yet
+
+**Correct is implemented, on `feat/correct`, behind its own hotkey:
+Control-Option-C.** Select German text anywhere and press it. A popup near
+the cursor streams the corrected text, then shows an inline word-level diff
+(removed struck through in red, added in green, the rest plain), every error
+itemised with a category chip and an English explanation, and any stylistic
+suggestions listed but not applied -- dimmed rows, each with its own Copy
+button for the suggested fragment. **Replace** pastes only the errors-fixed
+text; a suggestion never reaches the document unless adopted by hand.
+Non-German text gets "Correct works on German text." and nothing is sent.
+Text that is already correct shows "No errors found" with a checkmark icon;
+Replace and Copy are both disabled (nothing corrected to paste or copy).
+Full design: `docs/superpowers/specs/2026-09-28-correct-design.md`.
+
+**The live integration test passes**
+(`BABELOTTER_INTEGRATION=1 swift test --filter OllamaIntegrationTests`,
+against `mistral-small3.2:24b`, ~6-19s depending on load). Its first run,
+before the fix below, had "Ich habe gestern mit der Kollege gesprochen."
+come back as "Ich habe gestern mit der Kollegin gesprochen." -- the model
+resolved the article/noun mismatch by changing the noun's gender (to a
+female colleague) rather than fixing the case ending on the masculine noun
+(`dem Kollegen`). Both are grammatically valid resolutions of the same
+mismatch, but not the same sentence, so `PromptBuilder`'s Correct
+instruction gained a meaning rule: fix each error with the smallest change
+that keeps the author's meaning, resolve agreement/case errors by changing
+articles, pronouns and endings rather than the noun, and never change a
+person's gender, a count, the tense, or who the text is about. Run three
+times after that change, against the same sentence: "Ich habe gestern mit
+dem Kollegen gesprochen." every time, itemised as one `case` error, no
+warnings. Never `Kollegin` again.
+
+**Not yet run -- the manual checks, yours to do in the apps used daily:**
+
+| Do | Expected |
+|---|---|
+| Control-Option-C on German with a deliberate mistake in Word | diff shows the fix; the error is listed with a category and an English explanation |
+| Same in Teams and Outlook | same |
+| Control-Option-C on correct German | "No errors found"; Replace disabled (Copy is disabled too, by design: there is nothing corrected to copy) |
+| Control-Option-C on English | "Correct works on German text."; nothing sent |
+| Control-Option-C on a 5-sentence paragraph with several errors | finishes without timing out (it can take a minute or more; the timeout now only fires on silence) |
+| Replace after a correction with suggestions | only the error fixes are pasted |
+| A suggestion's Copy button | copies the suggested fragment |
+| Switch the audience to "Students (Sie)" on text addressing the reader as du | a register error appears |
 
 ## Update 2026-09-28: the prototype is on `main`, and it works where it matters
 
@@ -87,14 +132,16 @@ after three runs were cancelled at the hour.
 
 **Default model:** `mistral-small3.2:24b`, pulled locally.
 
-**Watchdog budget.** The 60s timeout (`timeoutSeconds`) budgets the *whole*
-translation -- including the one retry on a bad block count, and Ollama
-loading the 24B model from disk if it is not already resident. A first
-translation right after a reboot, or after Ollama has unloaded the model from
-being idle, can plausibly hit that budget while the model is still loading and
-show as a timeout rather than a slow success. If that happens often, raise
-`timeoutSeconds` in `config.json`; this is a known, accepted trade-off, not a
-bug to fix here.
+**Watchdog: idle, not total (changed 2026-09-30).** `timeoutSeconds` (60)
+now measures *silence*: a run fails only after that long with nothing at all
+from the model. It used to budget the whole run, and a five-paragraph
+correction measured 59.9 s on the default 24B model, warm -- a healthy reply
+cut off at the line. Translate and Correct now report a `progress` event for
+every piece of text the model sends, because Correct's error list streams
+with no preview change for its whole length. A cold model load (roughly 25 s
+for the 24B model) still counts against the silence budget before the first
+token, which fits within 60 s; if it does not, raise `timeoutSeconds` in
+`config.json`.
 
 ### Outstanding manual checks (yours -- nothing here can be pressed or watched from a coding session)
 

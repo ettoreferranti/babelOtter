@@ -79,8 +79,25 @@ public struct PromptBuilder: Sendable {
             return """
                 You are a patient language tutor. Correct the numbered blocks below, \
                 preserving the author's intent, structure and voice. Correct the \
-                language, do not rewrite the message. If there are no errors, return \
-                the text unchanged and an empty error list.
+                language, do not rewrite the message. Fix each error with the \
+                smallest change that keeps the author's meaning. Resolve agreement \
+                and case errors by changing articles, pronouns and endings, not by \
+                exchanging the noun: "mit der Lehrer" becomes "mit dem Lehrer", not \
+                "mit der Lehrerin". Never change a person's gender, the number of \
+                people or things, the tense, who the text is about, or any fact. \
+                Quote each original fragment exactly as the author wrote it, \
+                character for character, even where it breaks the orthography \
+                rules; those rules apply to corrected_blocks and corrected only. \
+                Each explanation_en names the specific rule that was broken and the \
+                words it connects, for example: "Leiterin refers to Anna, a woman, \
+                so the noun takes its feminine form" or "mit takes the dative, so der \
+                becomes dem". Personal pronouns such as du, ich and wir have no \
+                grammatical gender; never give a pronoun's gender as the reason. \
+                If there are no errors, return \
+                the text unchanged and an empty error list. corrected_blocks applies \
+                only changes whose severity is "error". List stylistic suggestions in \
+                errors with severity "suggestion", and do not apply them to \
+                corrected_blocks.
                 """
         case .explain:
             return "You are a language teacher. Explain the numbered blocks below in English."
@@ -117,17 +134,25 @@ public struct PromptBuilder: Sendable {
             .joined(separator: "\n")
     }
 
+    /// Written as a guard rather than a ternary on `request.action`: muter's
+    /// ternary operator mis-parses a condition ending in an enum member (see
+    /// the comment on `languages(_:)` above).
     private func audience(_ request: PromptRequest) -> String? {
         let profile = request.profile
-        var lines = [
-            "Audience: \(profile.name).",
-            #"Address the reader as "\#(profile.register.rawValue)"."#,
-            "Tone: \(profile.toneGuidance)",
-        ]
-        if !profile.glossaryBias.isEmpty {
-            lines.append("Prefer these terms where natural: \(profile.glossaryBias.joined(separator: ", ")).")
+        guard request.action == .correct else {
+            var lines = [
+                "Audience: \(profile.name).",
+                #"Address the reader as "\#(profile.register.rawValue)"."#,
+                "Tone: \(profile.toneGuidance)",
+            ]
+            if !profile.glossaryBias.isEmpty {
+                lines.append("Prefer these terms where natural: \(profile.glossaryBias.joined(separator: ", ")).")
+            }
+            return lines.joined(separator: "\n")
         }
-        return lines.joined(separator: "\n")
+        return
+            #"The text is addressed to \#(profile.name), who should be addressed as "\#(profile.register.rawValue)". "#
+            + "A mismatch is a register error."
     }
 
     private func glossarySection(_ request: PromptRequest) -> String? {
@@ -159,10 +184,16 @@ public struct PromptBuilder: Sendable {
         case .translate, .repitch:
             shape = #"{"detected_source": "...", "detected_audience": "...", "blocks": ["..."]}"#
         case .correct:
+            // Allowed values as prose, never "a|b": the model copied that
+            // notation into its answers (measured 2026-09-30).
             shape = """
                 {"corrected_blocks": ["..."], "errors": [{"original": "...", "corrected": "...", \
-                "category": "case|word order|gender|agreement|false friend|spelling|register|\
-                preposition|other", "explanation_en": "...", "severity": "error|suggestion"}]}
+                "category": "...", "explanation_en": "...", "severity": "..."}]}
+                category is exactly one of: case, word order, gender, agreement, false friend, \
+                spelling, register, preposition, other. severity is exactly one of: error, \
+                suggestion. One item per error: if a sentence has two errors, list two items. \
+                Quote the shortest fragment that contains the error, not the whole sentence. \
+                Never add empty items; if there are no errors, errors is [].
                 """
         case .explain:
             shape = #"{"summary_en": "...", "notes": [{"phrase": "...", "explanation_en": "..."}]}"#

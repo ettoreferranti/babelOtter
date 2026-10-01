@@ -16,6 +16,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let configLine = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private(set) var environment = AppEnvironment.load()
     private var hotKey: HotKey?
+    private var correctHotKey: HotKey?
     private let panel = PopupPanel()
     private var currentModel: PopupModel?
     /// A clipboard capture must always run to its own restore -- cancelling
@@ -33,8 +34,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         buildMenu()
         hotKey = HotKey(
             keyCode: UInt32(kVK_ANSI_T), modifiers: UInt32(controlKey | optionKey), id: 1
-        ) { [weak self] in self?.translateSelection() }
+        ) { [weak self] in self?.startAction(.translate) }
         if hotKey == nil { ollamaLine.title = "Control-Option-T is taken by another app" }
+        correctHotKey = HotKey(
+            keyCode: UInt32(kVK_ANSI_C), modifiers: UInt32(controlKey | optionKey), id: 2
+        ) { [weak self] in self?.startAction(.correct) }
+        if correctHotKey == nil { ollamaLine.title = "Control-Option-C is taken by another app" }
         promptForAccessibilityIfNeeded()
         refreshStatus()
     }
@@ -53,6 +58,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let menu = NSMenu()
         menu.addItem(action("Translate Selection (Control-Option-T)", #selector(translateSelectionAction)))
+        menu.addItem(action("Correct Selection (Control-Option-C)", #selector(correctSelectionAction)))
         menu.addItem(ollamaLine)
         menu.addItem(accessLine)
         menu.addItem(configLine)
@@ -96,11 +102,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSWorkspace.shared.open(home.appending(path: "Library/Application Support/ch.babelotter"))
     }
 
-    @objc private func translateSelectionAction() { translateSelection() }
+    @objc private func translateSelectionAction() { startAction(.translate) }
+    @objc private func correctSelectionAction() { startAction(.correct) }
 
-    /// Captures the frontmost application's selection and streams a
-    /// translation into the popup (NFR-P3/P5: never the text itself, outside
-    /// the popup's own view and the clipboard on Copy).
+    /// Captures the frontmost application's selection and streams the given
+    /// action's result into the popup (NFR-P3/P5: never the text itself,
+    /// outside the popup's own view and the clipboard on Copy).
     ///
     /// While a capture or a replacement is already in flight, a fresh press
     /// is ignored outright -- both are pasteboard work that must run to its
@@ -110,7 +117,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// as unsafe as two captures. Only once neither is in flight does a
     /// second press dismiss (and so cancel) the current popup before
     /// starting a new one.
-    func translateSelection() {
+    func startAction(_ action: Action) {
         guard AXIsProcessTrusted() else {
             promptForAccessibilityIfNeeded()
             return
@@ -127,6 +134,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         currentModel?.dismiss()
 
         let model = PopupModel(
+            action: action,
             environment: environment,
             close: { [weak self] in self?.panel.dismiss() },
             reopen: { [weak self] model in

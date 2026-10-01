@@ -232,6 +232,15 @@ struct TranslatorTests {
         #expect(chat.prompts.isEmpty)
     }
 
+    @Test("every piece of the reply is reported as progress")
+    func progress() async throws {
+        let chat = ScriptedChat([["{\"blocks\": [\"x", "y\"]", "}"]])
+        let events = try await collect(translator(chat).translate(
+            UserText("Hello"),
+            direction: Direction(source: english, target: german), profile: .colleagues))
+        #expect(events.filter { $0 == .progress }.count == 3)
+    }
+
     @Test("the configured translate model is the one asked")
     func usesConfiguredModel() async throws {
         let chat = ScriptedChat([["{\"blocks\": [\"x\"]}"]])

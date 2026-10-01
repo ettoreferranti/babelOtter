@@ -162,8 +162,94 @@ struct PromptBuilderTests {
         #expect(prompt.contains("no errors"))
     }
 
+    @Test("correction keeps the author's meaning and quotes originals exactly")
+    func correctionKeepsMeaning() {
+        let prompt = builder.build(request(action: .correct))
+        #expect(prompt.contains("keeps the author's meaning"))
+        #expect(prompt.contains("not by exchanging the noun"))
+        #expect(prompt.contains("Quote each original fragment exactly"))
+    }
+
+    @Test("Correct's audience section is the register only")
+    func correctAudienceIsRegisterOnly() {
+        let prompt = builder.build(request(action: .correct, profile: .administration))
+        #expect(prompt.contains(
+            #"The text is addressed to Administration, who should be addressed as "Sie"."#))
+        #expect(prompt.contains("A mismatch is a register error."))
+        #expect(!prompt.contains("Tone:"))
+    }
+
+    @Test("Translate keeps the tone line; Correct's meaning rule does not leak into it")
+    func translateAudienceUnchanged() {
+        let prompt = builder.build(request(action: .translate, profile: .administration))
+        #expect(!prompt.contains("exchanging the noun"))
+        #expect(prompt.contains("Tone:"))
+    }
+
     @Test("a prompt has no blank section left by an omitted part")
     func noDoubleBlankLines() {
         #expect(!builder.build(request()).contains("\n\n\n"))
+    }
+
+    @Test("Correct applies errors only and lists suggestions unapplied")
+    func correctErrorsOnly() {
+        let prompt = builder.build(PromptRequest(
+            action: .correct, source: .swissGerman, target: .swissGerman,
+            profile: .administration, styleNote: "streng", blocks: ["Ich habe"]))
+        #expect(prompt.contains("corrected_blocks applies only changes whose severity is \"error\""))
+        #expect(prompt.contains("do not apply them to corrected_blocks"))
+        #expect(prompt.contains("\"Sie\""))
+        #expect(prompt.contains("streng"))
+    }
+
+    /// A tutoring explanation that names the wrong rule teaches the wrong
+    /// rule. Measured 2026-09-30: a correct fix explained as "the gender of
+    /// the pronoun du", which has no gender.
+    @Test("Correct's explanations must name the rule that was broken")
+    func correctExplanationsNameTheRule() {
+        let prompt = builder.build(PromptRequest(
+            action: .correct, source: .swissGerman, target: .swissGerman,
+            profile: .colleagues, blocks: ["Ich habe"]))
+        #expect(prompt.contains("names the specific rule that was broken"))
+        #expect(prompt.contains("have no grammatical gender"))
+    }
+
+    /// The schema used to show "case|word order|..." and the model copied the
+    /// pipe notation into its answer. Allowed values are listed as prose.
+    @Test("Correct's schema lists allowed values without pipe notation")
+    func correctSchemaAllowedValues() {
+        let prompt = builder.build(PromptRequest(
+            action: .correct, source: .swissGerman, target: .swissGerman,
+            profile: .colleagues, blocks: ["Ich habe"]))
+        #expect(!prompt.contains("case|word order"))
+        #expect(!prompt.contains("error|suggestion"))
+        #expect(prompt.contains("exactly one of: case, word order, gender, agreement, false friend, spelling, register, preposition, other"))
+        #expect(prompt.contains("One item per error"))
+        #expect(prompt.contains("shortest fragment that contains the error"))
+        #expect(prompt.contains("Never add empty items"))
+    }
+
+    @Test("the explanation rule is Correct's alone")
+    func explanationRuleIsCorrectOnly() {
+        let prompt = builder.build(PromptRequest(
+            action: .translate, source: .english, target: .swissGerman,
+            profile: .colleagues, blocks: ["x"]))
+        #expect(!prompt.contains("names the specific rule that was broken"))
+    }
+
+    @Test("the errors-only rule is Correct's alone")
+    func errorsOnlyRuleIsCorrectOnly() {
+        let prompt = builder.build(PromptRequest(
+            action: .translate, source: .english, target: .swissGerman,
+            profile: .colleagues, blocks: ["x"]))
+        #expect(!prompt.contains("corrected_blocks applies only"))
+    }
+
+    @Test("a correction item can be built in code")
+    func correctionErrorInit() {
+        let item = CorrectionError(
+            original: "a", corrected: "b", category: .spelling,
+            explanationEn: "why", severity: .error)
+        #expect(item.corrected == "b")
     }
 }

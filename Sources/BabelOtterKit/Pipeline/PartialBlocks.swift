@@ -1,6 +1,6 @@
 import Foundation
 
-/// The `blocks` of a translate reply that is still arriving.
+/// The named string array of a reply that is still arriving.
 ///
 /// The model streams one JSON object, and nothing in it parses until the
 /// closing brace. On a 24B local model that is seconds of a frozen popup. This
@@ -9,11 +9,14 @@ import Foundation
 ///
 /// Only ever a preview. The result always comes from `ResponseParser` on the
 /// complete reply, so a misreading here costs a flicker, never a wrong paste.
-public enum PartialTranslateBlocks {
+public enum PartialBlocks {
 
-    public static func extract(from partial: String) -> [String] {
-        guard let key = partial.range(of: "\"blocks\"") else { return [] }
-        let scalars = Array(partial[key.upperBound...].unicodeScalars)
+    /// `key` names the JSON array to read: `blocks` for Translate,
+    /// `corrected_blocks` for Correct. The quotes are part of the match, so
+    /// `blocks` never matches inside `corrected_blocks`.
+    public static func extract(from partial: String, key: String) -> [String] {
+        guard let found = partial.range(of: "\"" + key + "\"") else { return [] }
+        let scalars = Array(partial[found.upperBound...].unicodeScalars)
 
         var index = skipWhitespace(scalars, from: 0)
         guard index < scalars.count, scalars[index] == ":" else { return [] }
