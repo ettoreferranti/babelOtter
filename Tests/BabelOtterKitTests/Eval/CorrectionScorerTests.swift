@@ -174,8 +174,8 @@ struct CorrectionScorerTests {
         let fixes = [fix("jetz", ["jetzt"])]
         let replaced: [DiffSegment] = [.same("ab "), .removed("jetz"), .added("jetzt"), .same(" cd")]
         #expect(CorrectionScorer.overCorrectedWords(in: replaced, original: "ab jetz cd", fixes: fixes) == 0)
-        let later: [DiffSegment] = [.same("ab jetz "), .removed("cd"), .added("ef gh")]
-        #expect(CorrectionScorer.overCorrectedWords(in: later, original: "ab jetz cd", fixes: fixes) == 3)
+        let later: [DiffSegment] = [.removed("ab"), .added("xy"), .same(" jetz")]
+        #expect(CorrectionScorer.overCorrectedWords(in: later, original: "ab jetz", fixes: fixes) == 1)
     }
 
     @Test("with no fixes, every changed word is over-correction")
