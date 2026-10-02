@@ -51,6 +51,7 @@ profiles.local.*
 *.personal.json
 evals/**/local/
 evals/**/*.private.*
+evals/results/
 secrets/
 *.pem
 *.p12
