@@ -41,7 +41,13 @@ final class PopupPanel: NSPanel {
     /// capture has finished reading the selection, so the synthetic
     /// Command-C the clipboard tier may have posted was routed to the source
     /// application, not to this panel (spec M1b, "non-activating popup").
+    ///
+    /// Does nothing once the panel is hidden: a popup dismissed during the
+    /// capture has been ordered out, and making an invisible window key
+    /// would take the user's keystrokes away from the application they are
+    /// typing in.
     func makeKeyNow() {
+        guard isVisible else { return }
         makeKey()
     }
 
