@@ -20,7 +20,8 @@ On a new Mac, create the signing identity once: Keychain Access, then Certificat
 - **On `main`:** Translate (Control-Option-T), the audience picker and instruction field, and **Correct (Control-Option-C)**, merged as #88 (`6564c30`). CI is green, including the mutation gate at 82.0%.
   - That score is honest. Of 133 mutants, the 24 that muter reports as surviving were each planted by hand and are killed by the suite: muter reports mutants inside closures and nested loops without ever inserting them. Six real survivors were found that way and killed with new tests.
   - Issues #40, #62, #63 and #64 are closed, as are epics #9 and #5.
-- **Still open:** PR **#87** (`chore/cleanup-after-prototype`): a one-line guard that keeps a hidden popup from taking keyboard focus, and a docs correction on muter artefacts. It is small, but it has not been reviewed; merge it or fold it in.
+- **Merged 2026-10-02:** PR **#87**, the guard that keeps a hidden popup from taking keyboard focus plus the muter-artefact correction, and PR **#89**, the 2026-09-21 capture readings in `docs/architecture.md` section 7 (Word can read on tier 1 when its focus is a text area). Both are merged into this branch; every other branch is deleted.
+- **After pulling app changes, rebuild:** `Tools/make-app.sh --run`. A stale `build/babelOtter.app` from before #88 looked like "Control-Option-C does nothing" on 2026-10-02.
 - **Active branch: `feat/eval-harness`**, already merged with `main`. It holds only the approved design so far: `docs/superpowers/specs/2026-09-30-eval-harness-design.md` (#74, #75, #76).
 
 **What changed in Correct after manual testing, and why** (all on `main`):
