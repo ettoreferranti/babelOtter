@@ -74,4 +74,10 @@ struct TranslationScorerTests {
         let english = translationCase("Hallo.", .swissGermanToEnglish, reference: "Hello.")
         #expect(TranslationScorer.score(english, outcome: .failed(.other)).esszettAbsent == nil)
     }
+
+    @Test("a failed translation never counts as keeping its terms, even with none to keep")
+    func failedWithoutTerms() {
+        let theCase = translationCase("Hello.", reference: "Hallo.")
+        #expect(!TranslationScorer.score(theCase, outcome: .failed(.timeout)).termsKept)
+    }
 }

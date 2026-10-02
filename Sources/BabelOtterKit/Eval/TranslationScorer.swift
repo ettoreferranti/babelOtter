@@ -16,7 +16,7 @@ public struct TranslationScore: Sendable, Equatable, Codable {
     public let structureKept: Bool
     public let chrF: Double
 
-    public var termsKept: Bool { missingTerms.isEmpty && !sentinelDebris }
+    public var termsKept: Bool { failure == nil && missingTerms.isEmpty && !sentinelDebris }
 }
 
 /// One translation scored against its case (spec 2026-09-30, section 4.3).
