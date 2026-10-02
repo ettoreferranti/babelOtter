@@ -396,6 +396,37 @@ built from. An element did appear on the retry after that failed arming, and an
 earlier version of the probe credited the arming for it; the extra wait was the
 only thing that changed.
 
+### Re-measured the next day: Word can read on tier 1
+
+Measured 2026-09-21 on the same managed machine (macOS 26.7), with
+`Tools/ax-probe.sh` and then `Tools/clipboard-probe.sh`, selections made by
+hand. `AXIsProcessTrusted()` was still YES.
+
+| App | Focused role | Tier 1 | Tier 2 | Verdict |
+|---|---|---|---|---|
+| Outlook | `AXTextArea` | OK, 11 chars | OK, 11 chars | **Tier 1** |
+| Teams (twice) | no element | `noValue` | `noValue` | **Tier 3** |
+| Word, first attempt | `AXScrollArea` | `noValue` | `noValue` | Tier 3 |
+| Word, second attempt | `AXTextArea` | OK, 37 chars | `noValue` | **Tier 1** |
+| VS Code | `AXTextArea` | empty | empty | **Tier 3** |
+
+**Word is not reliably tier 3.** With the focus in a container it reads
+nothing, exactly as on 2026-09-20; with the focus in its `AXTextArea` it reads
+the selection through `AXSelectedText`. This is the Outlook lesson again: a
+container role means the reading is invalid, not that the app is tier 3. Which
+role Word presents seems to depend on where the focus is, so expect both tiers
+from it in practice. The ladder already handles this by attempting a capture
+rather than deciding per app.
+
+**VS Code accepts `AXManualAccessibility`** (it returned success, unlike
+Outlook and Teams) and still exposes nothing: after the retry it presented an
+`AXTextArea` with both tiers empty. Arming the tree does not make it readable,
+so it stays clipboard-only.
+
+**The clipboard conduit worked every round:** four captures (Word twice,
+Outlook twice: 37, 12, 11 and 37 characters), each followed by a restore that
+put the previous clipboard back.
+
 ### Decision: Accessibility reads, the clipboard writes
 
 **Decided 2026-09-20**, on the measurements below.
