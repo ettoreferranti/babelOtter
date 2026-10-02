@@ -299,8 +299,9 @@ which produce identical strings from an ASCII file.
 - A ternary whose condition ends in an enum member.
 - A mutant inside a closure, or inside a loop body whose condition is also
   mutated, is silently never inserted and then reported as a survivor. This
-  understates the score, and it is the reason for every survivor measured so
-  far. See item 3 under "Settled".
+  understates the score. It explained all 15 survivors after the prototype
+  and 23 of the 29 on `feat/correct`; the other 6 were real. See item 3
+  under "Settled".
 - A `guard ... else { ...; return }` inside a `do` block inside a `Task`
   closure. muter replaced the whole `do` body with a bare `return`, so the
   *unmutated* baseline did nothing, and `OllamaClient.pull`'s tests hung. That
@@ -360,9 +361,11 @@ Worth reporting all of this upstream before M1b leans on it further.
    pass, and that reads as a survivor. All 15 "survivors" of the first scored
    run after the prototype merged (81.9%) were planted by hand, one at a time,
    at the exact position muter gave, and the suite killed every one: the
-   true score was 83/83. **Before writing a test to kill a reported survivor,
-   plant it by hand.** If the suite already kills it, muter never measured
-   it.
+   true score was 83/83. Not every survivor is an artifact, though: of the
+   29 that `feat/correct`'s first scored run reported, 23 were artifacts and
+   6 were real (in `WordDiff` and `CorrectionCheck`, killed in 0889948).
+   **Before writing a test to kill a reported survivor, plant it by hand.**
+   If the suite already kills it, muter never measured it.
 
 4. **The mutation threshold question is resolved by growth.** At 51 measured
    mutants the small-population rule (`total < 20`) no longer applies, so the
