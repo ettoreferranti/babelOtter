@@ -23,10 +23,10 @@ measured rather than guessed.
 | Where scoring lives | In `BabelOtterKit`: pure, TDD, mutation-gated. The CLI is a thin runner |
 | Prompt variants inside one run | Out of scope. Commit a change, re-run, and compare against the saved result |
 
-## 3. Golden set — `Evals/golden/`
+## 3. Golden set — `evals/golden/`
 
 Two JSON files in the repo. Both are scanned by the fixture content guard
-(`FixtureContentGuardTests`), whose roots are extended to `Evals/golden/`.
+(`FixtureContentGuardTests`), which already scans `evals/`.
 
 ### 3.1 `correction.json`
 
@@ -47,7 +47,9 @@ Two JSON files in the repo. Both are scanned by the fixture content guard
 ```
 
 - `profile` is optional (default `colleagues`). A register case sets it, for example `administration` for Sie.
+- `terms` is optional (default none): do-not-translate terms for the case, which must occur in `text`.
 - `right` lists acceptable alternatives. A fix counts if the text now contains *any* of them *and* no longer contains `wrong`.
+- Matching is on whole words: `wrong` must not touch a letter or digit on a side where it begins or ends with one. Otherwise the correct `jetzt` would still contain the wrong `jetz`.
 - `mustNot` lists strings that must not appear in the output (meaning guards, such as `"Kollegin"`).
 - `clean: true` marks an error-free text (with `fixes: []`), used to measure over-correction.
 - Target: about 30 cases. They cover every `ErrorCategory` at least twice, include multi-paragraph learner texts, a protected term inside a text, a Swiss ß case, and at least 5 clean texts.
@@ -68,6 +70,7 @@ Two JSON files in the repo. Both are scanned by the fixture content guard
 
 - `direction` is `en-de-ch` or `de-ch-en`.
 - `terms` are added to the configuration's do-not-translate list for that case.
+- `profile` is optional (default `colleagues`), so translation cases can mix registers.
 - Target: about 20 cases in both directions. They mix registers and lengths, and include bullet lists, multi-paragraph texts, protected terms, and de-CH targets where ß would naturally occur.
 
 ## 4. Kit — `Sources/BabelOtterKit/Eval/` (pure, TDD)
@@ -81,7 +84,12 @@ Two JSON files in the repo. Both are scanned by the fixture content guard
 - `category` is a known `ErrorCategory` raw value;
 - a clean case has no fixes;
 - `direction` is known;
-- every term occurs in its text.
+- every term occurs in its text;
+- every `mustNot` is absent from the text;
+- no `right` alternative contains `wrong` as whole words;
+- a case that is not clean has at least one fix or one `mustNot`;
+- the profile is a shipped profile id;
+- every translation term also occurs in `reference`, and `reference` is non-empty.
 
 ### 4.2 `CorrectionScorer`
 A pure function of the case plus the correction outcome (a `CorrectionResult`, or a failure).
@@ -125,7 +133,7 @@ For translation: the ß, term and structure pass rates, and mean chrF. For both:
 
 ```
 swift run babelotter-eval [--models a,b] [--only correct|translate|<case-id>,...]
-                          [--repeat N] [--compare Evals/results/<file>.json]
+                          [--repeat N] [--compare evals/results/<file>.json]
 ```
 
 - **Models:** with no `--models`, every installed model is used. A model that isn't installed is skipped, with a note in the table. If Ollama can't be reached, the tool prints a clear message and exits non-zero.
@@ -134,7 +142,7 @@ swift run babelotter-eval [--models a,b] [--only correct|translate|<case-id>,...
 - **Output:**
   - a comparison table, one row per model, with the §4.4 metrics (and deltas under `--compare`);
   - then the misses only, one line each: missed fix, guard violated, mangled term, broken structure, parse failure;
-  - `Evals/results/<yyyy-MM-dd-HHmm>-<short-commit>.json` (git-ignored), with every case, output, score and latency.
+  - `evals/results/<yyyy-MM-dd-HHmm>-<short-commit>.json` (git-ignored), with every case, output, score and latency.
 - **Isolation:** never run in CI. Only the kit's scorer tests and the golden-file validation test run there.
 
 ## 6. Testing
