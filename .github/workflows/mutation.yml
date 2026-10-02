@@ -158,6 +158,7 @@ jobs:
           Sources/BabelOtterKit/Eval/CorrectionScorer.swift
           Sources/BabelOtterKit/Eval/EvalOutcome.swift
           Sources/BabelOtterKit/Eval/ChrF.swift
+          Sources/BabelOtterKit/Eval/TranslationScorer.swift
           Sources/BabelOtterKit/Text/WordDiff.swift"
 
           MUTATED=$(printf '%s\n%s\n' "$PASS1" "$PASS2")
