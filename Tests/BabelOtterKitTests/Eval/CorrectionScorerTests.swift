@@ -47,6 +47,14 @@ struct CorrectionScorerTests {
         #expect(EvalFailure(TranslationError.languageNotConfigured(LanguageCode("fr"))) == .other)
     }
 
+    @Test("a daemon that cannot be reached is its own failure kind")
+    func unreachableDaemon() {
+        #expect(EvalFailure(OllamaTransportError.unreachable(detail: "Could not connect to the server.")) == .unreachable)
+        #expect(EvalFailure(OllamaTransportError.httpStatus(500)) == .other)
+        #expect(EvalFailure(OllamaTransportError.undecodableBody) == .other)
+        #expect(EvalFailure.unreachable.rawValue == "unreachable")
+    }
+
     @Test("a failed correction misses every fix and fails a clean case")
     func failedOutcome() {
         let failing = testCase("Ich bin jetz da.", fixes: [fix("jetz", ["jetzt"])])
