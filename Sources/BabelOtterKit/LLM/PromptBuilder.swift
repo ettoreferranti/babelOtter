@@ -89,8 +89,7 @@ public struct PromptBuilder: Sendable {
                 check what each word means in context, not only its grammar. \
                 A German word used with the meaning of a similar English word, \
                 so that the sentence does not say what the author means, is an \
-                error of category false friend: replace it with the German word \
-                for the intended meaning. \
+                error: replace it with the German word for the intended meaning. \
                 Quote each original fragment exactly as the author wrote it, \
                 character for character, even where it breaks the orthography \
                 rules; those rules apply to corrected_blocks and corrected only. \
