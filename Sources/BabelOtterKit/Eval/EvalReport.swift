@@ -41,7 +41,7 @@ public enum EvalReport {
     public static func format(_ value: Double, _ kind: MetricKind) -> String {
         switch kind {
         case .rate: return String(format: "%.1f%%", value * 100)
-        case .count: return String(Int(value.rounded()))
+        case .count: return countText(value)
         case .seconds: return String(format: "%.1fs", value)
         case .score: return String(format: "%.1f", value)
         }
@@ -51,11 +51,36 @@ public enum EvalReport {
         switch kind {
         case .rate: return String(format: "%+.1fpp", change * 100)
         case .count:
-            let whole = Int(change.rounded())
-            return whole < 0 ? String(whole) : "+\(whole)"
+            let tenths = (change * 10).rounded() / 10
+            return tenths < 0 ? countText(tenths) : "+" + countText(tenths)
         case .seconds: return String(format: "%+.1fs", change)
         case .score: return String(format: "%+.1f", change)
         }
+    }
+
+    /// A count is per run, so it can be fractional: a whole number when it
+    /// is one, otherwise one decimal.
+    private static func countText(_ value: Double) -> String {
+        let tenths = (value * 10).rounded() / 10
+        guard tenths != tenths.rounded() else { return String(Int(tenths)) }
+        return String(format: "%.1f", tenths)
+    }
+
+    /// The misses of every run, each distinct line once in first-seen order.
+    /// With more than one run, each line says in how many runs it occurred.
+    public static func collapsedMisses(_ runs: [[String]]) -> [String] {
+        var order: [String] = []
+        var occurrences: [String: Int] = [:]
+        for run in runs {
+            for line in Set(run) {
+                occurrences[line, default: 0] += 1
+            }
+            for line in run where !order.contains(line) {
+                order.append(line)
+            }
+        }
+        guard runs.count > 1 else { return order }
+        return order.map { "\($0) (\(occurrences[$0] ?? 0)/\(runs.count) runs)" }
     }
 
     public static func correctionMisses(

@@ -182,13 +182,15 @@ for model in models {
     if !selected.correction.isEmpty {
         var scores: [CorrectionScore] = []
         var times: [Double] = []
+        var missesByRun: [[String]] = []
         for run in 1...arguments.repeatCount {
+            var runMisses: [String] = []
             for testCase in selected.correction {
                 let attempt = await correct(testCase, model: model, client: client)
                 let score = CorrectionScorer.score(testCase, outcome: attempt.outcome)
                 let missed = EvalReport.correctionMisses(model: model, testCase: testCase, score: score)
                 print(progress(model, testCase.id, attempt.seconds, passed: missed.isEmpty))
-                misses += missed
+                runMisses += missed
                 scores.append(score)
                 times.append(attempt.seconds)
                 records.append(CaseRecord(
@@ -196,19 +198,23 @@ for model in models {
                     output: attempt.output, failureDetail: attempt.detail, correction: score,
                     translation: nil))
             }
+            missesByRun.append(runMisses)
         }
-        correctionSummaries.append(CorrectionSummary(model: model, scores: scores, seconds: times))
+        misses += EvalReport.collapsedMisses(missesByRun)
+        correctionSummaries.append(CorrectionSummary(model: model, scores: scores, seconds: times, runs: arguments.repeatCount))
     }
     if !selected.translation.isEmpty {
         var scores: [TranslationScore] = []
         var times: [Double] = []
+        var missesByRun: [[String]] = []
         for run in 1...arguments.repeatCount {
+            var runMisses: [String] = []
             for testCase in selected.translation {
                 let attempt = await translate(testCase, model: model, client: client)
                 let score = TranslationScorer.score(testCase, outcome: attempt.outcome)
                 let missed = EvalReport.translationMisses(model: model, testCase: testCase, score: score)
                 print(progress(model, testCase.id, attempt.seconds, passed: missed.isEmpty))
-                misses += missed
+                runMisses += missed
                 scores.append(score)
                 times.append(attempt.seconds)
                 records.append(CaseRecord(
@@ -216,8 +222,10 @@ for model in models {
                     output: attempt.output, failureDetail: attempt.detail, correction: nil,
                     translation: score))
             }
+            missesByRun.append(runMisses)
         }
-        translationSummaries.append(TranslationSummary(model: model, scores: scores, seconds: times))
+        misses += EvalReport.collapsedMisses(missesByRun)
+        translationSummaries.append(TranslationSummary(model: model, scores: scores, seconds: times, runs: arguments.repeatCount))
     }
 }
 
@@ -240,7 +248,7 @@ if !misses.isEmpty {
 }
 
 let run = EvalRun(
-    startedAt: startedAt, commit: commit, correction: correctionSummaries,
+    startedAt: startedAt, commit: commit, repeatCount: arguments.repeatCount, correction: correctionSummaries,
     translation: translationSummaries, records: records)
 let directory = "evals/results"
 do {

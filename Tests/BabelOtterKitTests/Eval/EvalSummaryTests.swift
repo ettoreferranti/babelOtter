@@ -97,6 +97,23 @@ struct EvalSummaryTests {
         ])
     }
 
+    @Test("with repeats, counts are per run and rates are unchanged")
+    func perRun() {
+        let once = CorrectionSummary(model: "m", scores: scores, seconds: [1, 3, 2, 10])
+        let twice = CorrectionSummary(model: "m", scores: scores + scores, seconds: [1, 3, 2, 10, 1, 3, 2, 10], runs: 2)
+        #expect(once.runs == 1)
+        #expect(twice.runs == 2)
+        #expect(twice.metrics == once.metrics)
+        let thrice = CorrectionSummary(
+            model: "m", scores: scores + [correctionScore(), correctionScore()], seconds: [1], runs: 3)
+        #expect(close(thrice.metrics.first { $0.name == "warnings" }?.value ?? 0, 1.0 / 3.0))
+        let translation = [translationScore(failure: .timeout), translationScore()]
+        let one = TranslationSummary(model: "m", scores: translation, seconds: [1, 2])
+        let two = TranslationSummary(model: "m", scores: translation + translation, seconds: [1, 2, 1, 2], runs: 2)
+        #expect(two.runs == 2)
+        #expect(two.metrics == one.metrics)
+    }
+
     @Test("a delta pairs metrics by name and skips ones the earlier run lacks")
     func delta() {
         let before = CorrectionSummary(model: "m", scores: [correctionScore(expected: 2, missed: 2)], seconds: [1])

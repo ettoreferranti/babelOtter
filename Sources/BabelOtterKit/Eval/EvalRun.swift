@@ -32,19 +32,33 @@ public struct CaseRecord: Sendable, Equatable, Codable {
 public struct EvalRun: Sendable, Equatable, Codable {
     public let startedAt: Date
     public let commit: String
+    /// How many times every case ran (`--repeat`).
+    public let repeatCount: Int
     public let correction: [CorrectionSummary]
     public let translation: [TranslationSummary]
     public let records: [CaseRecord]
 
     public init(
-        startedAt: Date, commit: String, correction: [CorrectionSummary],
+        startedAt: Date, commit: String, repeatCount: Int = 1, correction: [CorrectionSummary],
         translation: [TranslationSummary], records: [CaseRecord]
     ) {
         self.startedAt = startedAt
         self.commit = commit
+        self.repeatCount = repeatCount
         self.correction = correction
         self.translation = translation
         self.records = records
+    }
+
+    /// A run saved before repeats were recorded is one run.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        startedAt = try container.decode(Date.self, forKey: .startedAt)
+        commit = try container.decode(String.self, forKey: .commit)
+        repeatCount = try container.decodeIfPresent(Int.self, forKey: .repeatCount) ?? 1
+        correction = try container.decode([CorrectionSummary].self, forKey: .correction)
+        translation = try container.decode([TranslationSummary].self, forKey: .translation)
+        records = try container.decode([CaseRecord].self, forKey: .records)
     }
 
     public func encoded() throws -> Data {

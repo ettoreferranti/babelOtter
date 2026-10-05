@@ -78,8 +78,14 @@ func failureCounts(_ failures: [EvalFailure?]) -> [String: Int] {
     return counts
 }
 
+/// The count metrics of one model's run, per run: a sum over `runs` repeats
+/// divided by `runs`, so a repeated run compares fairly with a single one.
+/// The stored fields keep the sums.
 public struct CorrectionSummary: EvalSummary, Equatable, Codable {
     public let model: String
+    /// How many times every case ran.
+    public let runs: Int
+    /// Scored cases over all runs.
     public let cases: Int
     public let meanRecall: Double
     public let overCorrectedWords: Int
@@ -91,8 +97,9 @@ public struct CorrectionSummary: EvalSummary, Equatable, Codable {
     public let warnings: Int
     public let latency: Latency
 
-    public init(model: String, scores: [CorrectionScore], seconds: [Double]) {
+    public init(model: String, scores: [CorrectionScore], seconds: [Double], runs: Int = 1) {
         self.model = model
+        self.runs = runs
         cases = scores.count
         let recalls = scores.compactMap(\.recall)
         meanRecall = ratio(recalls.reduce(0, +), Double(recalls.count))
@@ -115,20 +122,41 @@ public struct CorrectionSummary: EvalSummary, Equatable, Codable {
         [
             Metric(name: "recall", value: meanRecall, kind: .rate, higherIsBetter: true),
             Metric(name: "over-correction", value: overCorrectionRate, kind: .rate, higherIsBetter: false),
-            Metric(name: "over-corrected words", value: Double(overCorrectedWords), kind: .count, higherIsBetter: false),
-            Metric(name: "guard violations", value: Double(guardViolations), kind: .count, higherIsBetter: false),
+            Metric(name: "over-corrected words", value: perRun(overCorrectedWords), kind: .count, higherIsBetter: false),
+            Metric(name: "guard violations", value: perRun(guardViolations), kind: .count, higherIsBetter: false),
             Metric(name: "category accuracy", value: categoryAccuracy, kind: .rate, higherIsBetter: true),
             Metric(name: "clean pass", value: cleanPassRate, kind: .rate, higherIsBetter: true),
-            Metric(name: "failures", value: Double(failures.values.reduce(0, +)), kind: .count, higherIsBetter: false),
-            Metric(name: "warnings", value: Double(warnings), kind: .count, higherIsBetter: false),
+            Metric(name: "failures", value: perRun(failures.values.reduce(0, +)), kind: .count, higherIsBetter: false),
+            Metric(name: "warnings", value: perRun(warnings), kind: .count, higherIsBetter: false),
             Metric(name: "latency median", value: latency.median, kind: .seconds, higherIsBetter: false),
             Metric(name: "latency max", value: latency.max, kind: .seconds, higherIsBetter: false),
         ]
     }
+
+    private func perRun(_ total: Int) -> Double { ratio(Double(total), Double(runs)) }
+
+    /// A summary saved before repeats were recorded is one run.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        model = try container.decode(String.self, forKey: .model)
+        runs = try container.decodeIfPresent(Int.self, forKey: .runs) ?? 1
+        cases = try container.decode(Int.self, forKey: .cases)
+        meanRecall = try container.decode(Double.self, forKey: .meanRecall)
+        overCorrectedWords = try container.decode(Int.self, forKey: .overCorrectedWords)
+        overCorrectionRate = try container.decode(Double.self, forKey: .overCorrectionRate)
+        guardViolations = try container.decode(Int.self, forKey: .guardViolations)
+        categoryAccuracy = try container.decode(Double.self, forKey: .categoryAccuracy)
+        cleanPassRate = try container.decode(Double.self, forKey: .cleanPassRate)
+        failures = try container.decode([String: Int].self, forKey: .failures)
+        warnings = try container.decode(Int.self, forKey: .warnings)
+        latency = try container.decode(Latency.self, forKey: .latency)
+    }
 }
 
+/// Like `CorrectionSummary`, the failure count is per run.
 public struct TranslationSummary: EvalSummary, Equatable, Codable {
     public let model: String
+    public let runs: Int
     public let cases: Int
     public let esszettPassRate: Double
     public let termPassRate: Double
@@ -137,8 +165,9 @@ public struct TranslationSummary: EvalSummary, Equatable, Codable {
     public let failures: [String: Int]
     public let latency: Latency
 
-    public init(model: String, scores: [TranslationScore], seconds: [Double]) {
+    public init(model: String, scores: [TranslationScore], seconds: [Double], runs: Int = 1) {
         self.model = model
+        self.runs = runs
         cases = scores.count
         let esszettVerdicts = scores.compactMap(\.esszettAbsent)
         esszettPassRate = ratio(Double(esszettVerdicts.filter { $0 }.count), Double(esszettVerdicts.count))
@@ -155,9 +184,25 @@ public struct TranslationSummary: EvalSummary, Equatable, Codable {
             Metric(name: "terms kept", value: termPassRate, kind: .rate, higherIsBetter: true),
             Metric(name: "structure kept", value: structurePassRate, kind: .rate, higherIsBetter: true),
             Metric(name: "chrF", value: meanChrF, kind: .score, higherIsBetter: true),
-            Metric(name: "failures", value: Double(failures.values.reduce(0, +)), kind: .count, higherIsBetter: false),
+            Metric(name: "failures", value: perRun(failures.values.reduce(0, +)), kind: .count, higherIsBetter: false),
             Metric(name: "latency median", value: latency.median, kind: .seconds, higherIsBetter: false),
             Metric(name: "latency max", value: latency.max, kind: .seconds, higherIsBetter: false),
         ]
+    }
+
+    private func perRun(_ total: Int) -> Double { ratio(Double(total), Double(runs)) }
+
+    /// A summary saved before repeats were recorded is one run.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        model = try container.decode(String.self, forKey: .model)
+        runs = try container.decodeIfPresent(Int.self, forKey: .runs) ?? 1
+        cases = try container.decode(Int.self, forKey: .cases)
+        esszettPassRate = try container.decode(Double.self, forKey: .esszettPassRate)
+        termPassRate = try container.decode(Double.self, forKey: .termPassRate)
+        structurePassRate = try container.decode(Double.self, forKey: .structurePassRate)
+        meanChrF = try container.decode(Double.self, forKey: .meanChrF)
+        failures = try container.decode([String: Int].self, forKey: .failures)
+        latency = try container.decode(Latency.self, forKey: .latency)
     }
 }

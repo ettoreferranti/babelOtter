@@ -25,6 +25,30 @@ struct EvalReportTests {
         #expect(EvalReport.signedChange(-value, kind).hasPrefix("-"))
     }
 
+    @Test("a count that is not whole shows one decimal", arguments: [
+        (0.7, "0.7", "+0.7"),
+        (2.0 / 3.0, "0.7", "+0.7"),
+        (2.0, "2", "+2"),
+        (-1.0, "-1", "-1"),
+        (-0.5, "-0.5", "-0.5"),
+        (1.04, "1", "+1"),
+    ])
+    func fractionalCount(value: Double, formatted: String, change: String) {
+        #expect(EvalReport.format(value, .count) == formatted)
+        #expect(EvalReport.signedChange(value, .count) == change)
+    }
+
+    @Test("repeated misses are listed once with the runs they occurred in")
+    func collapsedMisses() {
+        let runs = [["m  a: x", "m  b: y"], ["m  b: y", "m  c: z"], ["m  b: y"]]
+        #expect(EvalReport.collapsedMisses(runs) == [
+            "m  a: x (1/3 runs)", "m  b: y (3/3 runs)", "m  c: z (1/3 runs)",
+        ])
+        #expect(EvalReport.collapsedMisses([["m  a: x", "m  b: y"]]) == ["m  a: x", "m  b: y"])
+        #expect(EvalReport.collapsedMisses([[], []]).isEmpty)
+        #expect(EvalReport.collapsedMisses([["m  a: x", "m  a: x"], []]) == ["m  a: x (1/2 runs)"])
+    }
+
     @Test("the table has a row per metric and a column per model")
     func table() {
         let a = CorrectionSummary(model: "alpha", scores: [correctionScore(expected: 2, missed: ["x"])], seconds: [1])
