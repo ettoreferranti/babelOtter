@@ -7,10 +7,12 @@ Read this first if you are picking babelOtter up in a new session.
 **Run it** from the repository root, with Ollama running:
 
 ```sh
-swift run -c release babelotter-eval [--models a,b] [--only correct|translate] [--repeat N] [--compare evals/results/<file>.json]
+swift run -c release babelotter-eval [--models a,b] [--only correct|translate|<case-id>,...] [--repeat N] [--compare evals/results/<file>.json]
 ```
 
-The default model is `mistral-small3.2:24b`. Each run writes one JSON file to `evals/results/` (git-ignored), named by date, time and commit, for example `2026-10-05-0955-c420d96.json`. `--compare <file>` runs the set and prints the per-model deltas against that saved run. Run-to-run variance is real: `miss-ich-klein` passed on 2026-10-02 and missed on 2026-10-05. Use `--repeat 3` before trusting a small delta.
+The default model is `mistral-small3.2:24b`. Each run writes one JSON file to `evals/results/` (git-ignored), named by date, time to the second and commit, for example `2026-10-05-113545-ea862df.json`. `--compare <file>` prints per-model deltas against that saved run, over the cases both runs share; it names the baseline and any case it could not compare. With `--repeat N`, counts are per run and a miss reads "(k/N runs)". The tool exits 2 if every case failed.
+
+**Run-to-run variance is real** (`miss-ich-klein` passed on 2026-10-02 and missed on 2026-10-05), and a single run is not a baseline. **Compare against a `--repeat 3` run, at `--repeat 3`.** On `main` (`ea862df`), three correction runs give: recall 81.1%, over-correction 0.3%, category accuracy 85.3% (not the single run's 88.2%), clean pass 100%. That run's file, `2026-10-05-113545-ea862df.json`, is the baseline to compare against; it is local only, since results are git-ignored.
 
 **The first real run** (2026-10-05, `mistral-small3.2:24b`, 38 correction cases of which 8 are clean, 20 translation cases):
 
@@ -38,18 +40,24 @@ The default model is `mistral-small3.2:24b`. Each run writes one JSON file to `e
 **The golden set was reviewed by the user** on 2026-10-05. Rulings:
 
 - "probiere" and "versuche" are both acceptable.
-- "Use Swiss conventions when generating, but German (Germany) usage in the input is not an error." Two clean cases, `clean-de-brief-komma` and `clean-de-fahrrad-monatsende`, measure this, and both passed. The Correct prompt does not state the rule yet.
+- "Use Swiss conventions when generating, but German (Germany) usage in the input is not an error." Two clean cases, `clean-de-brief-komma` and `clean-de-fahrrad-monatsende`, measure this. The model already obeys it without being told: both pass in every run. Stating it in the prompt was tried and dropped; see the lesson below.
 - The eszett is the one Germany spelling that is always rewritten (FR-TRN-05). The two ß fixes in `eszett-weidenhofstrasse` therefore always pass, so read spelling recall with that in mind.
 
 **Rules for adding a case** (full list in the Task 9 brief): everything is synthetic (invented people and places such as Frau Muster, Otterbach, the Weidenhof school; nothing real, NFR-P8); `wrong` is two or three words, unique in its text; list every acceptable `right`, and never put `wrong` inside a `right`; clean cases are natural Swiss Standard German without eszett; protected `terms` appear verbatim in both `text` and `reference`; references are natural Swiss Standard German or English. `GoldenFilesTests` and `FixtureContentGuardTests` enforce the structure and the content.
 
 **Not verified:** the "Ollama could not be reached" message, because checking it needs Ollama stopped. To check: quit Ollama, run `swift run babelotter-eval --only correct`, and expect that message and exit code 1.
 
+**Lesson: do not give the model example pairs of what it must not change** (measured 2026-10-05, three runs each against `main`). Stating the Germany-usage rule in the Correct prompt made things worse both times it was tried:
+
+- With examples ("Fahrrad and Velo", "Ende des Monats" and "Ende Monat", "a comma after the salutation or none"), the model learned the swap it was told not to make. "Ende des Monats" became "Ende Monat". Naming the salutation drew edits to it: "Sehr geehrter Herr Beispiel" became "Sehr geehrte Frau Beispiel" in 3 of 3 runs, changing a person's gender, which the prompt already forbids. Clean pass fell to 83.3%, category accuracy to 76.5%.
+- Without examples, clean pass stayed at 100%, but category accuracy fell from 85.3% to 78.2%. The extra rule costs the error labelling and buys nothing the model was not already doing, so it was not merged.
+
+A prompt line is not free: every rule competes for the model's attention with the rules already there, and an example is read as an instruction. Add a rule only when a measured case fails without it.
+
 **Next steps.**
 
-1. State the Germany-usage rule in the Correct prompt. Keep the change only if `--compare` shows clean pass at 100% and recall not lower, with over-correction and guard violations not higher.
-2. Work on the five persistent misses, especially the false friends and "helfen" + dative.
-3. Try other installed models with `--models`.
+1. Work on the five persistent misses, especially the false friends and "helfen" + dative. Measure each prompt change at `--repeat 3` against the `--repeat 3` baseline above, and keep it only if clean pass stays at 100%, recall rises, and category accuracy, over-correction and guard violations do not get worse.
+2. Try other installed models with `--models`.
 
 ## Update 2026-10-01: Correct is merged; the evaluation harness is next
 
