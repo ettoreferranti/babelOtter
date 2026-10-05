@@ -1,6 +1,55 @@
-# Handoff — state as of 2026-10-01
+# Handoff — state as of 2026-10-05
 
 Read this first if you are picking babelOtter up in a new session.
+
+## Update 2026-10-05: the evaluation harness is built
+
+**Run it** from the repository root, with Ollama running:
+
+```sh
+swift run -c release babelotter-eval [--models a,b] [--only correct|translate] [--repeat N] [--compare evals/results/<file>.json]
+```
+
+The default model is `mistral-small3.2:24b`. Each run writes one JSON file to `evals/results/` (git-ignored), named by date, time and commit, for example `2026-10-05-0955-c420d96.json`. `--compare <file>` runs the set and prints the per-model deltas against that saved run. Run-to-run variance is real: `miss-ich-klein` passed on 2026-10-02 and missed on 2026-10-05. Use `--repeat 3` before trusting a small delta.
+
+**The first real run** (2026-10-05, `mistral-small3.2:24b`, 38 correction cases of which 8 are clean, 20 translation cases):
+
+| Correction | |
+|---|---|
+| Recall | 81.1% |
+| Over-correction | 0.3% (2 words) |
+| Guard violations | 0 |
+| Category accuracy | 88.2% |
+| Clean pass | 100% |
+| Failures / warnings | 0 / 4 |
+| Latency median / max | 5.8 s / 22.0 s |
+
+| Translation | |
+|---|---|
+| No eszett | 100% |
+| Terms kept | 100% |
+| Structure kept | 100% |
+| chrF | 70.2 |
+| Failures | 0 |
+| Latency median / max | 4.4 s / 7.1 s |
+
+**The 7 misses**, each a genuine model miss (the model left the error or kept the wrong word): `miss-ich-klein` ("ich habe"), `miss-probiere-um-zu` (kept "um"), `eszett-weidenhofstrasse` ("Seit letzte Woche"), `case-helfen-mich` ("du mich" instead of "du mir"), `falsefriend-sensibel` ("sensible Lösung"), `falsefriend-rezept` ("das Rezept" for receipt), `learner-mail-mittwoch` ("die du gefragt hast"). Five persist across runs; the false friends and "helfen" + dative are the most telling.
+
+**The golden set was reviewed by the user** on 2026-10-05. Rulings:
+
+- "probiere" and "versuche" are both acceptable.
+- "Use Swiss conventions when generating, but German (Germany) usage in the input is not an error." Two clean cases, `clean-de-brief-komma` and `clean-de-fahrrad-monatsende`, measure this, and both passed. The Correct prompt does not state the rule yet.
+- The eszett is the one Germany spelling that is always rewritten (FR-TRN-05). The two ß fixes in `eszett-weidenhofstrasse` therefore always pass, so read spelling recall with that in mind.
+
+**Rules for adding a case** (full list in the Task 9 brief): everything is synthetic (invented people and places such as Frau Muster, Otterbach, the Weidenhof school; nothing real, NFR-P8); `wrong` is two or three words, unique in its text; list every acceptable `right`, and never put `wrong` inside a `right`; clean cases are natural Swiss Standard German without eszett; protected `terms` appear verbatim in both `text` and `reference`; references are natural Swiss Standard German or English. `GoldenFilesTests` and `FixtureContentGuardTests` enforce the structure and the content.
+
+**Not verified:** the "Ollama could not be reached" message, because checking it needs Ollama stopped. To check: quit Ollama, run `swift run babelotter-eval --only correct`, and expect that message and exit code 1.
+
+**Next steps.**
+
+1. State the Germany-usage rule in the Correct prompt. Keep the change only if `--compare` shows clean pass at 100% and recall not lower, with over-correction and guard violations not higher.
+2. Work on the five persistent misses, especially the false friends and "helfen" + dative.
+3. Try other installed models with `--models`.
 
 ## Update 2026-10-01: Correct is merged; the evaluation harness is next
 
