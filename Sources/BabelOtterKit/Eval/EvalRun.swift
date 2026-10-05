@@ -61,6 +61,12 @@ public struct EvalRun: Sendable, Equatable, Codable {
         records = try container.decode([CaseRecord].self, forKey: .records)
     }
 
+    /// Whether no case produced a result at all, as when the daemon went
+    /// away: the CLI then exits with a failure status.
+    public var everyCaseFailed: Bool {
+        !records.isEmpty && records.allSatisfy { ($0.correction?.failure ?? $0.translation?.failure) != nil }
+    }
+
     public func encoded() throws -> Data {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
@@ -74,12 +80,12 @@ public struct EvalRun: Sendable, Equatable, Codable {
         return try decoder.decode(EvalRun.self, from: data)
     }
 
-    /// `yyyy-MM-dd-HHmm-<commit>.json`.
+    /// `yyyy-MM-dd-HHmmss-<commit>.json`.
     public static func fileName(startedAt: Date, commit: String, timeZone: TimeZone = .current) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.timeZone = timeZone
-        formatter.dateFormat = "yyyy-MM-dd-HHmm"
+        formatter.dateFormat = "yyyy-MM-dd-HHmmss"
         return "\(formatter.string(from: startedAt))-\(commit).json"
     }
 

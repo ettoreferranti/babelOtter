@@ -80,9 +80,30 @@ struct EvalRunTests {
     @Test("the file name is the start time and the commit")
     func fileName() throws {
         let utc = try #require(TimeZone(identifier: "UTC"))
-        let date = Date(timeIntervalSince1970: 1_790_000_000)  // 2026-09-21 14:13 UTC
+        let date = Date(timeIntervalSince1970: 1_790_000_000)  // 2026-09-21 14:13:20 UTC
         #expect(EvalRun.fileName(startedAt: date, commit: "abc1234", timeZone: utc)
-            == "2026-09-21-1413-abc1234.json")
+            == "2026-09-21-141320-abc1234.json")
+    }
+
+    @Test("a run fails as a whole only when every case failed")
+    func everyCaseFailed() {
+        let failedCorrection = CaseRecord(
+            model: "m", caseID: "a", run: 1, seconds: 1, output: nil, failureDetail: "down",
+            correction: CorrectionScore(
+                caseID: "a", failure: .unreachable, expectedFixes: 1, missedFixes: ["x"],
+                overCorrectedWords: 0, originalWords: 4, guardViolations: [], categoryMatches: 0,
+                unexplainedFixes: 0, cleanPassed: nil, warnings: 0),
+            translation: nil)
+        let failedTranslation = CaseRecord(
+            model: "m", caseID: "t", run: 1, seconds: 1, output: nil, failureDetail: "down",
+            correction: nil,
+            translation: TranslationScore(
+                caseID: "t", failure: .unreachable, esszettAbsent: nil, missingTerms: [],
+                sentinelDebris: false, structureKept: false, chrF: 0))
+        #expect(savedRun([failedCorrection, failedTranslation]).everyCaseFailed)
+        #expect(!savedRun([failedCorrection, translationRecord("m", "t")]).everyCaseFailed)
+        #expect(!savedRun([correctionRecord("m", "a"), failedTranslation]).everyCaseFailed)
+        #expect(!savedRun([]).everyCaseFailed)
     }
 
     @Test("a baseline is rebuilt over only the cases of the current run")

@@ -142,7 +142,7 @@ swift run babelotter-eval [--models a,b] [--only correct|translate|<case-id>,...
 - **Output:**
   - a comparison table, one row per model, with the §4.4 metrics (and deltas under `--compare`);
   - then the misses only, one line each: missed fix, guard violated, mangled term, broken structure, parse failure;
-  - `evals/results/<yyyy-MM-dd-HHmm>-<short-commit>.json` (git-ignored), with every case, output, score and latency.
+  - `evals/results/<yyyy-MM-dd-HHmmss>-<short-commit>.json` (git-ignored), with every case, output, score and latency.
 - **Isolation:** never run in CI. Only the kit's scorer tests and the golden-file validation test run there.
 
 ## 6. Testing

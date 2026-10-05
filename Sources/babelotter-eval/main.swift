@@ -275,3 +275,10 @@ do {
 } catch {
     fail("Could not save the results: \(error)")
 }
+
+// A run in which nothing answered is a failed run, not a report of a
+// weak model.
+if run.everyCaseFailed {
+    FileHandle.standardError.write(Data("Every case failed; see the misses above.\n".utf8))
+    exit(2)
+}
