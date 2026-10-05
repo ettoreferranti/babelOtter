@@ -3,6 +3,31 @@ import Testing
 
 @testable import BabelOtterKit
 
+private func correctionRecord(_ model: String, _ caseID: String, run: Int = 1, seconds: Double = 1, warnings: Int = 0) -> CaseRecord {
+    let score = CorrectionScore(
+        caseID: caseID, failure: nil, expectedFixes: 1, missedFixes: [], overCorrectedWords: 0,
+        originalWords: 4, guardViolations: [], categoryMatches: 1, unexplainedFixes: 0,
+        cleanPassed: nil, warnings: warnings)
+    return CaseRecord(
+        model: model, caseID: caseID, run: run, seconds: seconds, output: nil, failureDetail: nil,
+        correction: score, translation: nil)
+}
+
+private func translationRecord(_ model: String, _ caseID: String, run: Int = 1, chrF: Double = 50) -> CaseRecord {
+    let score = TranslationScore(
+        caseID: caseID, failure: nil, esszettAbsent: true, missingTerms: [], sentinelDebris: false,
+        structureKept: true, chrF: chrF)
+    return CaseRecord(
+        model: model, caseID: caseID, run: run, seconds: 2, output: nil, failureDetail: nil,
+        correction: nil, translation: score)
+}
+
+private func savedRun(repeatCount: Int = 1, _ records: [CaseRecord]) -> EvalRun {
+    EvalRun(
+        startedAt: Date(timeIntervalSince1970: 0), commit: "old", repeatCount: repeatCount,
+        correction: [], translation: [], records: records)
+}
+
 @Suite("Eval: the saved run")
 struct EvalRunTests {
 
@@ -58,5 +83,52 @@ struct EvalRunTests {
         let date = Date(timeIntervalSince1970: 1_790_000_000)  // 2026-09-21 14:13 UTC
         #expect(EvalRun.fileName(startedAt: date, commit: "abc1234", timeZone: utc)
             == "2026-09-21-1413-abc1234.json")
+    }
+
+    @Test("a baseline is rebuilt over only the cases of the current run")
+    func restricted() {
+        let baseline = savedRun(repeatCount: 2, [
+            correctionRecord("m", "a", run: 1, seconds: 1, warnings: 1),
+            correctionRecord("m", "b", run: 1, seconds: 9, warnings: 5),
+            translationRecord("m", "t", run: 1, chrF: 40),
+            translationRecord("m", "u", run: 1, chrF: 0),
+            correctionRecord("m", "a", run: 2, seconds: 3, warnings: 1),
+            correctionRecord("m", "b", run: 2, seconds: 9, warnings: 5),
+            translationRecord("m", "t", run: 2, chrF: 60),
+            translationRecord("m", "u", run: 2, chrF: 0),
+        ])
+        let current = [correctionRecord("m", "a"), translationRecord("m", "t")]
+        let rebuilt = baseline.comparable(to: current)
+        let scoreA = correctionRecord("m", "a", warnings: 1).correction
+        #expect(rebuilt.correction == [CorrectionSummary(
+            model: "m", scores: [scoreA, scoreA].compactMap { $0 }, seconds: [1, 3], runs: 2)])
+        #expect(rebuilt.correction.first?.metrics.first { $0.name == "warnings" }?.value == 1)
+        #expect(rebuilt.correction.first?.latency == Latency(median: 2, max: 3))
+        #expect(rebuilt.translation.first?.meanChrF == 50)
+        #expect(rebuilt.translation.first?.runs == 2)
+        #expect(rebuilt.missing.isEmpty)
+    }
+
+    @Test("current cases the baseline lacks are named, per model")
+    func missingCase() {
+        let baseline = savedRun([correctionRecord("m", "a"), correctionRecord("n", "a")])
+        let current = [
+            correctionRecord("m", "a"), correctionRecord("m", "new"), translationRecord("m", "t"),
+            correctionRecord("n", "a"),
+        ]
+        let rebuilt = baseline.comparable(to: current)
+        #expect(rebuilt.missing == ["m": ["new", "t"]])
+        #expect(rebuilt.correction.map(\.model) == ["m", "n"])
+        #expect(rebuilt.correction.map(\.cases) == [1, 1])
+        #expect(rebuilt.translation.isEmpty)
+    }
+
+    @Test("a model the baseline lacks gets no baseline summary and all its cases are named")
+    func missingModel() {
+        let baseline = savedRun([correctionRecord("m", "a")])
+        let current = [correctionRecord("m", "a"), correctionRecord("x", "a"), correctionRecord("x", "a", run: 2)]
+        let rebuilt = baseline.comparable(to: current)
+        #expect(rebuilt.correction.map(\.model) == ["m"])
+        #expect(rebuilt.missing == ["x": ["a"]])
     }
 }

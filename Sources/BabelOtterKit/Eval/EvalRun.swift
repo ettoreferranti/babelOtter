@@ -82,4 +82,51 @@ public struct EvalRun: Sendable, Equatable, Codable {
         formatter.dateFormat = "yyyy-MM-dd-HHmm"
         return "\(formatter.string(from: startedAt))-\(commit).json"
     }
+
+    /// This run's summaries rebuilt from its records, over only the
+    /// (model, case) pairs of `current`, so `--compare` compares like with
+    /// like when the earlier run covered other cases. A model this run has
+    /// no record of gets no summary.
+    public func comparable(to current: [CaseRecord]) -> EvalBaseline {
+        var models: [String] = []
+        for record in current where !models.contains(record.model) {
+            models.append(record.model)
+        }
+        var correction: [CorrectionSummary] = []
+        var translation: [TranslationSummary] = []
+        var missing: [String: [String]] = [:]
+        for model in models {
+            let wanted = Set(current.filter { $0.model == model }.map(\.caseID))
+            let earlier = records.filter { $0.model == model && wanted.contains($0.caseID) }
+            let corrections = earlier.filter { $0.correction != nil }
+            if !corrections.isEmpty {
+                correction.append(CorrectionSummary(
+                    model: model, scores: corrections.compactMap(\.correction),
+                    seconds: corrections.map(\.seconds), runs: repeatCount))
+            }
+            let translations = earlier.filter { $0.translation != nil }
+            if !translations.isEmpty {
+                translation.append(TranslationSummary(
+                    model: model, scores: translations.compactMap(\.translation),
+                    seconds: translations.map(\.seconds), runs: repeatCount))
+            }
+            let known = Set(earlier.map(\.caseID))
+            var absent: [String] = []
+            for record in current where record.model == model && !known.contains(record.caseID)
+                && !absent.contains(record.caseID) {
+                absent.append(record.caseID)
+            }
+            if !absent.isEmpty { missing[model] = absent }
+        }
+        return EvalBaseline(correction: correction, translation: translation, missing: missing)
+    }
+}
+
+/// An earlier run made comparable with the current one.
+public struct EvalBaseline: Sendable, Equatable {
+    public let correction: [CorrectionSummary]
+    public let translation: [TranslationSummary]
+    /// Per model, the current run's case ids the earlier run has no record
+    /// of, in the current run's order. Models with none are left out.
+    public let missing: [String: [String]]
 }

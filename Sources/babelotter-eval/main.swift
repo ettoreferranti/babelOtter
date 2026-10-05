@@ -231,14 +231,30 @@ for model in models {
 
 // MARK: - Report
 
+// The baseline is rebuilt over this run's cases only, so an --only run or a
+// golden set that has changed since is still compared like with like.
+let comparable = baseline?.comparable(to: records)
+if let path = arguments.compare, let baseline, let comparable {
+    let when = DateFormatter()
+    when.locale = Locale(identifier: "en_US_POSIX")
+    when.dateFormat = "yyyy-MM-dd HH:mm"
+    notes.append("Compared with \(path) (commit \(baseline.commit), \(when.string(from: baseline.startedAt)))")
+    for model in models {
+        guard let absent = comparable.missing[model] else { continue }
+        notes.append(
+            "\(model): not in the baseline, so not compared: \(absent.joined(separator: ", "))"
+                + " (they still count in this run's column)")
+    }
+}
+
 print("")
 for note in notes { print(note) }
 if !correctionSummaries.isEmpty {
-    print(EvalReport.table("Correction", correctionSummaries, baseline: baseline?.correction ?? []))
+    print(EvalReport.table("Correction", correctionSummaries, baseline: comparable?.correction ?? []))
     print("")
 }
 if !translationSummaries.isEmpty {
-    print(EvalReport.table("Translation", translationSummaries, baseline: baseline?.translation ?? []))
+    print(EvalReport.table("Translation", translationSummaries, baseline: comparable?.translation ?? []))
     print("")
 }
 if !misses.isEmpty {
