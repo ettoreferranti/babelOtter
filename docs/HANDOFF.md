@@ -1,6 +1,98 @@
-# Handoff — state as of 2026-09-29
+# Handoff — state as of 2026-10-05
 
 Read this first if you are picking babelOtter up in a new session.
+
+## Update 2026-10-05: the evaluation harness is built
+
+**Run it** from the repository root, with Ollama running:
+
+```sh
+swift run -c release babelotter-eval [--models a,b] [--only correct|translate] [--repeat N] [--compare evals/results/<file>.json]
+```
+
+The default model is `mistral-small3.2:24b`. Each run writes one JSON file to `evals/results/` (git-ignored), named by date, time and commit, for example `2026-10-05-0955-c420d96.json`. `--compare <file>` runs the set and prints the per-model deltas against that saved run. Run-to-run variance is real: `miss-ich-klein` passed on 2026-10-02 and missed on 2026-10-05. Use `--repeat 3` before trusting a small delta.
+
+**The first real run** (2026-10-05, `mistral-small3.2:24b`, 38 correction cases of which 8 are clean, 20 translation cases):
+
+| Correction | |
+|---|---|
+| Recall | 81.1% |
+| Over-correction | 0.3% (2 words) |
+| Guard violations | 0 |
+| Category accuracy | 88.2% |
+| Clean pass | 100% |
+| Failures / warnings | 0 / 4 |
+| Latency median / max | 5.8 s / 22.0 s |
+
+| Translation | |
+|---|---|
+| No eszett | 100% |
+| Terms kept | 100% |
+| Structure kept | 100% |
+| chrF | 70.2 |
+| Failures | 0 |
+| Latency median / max | 4.4 s / 7.1 s |
+
+**The 7 misses**, each a genuine model miss (the model left the error or kept the wrong word): `miss-ich-klein` ("ich habe"), `miss-probiere-um-zu` (kept "um"), `eszett-weidenhofstrasse` ("Seit letzte Woche"), `case-helfen-mich` ("du mich" instead of "du mir"), `falsefriend-sensibel` ("sensible Lösung"), `falsefriend-rezept` ("das Rezept" for receipt), `learner-mail-mittwoch` ("die du gefragt hast"). Five persist across runs; the false friends and "helfen" + dative are the most telling.
+
+**The golden set was reviewed by the user** on 2026-10-05. Rulings:
+
+- "probiere" and "versuche" are both acceptable.
+- "Use Swiss conventions when generating, but German (Germany) usage in the input is not an error." Two clean cases, `clean-de-brief-komma` and `clean-de-fahrrad-monatsende`, measure this, and both passed. The Correct prompt does not state the rule yet.
+- The eszett is the one Germany spelling that is always rewritten (FR-TRN-05). The two ß fixes in `eszett-weidenhofstrasse` therefore always pass, so read spelling recall with that in mind.
+
+**Rules for adding a case** (full list in the Task 9 brief): everything is synthetic (invented people and places such as Frau Muster, Otterbach, the Weidenhof school; nothing real, NFR-P8); `wrong` is two or three words, unique in its text; list every acceptable `right`, and never put `wrong` inside a `right`; clean cases are natural Swiss Standard German without eszett; protected `terms` appear verbatim in both `text` and `reference`; references are natural Swiss Standard German or English. `GoldenFilesTests` and `FixtureContentGuardTests` enforce the structure and the content.
+
+**Not verified:** the "Ollama could not be reached" message, because checking it needs Ollama stopped. To check: quit Ollama, run `swift run babelotter-eval --only correct`, and expect that message and exit code 1.
+
+**Next steps.**
+
+1. State the Germany-usage rule in the Correct prompt. Keep the change only if `--compare` shows clean pass at 100% and recall not lower, with over-correction and guard violations not higher.
+2. Work on the five persistent misses, especially the false friends and "helfen" + dative.
+3. Try other installed models with `--models`.
+
+## Update 2026-10-01: Correct is merged; the evaluation harness is next
+
+**Start here on a new machine.**
+
+```sh
+git fetch && git checkout feat/eval-harness   # the active branch
+swift test                                    # 487 tests, all green
+Tools/make-app.sh --run                       # needs the "babelOtter Dev" signing identity
+ollama pull mistral-small3.2:24b              # the default model, about 15 GB
+```
+
+On a new Mac, create the signing identity once: Keychain Access, then Certificate Assistant, then Create a Certificate. Name it `babelOtter Dev`, with identity type *Self Signed Root* and certificate type *Code Signing*. Without it, `make-app.sh` signs ad hoc, and Accessibility has to be granted again after every build.
+
+**Where things stand.**
+
+- **On `main`:** Translate (Control-Option-T), the audience picker and instruction field, and **Correct (Control-Option-C)**, merged as #88 (`6564c30`). CI is green, including the mutation gate at 82.0%.
+  - That score is honest. Of 133 mutants, the 24 that muter reports as surviving were each planted by hand and are killed by the suite: muter reports mutants inside closures and nested loops without ever inserting them. Six real survivors were found that way and killed with new tests.
+  - Issues #40, #62, #63 and #64 are closed, as are epics #9 and #5.
+- **Merged 2026-10-02:** PR **#87**, the guard that keeps a hidden popup from taking keyboard focus plus the muter-artefact correction, and PR **#89**, the 2026-09-21 capture readings in `docs/architecture.md` section 7 (Word can read on tier 1 when its focus is a text area). Both are merged into this branch; every other branch is deleted.
+- **After pulling app changes, rebuild:** `Tools/make-app.sh --run`. A stale `build/babelOtter.app` from before #88 looked like "Control-Option-C does nothing" on 2026-10-02.
+- **Active branch: `feat/eval-harness`**, already merged with `main`. It holds only the approved design so far: `docs/superpowers/specs/2026-09-30-eval-harness-design.md` (#74, #75, #76).
+
+**What changed in Correct after manual testing, and why** (all on `main`):
+
+- **Explanations name the real rule.** The model had explained a correct fix as "the gender of the pronoun *du*", and *du* has no gender.
+- **The timeout fires on 60 s of silence, not 60 s in total.** Five short paragraphs took 59.9 s while streaming the whole time. Translate and Correct now emit a `progress` event for every piece of text the model sends.
+- **The error list is read leniently.** One reply in three named two categories ("word order|spelling", copying the schema's own notation) or padded the list with empty items. The text that gets pasted is still read strictly.
+- **The prompt keeps the author's meaning.** "mit der Kollege" had become "mit der Kollegin", turning a male colleague into a female one. It now becomes "mit dem Kollegen".
+
+**Known limits, which motivate the harness.** On a learner text, the 24B model fixes spelling and some word order. It misses a lowercase "ich" at the start, "eine Sätze", "in Deutsch" (should be "auf Deutsch") and "probiere … um … zu". Its reason for one word-order fix is also off. A gender-gap `_r` appeared once during manual testing and never reproduced.
+
+**Next steps, in order.**
+
+1. Write the implementation plan for the harness from its spec, with the writing-plans skill.
+2. Draft the golden set (`Evals/golden/correction.json`, about 30 cases, and `translation.json`, about 20). All cases must be synthetic: invented names, nothing real. **The user reviews the set before it is committed.**
+3. Build it the same way as Correct: kit scorers test-first, then the thin `babelotter-eval` CLI, then one real run on the local model.
+
+**Working conventions that saved time this round.**
+
+- Before writing a test to kill a muter survivor, plant the mutant by hand at muter's reported line and column. Most survivors are artefacts.
+- Check live-model behaviour with a temporary test under `Tests/BabelOtterKitTests/Integration/`, gated by `BABELOTTER_INTEGRATION=1`, and delete it afterwards. Never commit one.
+- Wall-clock assertions are skipped under muter: test `IS_MUTER_RUNNING`.
 
 ## Update 2026-09-29: Correct is built; the live model check passes, the manual ones don't yet
 

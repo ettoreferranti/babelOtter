@@ -1,0 +1,136 @@
+[
+  {
+    "id": "en-de-strasse-buero",
+    "text": "The new office in Otterbach is on a large street just outside the old town.",
+    "direction": "en-de-ch",
+    "terms": ["Otterbach"],
+    "reference": "Das neue Büro in Otterbach liegt an einer grossen Strasse gleich ausserhalb der Altstadt."
+  },
+  {
+    "id": "en-de-velo-eingang",
+    "text": "Please do not leave your bike outside the main entrance. There is a large bike stand behind the gym.",
+    "direction": "en-de-ch",
+    "profile": "students",
+    "reference": "Bitte stellen Sie Ihr Velo nicht vor dem Haupteingang ab. Hinter der Turnhalle steht ein grosser Veloständer."
+  },
+  {
+    "id": "en-de-brief-anmeldung",
+    "text": "Dear Mr Beispiel\n\nThank you for your registration. We will send you the course documents by the end of next week.\n\nKind regards\nNina Muster",
+    "direction": "en-de-ch",
+    "profile": "administration",
+    "reference": "Sehr geehrter Herr Beispiel\n\nVielen Dank für Ihre Anmeldung. Wir senden Ihnen die Kursunterlagen bis Ende nächster Woche.\n\nFreundliche Grüsse\nNina Muster"
+  },
+  {
+    "id": "en-de-liste-exkursion",
+    "text": "For the excursion on Friday, please bring:\n- a packed lunch\n- sturdy shoes\n- a rain jacket\n- your student ID",
+    "direction": "en-de-ch",
+    "profile": "students",
+    "reference": "Bitte nehmen Sie für die Exkursion am Freitag Folgendes mit:\n- ein Picknick\n- feste Schuhe\n- eine Regenjacke\n- Ihren Studierendenausweis"
+  },
+  {
+    "id": "en-de-folien",
+    "text": "Could you send me the slides from yesterday's meeting? I'd like to look at them again before the workshop.",
+    "direction": "en-de-ch",
+    "reference": "Kannst du mir die Folien von der gestrigen Sitzung schicken? Ich möchte sie mir vor dem Workshop noch einmal anschauen."
+  },
+  {
+    "id": "en-de-draussen-terrasse",
+    "text": "If it stays dry, we'll eat outside on the big terrace on Saturday.",
+    "direction": "en-de-ch",
+    "profile": "informal",
+    "reference": "Wenn es trocken bleibt, essen wir am Samstag draussen auf der grossen Terrasse."
+  },
+  {
+    "id": "en-de-weidenhof-geschlossen",
+    "text": "The Weidenhof school is closed on Monday because of a staff training day.",
+    "direction": "en-de-ch",
+    "terms": ["Weidenhof"],
+    "reference": "Die Schule Weidenhof bleibt am Montag wegen eines Weiterbildungstags für das Personal geschlossen."
+  },
+  {
+    "id": "en-de-spaete-antwort",
+    "text": "Sorry for the late reply. I was away for a few days and only saw your message today.",
+    "direction": "en-de-ch",
+    "reference": "Entschuldige die späte Antwort. Ich war ein paar Tage weg und habe deine Nachricht erst heute gesehen."
+  },
+  {
+    "id": "en-de-frist-formular",
+    "text": "Please submit the completed form by 15 March at the latest. Late submissions cannot be considered.",
+    "direction": "en-de-ch",
+    "profile": "administration",
+    "reference": "Bitte reichen Sie das ausgefüllte Formular bis spätestens 15. März ein. Verspätete Eingaben können nicht berücksichtigt werden."
+  },
+  {
+    "id": "en-de-liste-buero-verlassen",
+    "text": "Before you leave the office:\n- switch off the lights\n- close the windows\n- lock the door",
+    "direction": "en-de-ch",
+    "reference": "Bevor du das Büro verlässt:\n- das Licht ausschalten\n- die Fenster schliessen\n- die Tür abschliessen"
+  },
+  {
+    "id": "de-en-sitzung-verschoben",
+    "text": "Die Sitzung von morgen wird auf Donnerstag verschoben, weil Frau Muster krank ist.",
+    "direction": "de-ch-en",
+    "reference": "Tomorrow's meeting has been moved to Thursday because Ms Muster is ill."
+  },
+  {
+    "id": "de-en-velo-otterbach",
+    "text": "Wer mit dem Velo nach Otterbach fährt, kann es beim Bahnhof gratis abstellen.",
+    "direction": "de-ch-en",
+    "terms": ["Otterbach"],
+    "reference": "Anyone cycling to Otterbach can park their bike at the station for free."
+  },
+  {
+    "id": "de-en-liste-unterlagen",
+    "text": "Für die Anmeldung brauchen wir folgende Unterlagen:\n- eine Kopie Ihres Ausweises\n- Ihren Lebenslauf\n- ein aktuelles Foto",
+    "direction": "de-ch-en",
+    "profile": "administration",
+    "reference": "For registration, we need the following documents:\n- a copy of your ID\n- your CV\n- a recent photo"
+  },
+  {
+    "id": "de-en-dank-umzug",
+    "text": "Liebe Lea\n\nVielen Dank für deine Hilfe beim Umzug am Samstag. Ohne dich hätten wir es nicht geschafft.\n\nNächste Woche lade ich dich zum Abendessen ein.\n\nLiebe Grüsse\nNina",
+    "direction": "de-ch-en",
+    "profile": "informal",
+    "reference": "Dear Lea\n\nThank you so much for your help with the move on Saturday. We couldn't have done it without you.\n\nNext week I'm taking you out for dinner.\n\nBest wishes\nNina"
+  },
+  {
+    "id": "de-en-rueckmeldung-arbeit",
+    "text": "Ihre Arbeit ist gut strukturiert. Achten Sie beim nächsten Text aber besser auf die Quellenangaben.",
+    "direction": "de-ch-en",
+    "profile": "students",
+    "reference": "Your paper is well structured. In your next piece of work, however, pay closer attention to your references."
+  },
+  {
+    "id": "de-en-austausch-riverside",
+    "text": "Der Austausch mit unserer Partnerschule in Riverside findet dieses Jahr im Mai statt.",
+    "direction": "de-ch-en",
+    "terms": ["Riverside"],
+    "reference": "This year the exchange with our partner school in Riverside will take place in May."
+  },
+  {
+    "id": "de-en-strasse-gesperrt",
+    "text": "Die Strasse vor dem Schulhaus ist ab Montag wegen Bauarbeiten gesperrt.",
+    "direction": "de-ch-en",
+    "reference": "The street in front of the school building will be closed from Monday because of construction work."
+  },
+  {
+    "id": "de-en-liste-traktanden",
+    "text": "Traktanden für die Sitzung vom Dienstag:\n- Budget 2027\n- neue Stundenpläne\n- Verschiedenes",
+    "direction": "de-ch-en",
+    "reference": "Agenda for Tuesday's meeting:\n- 2027 budget\n- new timetables\n- any other business"
+  },
+  {
+    "id": "de-en-sommerfest-weidenhof",
+    "text": "Liebe Eltern\n\nAm Freitag, 14. Juni, feiert die Schule Weidenhof ihr Sommerfest. Wir freuen uns auf viele Besucherinnen und Besucher.\n\nBei schlechtem Wetter findet das Fest in der Turnhalle statt.",
+    "direction": "de-ch-en",
+    "terms": ["Weidenhof"],
+    "reference": "Dear parents\n\nOn Friday, 14 June, the Weidenhof school is holding its summer party. We look forward to welcoming many visitors.\n\nIf the weather is bad, the party will take place in the gym."
+  },
+  {
+    "id": "de-en-see-sonntag",
+    "text": "Hast du Lust, am Sonntag mit uns an den See zu kommen? Jonas bringt den Grill mit.",
+    "direction": "de-ch-en",
+    "profile": "informal",
+    "reference": "Do you fancy coming to the lake with us on Sunday? Jonas is bringing the barbecue."
+  }
+]
