@@ -38,6 +38,12 @@ struct EvalReportTests {
         #expect(EvalReport.signedChange(value, .count) == change)
     }
 
+    @Test("no change in a count is +0")
+    func zeroCountChange() {
+        #expect(EvalReport.signedChange(0, .count) == "+0")
+        #expect(EvalReport.signedChange(-0.01, .count) == "+0")
+    }
+
     @Test("repeated misses are listed once with the runs they occurred in")
     func collapsedMisses() {
         let runs = [["m  a: x", "m  b: y"], ["m  b: y", "m  c: z"], ["m  b: y"]]

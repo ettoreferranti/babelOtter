@@ -31,6 +31,11 @@ struct EvalArgumentsTests {
         #expect(parsed.compare == "evals/results/x.json")
     }
 
+    @Test("--repeat 1 is accepted")
+    func repeatOnce() throws {
+        #expect(try EvalArguments.parse(["--repeat", "1"]).repeatCount == 1)
+    }
+
     @Test("--only takes an action name")
     func onlyAction() throws {
         #expect(try EvalArguments.parse(["--only", "correct"]).selection == .correctionOnly)
