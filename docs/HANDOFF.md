@@ -12,7 +12,7 @@ swift run -c release babelotter-eval [--models a,b] [--only correct|translate|<c
 
 The default model is `mistral-small3.2:24b`. Each run writes one JSON file to `evals/results/` (git-ignored), named by date, time to the second and commit, for example `2026-10-05-113545-ea862df.json`. `--compare <file>` prints per-model deltas against that saved run, over the cases both runs share; it names the baseline and any case it could not compare. With `--repeat N`, counts are per run and a miss reads "(k/N runs)". The tool exits 2 if every case failed.
 
-**Run-to-run variance is real** (`miss-ich-klein` passed on 2026-10-02 and missed on 2026-10-05), and a single run is not a baseline. **Compare against a `--repeat 3` run, at `--repeat 3`.** On `main` (`ea862df`), three correction runs give: recall 81.1%, over-correction 0.3%, category accuracy 85.3% (not the single run's 88.2%), clean pass 100%. That run's file, `2026-10-05-113545-ea862df.json`, is the baseline to compare against; it is local only, since results are git-ignored.
+**Run-to-run variance is real** (`miss-ich-klein` passed on 2026-10-02 and missed on 2026-10-05), and a single run is not a baseline. **Compare against a `--repeat 3` run, at `--repeat 3`.** Before the false-friend rule (`ea862df`), three correction runs gave: recall 81.1%, over-correction 0.3%, category accuracy 85.3% (not the single run's 88.2%), clean pass 100% (`2026-10-05-113545-ea862df.json`). **With the false-friend rule** (below), the current baseline is recall 87.5%, over-correction 0.4%, category accuracy 81.3%, clean pass 100%, guard violations 0 (`2026-10-05-133719-b59d4c7-dirty.json`; "dirty" only because a throwaway probe test was in the tree). Results are git-ignored, so both files are local only; re-run `main` at `--repeat 3` on another machine.
 
 **The first real run** (2026-10-05, `mistral-small3.2:24b`, 38 correction cases of which 8 are clean, 20 translation cases):
 
@@ -54,10 +54,33 @@ The default model is `mistral-small3.2:24b`. Each run writes one JSON file to `e
 
 A prompt line is not free: every rule competes for the model's attention with the rules already there, and an example is read as an instruction. Add a rule only when a measured case fails without it.
 
+**The false-friend rule is kept** (2026-10-05). The Correct prompt now says the author often thinks in English, so each word's meaning is checked in context, and a German word used with the meaning of a similar English word is an error. It names no example and no category:
+
+- **First wording**, which said "an error of category false friend": recall 81.1% to 87.8%, but category accuracy 85.3% to 79.6%. Naming a category inside the instruction shifted other labels; gender and agreement fixes came back as "case".
+- **Kept wording**, with no category named: recall 87.5%, category accuracy 81.3%, clean pass 100%, over-correction 0.4%, guard violations 0.
+  - "das Rezept" (receipt) is now fixed in 3/3 runs.
+  - "probiere ... um ... zu" is fixed in 2/3, and "warten für den Bus" in 1/3.
+  - "sensible Lösung" is still missed in 3/3.
+  - Five previously right labels now come back as another category, mostly "case"; "Der Sitzung" is arguable either way.
+
+The user ruled on 2026-10-05 that the corrected text, which Replace pastes, matters more than the category chip.
+
+**The keep test for a prompt change** (user ruling, 2026-10-05), measured at `--repeat 3` against a `--repeat 3` baseline:
+1. Clean pass stays at 100%.
+2. Guard violations stay at 0.
+3. Recall rises, and over-correction does not.
+4. Category accuracy may dip slightly when recall rises clearly; say so in the PR and let the user decide.
+5. Never name example words from the golden set in the prompt: that teaches the test, not German.
+
 **Next steps.**
 
-1. Work on the five persistent misses, especially the false friends and "helfen" + dative. Measure each prompt change at `--repeat 3` against the `--repeat 3` baseline above, and keep it only if clean pass stays at 100%, recall rises, and category accuracy, over-correction and guard violations do not get worse.
-2. Try other installed models with `--models`.
+1. The remaining persistent misses:
+   - "sensible Lösung" (false friend);
+   - "du mich ... helfen" (helfen takes the dative);
+   - "Seit letzte Woche" (seit takes the dative);
+   - "die du gefragt hast" (missing nach).
+   Two of the four are dative after a verb or preposition, so that is a shared target.
+2. Try other installed models with `--models`. Category labels in particular may be a model limit, not a prompt one.
 
 ## Update 2026-10-01: Correct is merged; the evaluation harness is next
 
