@@ -45,7 +45,7 @@ The default model is `mistral-small3.2:24b`. Each run writes one JSON file to `e
 
 **Rules for adding a case** (full list in the Task 9 brief): everything is synthetic (invented people and places such as Frau Muster, Otterbach, the Weidenhof school; nothing real, NFR-P8); `wrong` is two or three words, unique in its text; list every acceptable `right`, and never put `wrong` inside a `right`; clean cases are natural Swiss Standard German without eszett; protected `terms` appear verbatim in both `text` and `reference`; references are natural Swiss Standard German or English. `GoldenFilesTests` and `FixtureContentGuardTests` enforce the structure and the content.
 
-**Not verified:** the "Ollama could not be reached" message, because checking it needs Ollama stopped. To check: quit Ollama, run `swift run babelotter-eval --only correct`, and expect that message and exit code 1.
+**Verified by the user, 2026-10-05:** with Ollama stopped, `swift run babelotter-eval --only correct` prints "Ollama could not be reached on 127.0.0.1:11434. Start it with `ollama serve` and try again." and exits 1.
 
 **Lesson: do not give the model example pairs of what it must not change** (measured 2026-10-05, three runs each against `main`). Stating the Germany-usage rule in the Correct prompt made things worse both times it was tried:
 
