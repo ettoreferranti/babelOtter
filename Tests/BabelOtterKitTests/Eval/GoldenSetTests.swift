@@ -103,6 +103,27 @@ struct GoldenSetTests {
         #expect(error?.file == "translation.json")
     }
 
+    @Test("an unknown key in a case is an error, never a silent default")
+    func unknownCaseKey() {
+        let error = correctionError(#"{"id": "a", "text": "Hallo.", "profle": "colleagues", "fixes": [], "clean": true}"#)
+        #expect(error == GoldenSetError(
+            file: "correction.json", caseID: "a", field: "profle", reason: "is not a known field"))
+        let translation = translationError(#"{"id": "t", "text": "Hi.", "direction": "en-de-ch", "reference": "Hallo.", "refrence": "x"}"#)
+        #expect(translation == GoldenSetError(
+            file: "translation.json", caseID: "t", field: "refrence", reason: "is not a known field"))
+    }
+
+    @Test("an unknown key in a fix is an error naming the fix")
+    func unknownFixKey() {
+        let error = correctionError("""
+            {"id": "a", "text": "Ich bin jetz da.",
+             "fixes": [{"wrong": "jetz", "right": ["jetzt"], "category": "spelling"},
+                       {"wrong": "bin", "right": ["war"], "category": "agreement", "mustnot": ["x"]}]}
+            """)
+        #expect(error == GoldenSetError(
+            file: "correction.json", caseID: "a", field: "fixes[1].mustnot", reason: "is not a known field"))
+    }
+
     @Test("ids are unique across both files")
     func duplicateAcrossFiles() {
         #expect(throws: GoldenSetError.self) {

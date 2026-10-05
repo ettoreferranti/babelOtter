@@ -79,8 +79,9 @@ public struct GoldenSet: Sendable, Equatable {
     static let knownProfiles = Set(AudienceProfile.shippedDefaults.map(\.id))
 
     public static func load(correction: Data, translation: Data) throws -> GoldenSet {
-        let rawCorrection = try decode([RawCorrectionCase].self, correction, file: correctionFile)
-        let rawTranslation = try decode([RawTranslationCase].self, translation, file: translationFile)
+        let rawCorrection = try decode([Checked<RawCorrectionCase>].self, correction, file: correctionFile).map(\.raw)
+        let rawTranslation = try decode([Checked<RawTranslationCase>].self, translation, file: translationFile)
+            .map(\.raw)
         var ids: Set<String> = []
         var corrections: [CorrectionCase] = []
         for raw in rawCorrection {
@@ -95,23 +96,26 @@ public struct GoldenSet: Sendable, Equatable {
 
     // MARK: - Decoding
 
-    private struct RawFix: Decodable {
+    private struct RawFix: KnownFields {
+        static let fields: Set<String> = ["wrong", "right", "category"]
         let wrong: String
         let right: [String]
         let category: String
     }
 
-    private struct RawCorrectionCase: Decodable {
+    private struct RawCorrectionCase: KnownFields {
+        static let fields: Set<String> = ["id", "text", "profile", "terms", "fixes", "mustNot", "clean"]
         let id: String
         let text: String
         let profile: String?
         let terms: [String]?
-        let fixes: [RawFix]
+        let fixes: [Checked<RawFix>]
         let mustNot: [String]?
         let clean: Bool?
     }
 
-    private struct RawTranslationCase: Decodable {
+    private struct RawTranslationCase: KnownFields {
+        static let fields: Set<String> = ["id", "text", "direction", "profile", "terms", "reference"]
         let id: String
         let text: String
         let direction: String
@@ -123,6 +127,8 @@ public struct GoldenSet: Sendable, Equatable {
     private static func decode<T: Decodable>(_ type: T.Type, _ data: Data, file: String) throws -> T {
         do {
             return try JSONDecoder().decode(type, from: data)
+        } catch let unknown as UnknownField {
+            throw GoldenSetError(file: file, caseID: unknown.caseID, field: unknown.field, reason: "is not a known field")
         } catch {
             throw GoldenSetError(file: file, caseID: nil, field: "json", reason: String(describing: error))
         }
@@ -141,7 +147,7 @@ public struct GoldenSet: Sendable, Equatable {
         try checkTerms(terms, occurIn: raw.text, fail: fail)
         var fixes: [ExpectedFix] = []
         for (index, fix) in raw.fixes.enumerated() {
-            fixes.append(try validated(fix, field: "fixes[\(index)]", text: raw.text, fail: fail))
+            fixes.append(try validated(fix.raw, field: "fixes[\(index)]", text: raw.text, fail: fail))
         }
         let mustNot = raw.mustNot ?? []
         for (index, phrase) in mustNot.enumerated() {
@@ -218,5 +224,71 @@ public struct GoldenSet: Sendable, Equatable {
                 throw fail("terms[\(index)]", "\"\(term)\" does not occur in the text it protects")
             }
         }
+    }
+}
+
+// MARK: - Unknown keys
+
+/// A decoded golden-file object that names the keys it accepts, so a typo
+/// such as "profle" is an error rather than a silent default.
+private protocol KnownFields: Decodable {
+    static var fields: Set<String> { get }
+}
+
+private struct AnyKey: CodingKey {
+    let stringValue: String
+    let intValue: Int?
+
+    init(stringValue: String) {
+        self.stringValue = stringValue
+        intValue = nil
+    }
+
+    init?(intValue: Int) {
+        stringValue = String(intValue)
+        self.intValue = intValue
+    }
+}
+
+private struct UnknownField: Error {
+    let caseID: String?
+    let field: String
+}
+
+/// Decodes `Raw` after checking every key of its object against
+/// `Raw.fields`. An unknown key inside a nested object (a fix) is reported
+/// with the enclosing case's id and its path, such as `fixes[1].mustnot`.
+private struct Checked<Raw: KnownFields>: Decodable {
+    let raw: Raw
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: AnyKey.self)
+        let unknown = container.allKeys.map(\.stringValue).filter { !Raw.fields.contains($0) }.sorted()
+        // A fix has no id of its own; the enclosing case adds it below.
+        var caseID: String?
+        if Raw.fields.contains("id") {
+            caseID = try? container.decodeIfPresent(String.self, forKey: AnyKey(stringValue: "id"))
+        }
+        if let key = unknown.first {
+            throw UnknownField(caseID: caseID, field: Self.path(decoder.codingPath) + key)
+        }
+        do {
+            raw = try Raw(from: decoder)
+        } catch let nested as UnknownField where nested.caseID == nil {
+            throw UnknownField(caseID: caseID, field: nested.field)
+        }
+    }
+
+    /// The path below the top-level array: `fixes[1].` for a fix, empty for a case.
+    private static func path(_ codingPath: [any CodingKey]) -> String {
+        var text = ""
+        for key in codingPath.dropFirst() {
+            if let index = key.intValue {
+                text += "[\(index)]"
+            } else {
+                text += (text.isEmpty ? "" : ".") + key.stringValue
+            }
+        }
+        return text.isEmpty ? "" : text + "."
     }
 }
