@@ -1,0 +1,311 @@
+[
+  {
+    "id": "miss-ich-klein",
+    "text": "Letzte Woche war ich zum ersten Mal in Otterbach. ich habe dort eine alte Freundin besucht.",
+    "fixes": [
+      { "wrong": "ich habe", "right": ["Ich habe"], "category": "spelling" }
+    ]
+  },
+  {
+    "id": "miss-eine-saetze",
+    "text": "Jeden Abend schreibe ich eine Sätze über meinen Tag in ein kleines Heft.",
+    "fixes": [
+      { "wrong": "eine Sätze", "right": ["einige Sätze", "ein paar Sätze", "ein, zwei Sätze", "mehrere Sätze", "einen Satz"], "category": "agreement" }
+    ]
+  },
+  {
+    "id": "miss-in-deutsch",
+    "text": "Seit dem Sommer schreibe ich alle E-Mails an meine Nachbarn in Deutsch.",
+    "fixes": [
+      { "wrong": "in Deutsch", "right": ["auf Deutsch"], "category": "preposition" }
+    ]
+  },
+  {
+    "id": "miss-probiere-um-zu",
+    "text": "Ich probiere jeden Tag um mit meinen Kindern Deutsch zu sprechen.",
+    "fixes": [
+      {
+        "wrong": "probiere jeden Tag um mit",
+        "right": [
+          "versuche jeden Tag, mit", "versuche jeden Tag mit", "versuche, jeden Tag mit",
+          "probiere jeden Tag, mit", "probiere jeden Tag mit", "probiere, jeden Tag mit"
+        ],
+        "category": "other"
+      }
+    ]
+  },
+  {
+    "id": "guard-kollege",
+    "text": "Heute Morgen habe ich mit der Kollege aus der Buchhaltung über das Budget gesprochen.",
+    "fixes": [
+      { "wrong": "mit der Kollege", "right": ["mit dem Kollegen"], "category": "case" }
+    ],
+    "mustNot": ["Kollegin"]
+  },
+  {
+    "id": "eszett-weidenhofstrasse",
+    "text": "Das neue Büro liegt an der Weidenhofstraße, gleich neben dem großen Parkplatz. Seit letzte Woche arbeiten wir dort.",
+    "fixes": [
+      { "wrong": "Weidenhofstraße", "right": ["Weidenhofstrasse"], "category": "spelling" },
+      { "wrong": "großen Parkplatz", "right": ["grossen Parkplatz"], "category": "spelling" },
+      { "wrong": "Seit letzte Woche", "right": ["Seit letzter Woche"], "category": "case" }
+    ]
+  },
+  {
+    "id": "register-administration-du",
+    "text": "Sehr geehrte Frau Muster, kannst du mir bitte bis Freitag das unterschriebene Formular schicken? Vielen Dank für deine Unterstützung.",
+    "profile": "administration",
+    "fixes": [
+      { "wrong": "kannst du mir", "right": ["können Sie mir", "könnten Sie mir", "würden Sie mir", "Können Sie mir", "Könnten Sie mir", "Würden Sie mir"], "category": "register" },
+      { "wrong": "deine Unterstützung", "right": ["Ihre Unterstützung"], "category": "register" }
+    ]
+  },
+  {
+    "id": "register-students-du",
+    "text": "Lieber Herr Beispiel, hast du dein Thema für die Semesterarbeit schon gewählt? Bitte schick mir bis Ende Monat eine kurze Beschreibung.",
+    "profile": "students",
+    "fixes": [
+      { "wrong": "hast du dein Thema", "right": ["haben Sie Ihr Thema", "Haben Sie Ihr Thema"], "category": "register" },
+      { "wrong": "schick mir", "right": ["schicken Sie mir", "senden Sie mir", "Schicken Sie mir", "Senden Sie mir"], "category": "register" }
+    ]
+  },
+  {
+    "id": "terms-otterbach-stadt",
+    "text": "Seit drei Jahren wohne ich in Otterbach, aber ich kenne noch nicht viele Leute in die Stadt. Am Wochenende ich gehe oft allein im Wald spazieren.",
+    "terms": ["Otterbach"],
+    "fixes": [
+      { "wrong": "in die Stadt", "right": ["in der Stadt"], "category": "case" },
+      { "wrong": "Wochenende ich gehe", "right": ["Wochenende gehe ich"], "category": "word order" }
+    ]
+  },
+  {
+    "id": "gender-die-thema",
+    "text": "Wir müssen die Thema am Donnerstag noch einmal besprechen, weil viele Fragen offen sind.",
+    "fixes": [
+      { "wrong": "die Thema", "right": ["das Thema"], "category": "gender" }
+    ]
+  },
+  {
+    "id": "gender-der-sitzung",
+    "text": "Der Sitzung von gestern hat länger gedauert als geplant.",
+    "fixes": [
+      { "wrong": "Der Sitzung", "right": ["Die Sitzung"], "category": "gender" }
+    ]
+  },
+  {
+    "id": "gender-eine-fehler",
+    "text": "In meinem Bericht habe ich eine Fehler gefunden, den ich noch korrigieren muss.",
+    "fixes": [
+      { "wrong": "eine Fehler", "right": ["einen Fehler"], "category": "gender" }
+    ]
+  },
+  {
+    "id": "agreement-studierende-ist",
+    "text": "Die Studierenden ist heute sehr motiviert, denn nächste Woche beginnen die Prüfungen.",
+    "fixes": [
+      { "wrong": "Studierenden ist", "right": ["Studierenden sind"], "category": "agreement" }
+    ]
+  },
+  {
+    "id": "agreement-adjektiv-artikel",
+    "text": "Lea hat mir gestern einen interessante Artikel über die Geschichte von Otterbach geschickt.",
+    "fixes": [
+      { "wrong": "einen interessante Artikel", "right": ["einen interessanten Artikel"], "category": "agreement" }
+    ]
+  },
+  {
+    "id": "case-helfen-mich",
+    "text": "Kannst du mich morgen beim Umzug helfen?",
+    "fixes": [
+      { "wrong": "du mich morgen", "right": ["du mir morgen"], "category": "case" }
+    ]
+  },
+  {
+    "id": "case-fuer-meinem",
+    "text": "Ich habe ein Geschenk für meinem Bruder gekauft.",
+    "fixes": [
+      { "wrong": "für meinem Bruder", "right": ["für meinen Bruder"], "category": "case" }
+    ]
+  },
+  {
+    "id": "order-weil-verb",
+    "text": "Ich komme heute etwas später, weil ich habe am Morgen einen Arzttermin.",
+    "fixes": [
+      {
+        "wrong": "weil ich habe am Morgen einen Arzttermin",
+        "right": [
+          "weil ich am Morgen einen Arzttermin habe", "da ich am Morgen einen Arzttermin habe",
+          "denn ich habe am Morgen einen Arzttermin"
+        ],
+        "category": "word order"
+      }
+    ]
+  },
+  {
+    "id": "order-verb-zweit",
+    "text": "Morgen ich schicke dir die Präsentation, sobald Nina sie gelesen hat.",
+    "fixes": [
+      { "wrong": "Morgen ich schicke", "right": ["Morgen schicke ich"], "category": "word order" }
+    ]
+  },
+  {
+    "id": "falsefriend-bekommen",
+    "text": "Nach dem Studium möchte ich Primarlehrerin bekommen.",
+    "fixes": [
+      { "wrong": "Primarlehrerin bekommen", "right": ["Primarlehrerin werden"], "category": "false friend" }
+    ]
+  },
+  {
+    "id": "falsefriend-sensibel",
+    "text": "Der Vorschlag von Jonas ist eine sensible Lösung für unser Problem.",
+    "fixes": [
+      {
+        "wrong": "sensible Lösung",
+        "right": ["vernünftige Lösung", "sinnvolle Lösung", "kluge Lösung", "durchdachte Lösung", "gute Lösung", "praktische Lösung"],
+        "category": "false friend"
+      }
+    ]
+  },
+  {
+    "id": "falsefriend-rezept",
+    "text": "Für die Spesenabrechnung brauche ich noch das Rezept vom Hotel.",
+    "fixes": [
+      { "wrong": "das Rezept", "right": ["die Quittung", "den Beleg", "die Rechnung"], "category": "false friend" }
+    ]
+  },
+  {
+    "id": "spelling-vielleicht-adresse",
+    "text": "Vieleicht können wir uns nächste Woche treffen. Ich schicke dir noch meine neue Addresse.",
+    "fixes": [
+      { "wrong": "Vieleicht", "right": ["Vielleicht"], "category": "spelling" },
+      { "wrong": "Addresse", "right": ["Adresse"], "category": "spelling" }
+    ]
+  },
+  {
+    "id": "spelling-nomen-klein",
+    "text": "Gestern hatten wir eine lange besprechung mit der Schulleitung.",
+    "fixes": [
+      { "wrong": "lange besprechung", "right": ["lange Besprechung"], "category": "spelling" }
+    ]
+  },
+  {
+    "id": "preposition-warten-fuer",
+    "text": "Ich warte schon seit zwanzig Minuten für den Bus.",
+    "fixes": [
+      { "wrong": "für den Bus", "right": ["auf den Bus"], "category": "preposition" }
+    ]
+  },
+  {
+    "id": "preposition-interessieren-an",
+    "text": "Jonas interessiert sich sehr an Geschichte und Politik.",
+    "fixes": [
+      { "wrong": "an Geschichte", "right": ["für Geschichte"], "category": "preposition" }
+    ]
+  },
+  {
+    "id": "preposition-zu-hause",
+    "text": "Nach dem Kurs gehe ich direkt zu Hause.",
+    "fixes": [
+      { "wrong": "zu Hause", "right": ["nach Hause"], "category": "preposition" }
+    ]
+  },
+  {
+    "id": "other-groesser-wie",
+    "text": "Die neue Wohnung ist viel grösser wie die alte.",
+    "fixes": [
+      { "wrong": "grösser wie", "right": ["grösser als"], "category": "other" }
+    ]
+  },
+  {
+    "id": "other-fehlendes-zu",
+    "text": "Ich habe leider keine Zeit, die ganze Aufgabe heute machen.",
+    "fixes": [
+      { "wrong": "heute machen", "right": ["heute zu machen", "heute zu erledigen", "heute fertig zu machen"], "category": "other" }
+    ]
+  },
+  {
+    "id": "learner-mail-mittwoch",
+    "text": "Hallo Nina\n\nDanke für deine Nachricht. Leider ich kann am Mittwoch nicht kommen, weil ich muss meine Tochter vom Kindergarten abholen.\n\nKönnen wir die Besprechung auf Donnerstag verschieben? Dann habe ich den ganzen Nachmittag Zeit, und ich kann auch die Unterlagen mitbringen, die du gefragt hast.\n\nLiebe Grüsse\nJonas",
+    "fixes": [
+      { "wrong": "Leider ich kann", "right": ["Leider kann ich"], "category": "word order" },
+      {
+        "wrong": "weil ich muss meine Tochter vom Kindergarten abholen",
+        "right": [
+          "weil ich meine Tochter vom Kindergarten abholen muss", "da ich meine Tochter vom Kindergarten abholen muss",
+          "denn ich muss meine Tochter vom Kindergarten abholen"
+        ],
+        "category": "word order"
+      },
+      {
+        "wrong": "die du gefragt hast",
+        "right": [
+          "nach denen du gefragt hast", "nach denen du mich gefragt hast", "um die du gebeten hast",
+          "um die du mich gebeten hast", "die du gewünscht hast", "die du verlangt hast", "die du angefragt hast",
+          "die du wolltest", "die du haben wolltest"
+        ],
+        "category": "preposition"
+      }
+    ]
+  },
+  {
+    "id": "learner-wochenende-riverside",
+    "text": "Am letzten Wochenende bin ich mit meinen Eltern nach Riverside gefahren. Das Wetter war schön, und wir haben viele Fotos gemacht.\n\nAm Samstag wir haben ein Museum besucht. Das Museum war sehr intressant, aber leider war es zu voll. Am Abend haben wir in einer kleinen Restaurant gegessen, und das Essen war sehr gut.\n\nAm Sonntag sind wir lange am Fluss spaziert. Ich freue mich schon auf die nächste Reise mit meine Familie.",
+    "fixes": [
+      { "wrong": "Samstag wir haben", "right": ["Samstag haben wir"], "category": "word order" },
+      { "wrong": "intressant", "right": ["interessant"], "category": "spelling" },
+      { "wrong": "einer kleinen Restaurant", "right": ["einem kleinen Restaurant"], "category": "gender" },
+      { "wrong": "mit meine Familie", "right": ["mit meiner Familie"], "category": "case" }
+    ]
+  },
+  {
+    "id": "clean-zug",
+    "text": "Der Zug nach Otterbach fährt heute wegen Bauarbeiten eine halbe Stunde später ab.",
+    "fixes": [],
+    "clean": true
+  },
+  {
+    "id": "clean-semester",
+    "text": "Am Montag beginnt das neue Semester. Die Stundenpläne hängen ab heute im Gang vor dem Sekretariat.",
+    "fixes": [],
+    "clean": true
+  },
+  {
+    "id": "clean-unterlagen",
+    "text": "Nina hat die Unterlagen für den Workshop bereits verschickt. Falls etwas fehlt, kannst du dich direkt bei ihr melden.",
+    "fixes": [],
+    "clean": true
+  },
+  {
+    "id": "clean-velo",
+    "text": "Jonas fährt jeden Morgen mit dem Velo zur Arbeit, ausser wenn es stark schneit.",
+    "fixes": [],
+    "clean": true
+  },
+  {
+    "id": "clean-sporttag",
+    "text": "Wegen des schlechten Wetters findet der Sporttag der Schule Weidenhof erst nächste Woche statt.",
+    "fixes": [],
+    "clean": true
+  },
+  {
+    "id": "clean-brief-anmeldung",
+    "text": "Sehr geehrter Herr Beispiel\n\nBesten Dank für Ihre Anmeldung. Gerne bestätigen wir Ihnen den Platz im Abendkurs, der am 4. November beginnt.\n\nFreundliche Grüsse\nLea Muster",
+    "profile": "administration",
+    "fixes": [],
+    "clean": true
+  },
+  {
+    "id": "clean-de-brief-komma",
+    "text": "Sehr geehrte Frau Muster,\n\nvielen Dank für Ihre Anfrage. Die unterschriebenen Unterlagen schicke ich Ihnen bis Freitag per Post zu.",
+    "profile": "administration",
+    "fixes": [],
+    "clean": true
+  },
+  {
+    "id": "clean-de-fahrrad-monatsende",
+    "text": "Ich fahre morgen mit dem Fahrrad ins Büro. Die neuen Zugangskarten bekommen wir leider erst Ende des Monats.",
+    "profile": "colleagues",
+    "fixes": [],
+    "clean": true
+  }
+]
