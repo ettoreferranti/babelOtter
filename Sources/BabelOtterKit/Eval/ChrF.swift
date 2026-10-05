@@ -5,12 +5,12 @@ import Foundation
 /// Precision and recall are averaged over the orders first, then combined,
 /// as in the original definition. Whitespace is ignored, so a translation is
 /// not rewarded or punished for spacing.
-public enum ChrF {
+enum ChrF {
 
     static let maxOrder = 6
     static let beta = 2.0
 
-    public static func score(hypothesis: String, reference: String) -> Double {
+    static func score(hypothesis: String, reference: String) -> Double {
         let hypothesisCharacters = Array(hypothesis.filter { !$0.isWhitespace })
         let referenceCharacters = Array(reference.filter { !$0.isWhitespace })
         var precisions: [Double] = []

@@ -10,7 +10,7 @@ public enum EvalSelection: Sendable, Equatable {
 public struct EvalArgumentError: Error, Equatable, CustomStringConvertible {
     public let message: String
 
-    public init(message: String) {
+    init(message: String) {
         self.message = message
     }
 

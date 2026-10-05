@@ -38,7 +38,7 @@ public enum EvalReport {
         }
     }
 
-    public static func format(_ value: Double, _ kind: MetricKind) -> String {
+    static func format(_ value: Double, _ kind: MetricKind) -> String {
         switch kind {
         case .rate: return String(format: "%.1f%%", value * 100)
         case .count: return countText(value)
@@ -47,7 +47,7 @@ public enum EvalReport {
         }
     }
 
-    public static func signedChange(_ change: Double, _ kind: MetricKind) -> String {
+    static func signedChange(_ change: Double, _ kind: MetricKind) -> String {
         switch kind {
         case .rate: return String(format: "%+.1fpp", change * 100)
         case .count:

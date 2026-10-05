@@ -52,7 +52,7 @@ public struct Latency: Sendable, Equatable, Codable {
         self.max = max
     }
 
-    public init(seconds: [Double]) {
+    init(seconds: [Double]) {
         let sorted = seconds.sorted()
         guard let last = sorted.last else {
             self.init(median: 0, max: 0)

@@ -36,7 +36,7 @@ public enum TranslationDirection: String, Sendable, Equatable, CaseIterable {
     }
 
     /// Whether the target is the German locale, whose output must carry no eszett.
-    public var targetIsGerman: Bool {
+    var targetIsGerman: Bool {
         switch self {
         case .englishToSwissGerman: return true
         case .swissGermanToEnglish: return false
