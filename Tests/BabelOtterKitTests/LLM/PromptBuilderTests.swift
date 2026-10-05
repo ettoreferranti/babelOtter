@@ -229,6 +229,29 @@ struct PromptBuilderTests {
         #expect(prompt.contains("Never add empty items"))
     }
 
+    /// Measured 2026-10-05: "das Rezept" for a receipt and "sensible Loesung"
+    /// for a sensible one came back unchanged in 3/3 runs. Both sentences are
+    /// grammatical, so only a check of each word's meaning finds them. The
+    /// rule names no example: example pairs teach the swap (see HANDOFF).
+    @Test("Correct checks each word's meaning, for false friends")
+    func correctChecksMeaning() {
+        let prompt = builder.build(PromptRequest(
+            action: .correct, source: .swissGerman, target: .swissGerman,
+            profile: .colleagues, blocks: ["Ich habe"]))
+        #expect(prompt.contains("check what each word means in context"))
+        #expect(prompt.contains("the meaning of a similar English word"))
+        #expect(!prompt.contains("Rezept"))
+        #expect(!prompt.contains("sensibel"))
+    }
+
+    @Test("the false-friend rule is Correct's alone")
+    func falseFriendRuleIsCorrectOnly() {
+        let prompt = builder.build(PromptRequest(
+            action: .translate, source: .english, target: .swissGerman,
+            profile: .colleagues, blocks: ["x"]))
+        #expect(!prompt.contains("check what each word means in context"))
+    }
+
     @Test("the explanation rule is Correct's alone")
     func explanationRuleIsCorrectOnly() {
         let prompt = builder.build(PromptRequest(
