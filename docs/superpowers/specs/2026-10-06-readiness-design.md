@@ -97,10 +97,12 @@ public struct ReadinessPolicy: Sendable {
 | Cause | Detail |
 |---|---|
 | `accessibilityMissing` | "Accessibility is not granted, so babelOtter can't read your selection." |
-| `ollamaUnreachable(d)` | "Ollama is not reachable: `d`." |
+| `ollamaUnreachable(d)` | "Ollama is not reachable: `d`" |
 | `modelMissing(a, m)` | "`<Action>`: the model `m` is not installed." |
 | `hotKeyNotRegistered(a, c)` | "`<c>` couldn't be registered. Use the menu for `<Action>`." |
 | `hotKeyClashesWithSystem(a, c)` | "`<c>` is also a system shortcut, so it may not reach `<Action>`. Change it in System Settings › Keyboard › Keyboard Shortcuts, or use the menu." |
+
+No period follows the daemon's text, which may already end in one.
 
 `<Action>` is the action's display name. `Action` gains `public var displayName: String` ("Translate", "Correct", "Explain", "Re-pitch") in `Configuration.swift`.
 
