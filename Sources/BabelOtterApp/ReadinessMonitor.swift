@@ -24,11 +24,15 @@ final class ReadinessMonitor {
     private var wakeObserver: (any NSObjectProtocol)?
 
     private static let interval = Duration.seconds(30)
+    /// A tags request answers in milliseconds. The generation timeout, which
+    /// a user may raise to minutes for a slow model, would leave a hung check
+    /// joined by every Check Again, menu open and hotkey press until it ends.
+    private static let probeTimeout: TimeInterval = 5
 
     /// Only the actions that exist are checked. One without a configured
     /// model falls back to the default, as the pipeline does.
     init(environment: AppEnvironment) {
-        client = environment.client
+        client = OllamaClient.loopback(timeout: Self.probeTimeout)
         var models: [Action: String] = [:]
         for action in [Action.translate, .correct] {
             models[action] = environment.configuration.models[action] ?? Configuration.defaultModel

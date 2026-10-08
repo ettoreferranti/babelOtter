@@ -220,21 +220,24 @@ public struct URLSessionTransport: OllamaTransport {
 
     private let timeout: TimeInterval
 
-    public init(timeout: TimeInterval = 60) {
-        self.timeout = timeout
-    }
-
     /// An ephemeral session: no cookie store, no credential store, no on-disk
     /// cache. babelOtter talks to one loopback daemon and has nothing to
     /// remember between calls, so a session that persists anything is a place
     /// user content could come to rest without anyone deciding it should.
-    private var session: URLSession {
+    ///
+    /// Built once, not per request: the readiness check probes every 30 s
+    /// for as long as the app runs, and a session per request was measured
+    /// growing memory by about 13 KB a request.
+    let session: URLSession
+
+    public init(timeout: TimeInterval = 60) {
+        self.timeout = timeout
         let configuration = URLSessionConfiguration.ephemeral
         configuration.timeoutIntervalForRequest = timeout
         configuration.waitsForConnectivity = false
         configuration.httpCookieStorage = nil
         configuration.urlCredentialStorage = nil
-        return URLSession(configuration: configuration)
+        self.session = URLSession(configuration: configuration)
     }
 
     public func chunks(from url: URL, body: Data?) async throws -> AsyncThrowingStream<

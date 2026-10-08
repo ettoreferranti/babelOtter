@@ -210,6 +210,15 @@ struct OllamaClientTests {
         #expect(status.detail.contains("refused"))
     }
 
+    /// The readiness check probes every 30 s for as long as the app runs. A
+    /// session built per request was measured growing memory by about 13 KB
+    /// per request; one session for the transport's lifetime stays flat.
+    @Test("the real transport keeps one session for all its requests")
+    func transportReusesSession() {
+        let transport = URLSessionTransport(timeout: 5)
+        #expect(transport.session === transport.session)
+    }
+
     @Test("probe lists the installed models from a single tags request")
     func probeReachable() async throws {
         let transport = FakeTransport(chunks: [
