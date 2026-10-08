@@ -13,6 +13,8 @@ final class PopupModel {
         case translating
         case finished
         case failed(String)
+        /// Accessibility is not granted, so nothing was captured.
+        case needsAccessibility
     }
 
     let action: Action
@@ -116,7 +118,7 @@ final class PopupModel {
         }
         switch phase {
         case .translating, .finished, .failed: return true
-        case .capturing, .choosingDirection: return false
+        case .capturing, .choosingDirection, .needsAccessibility: return false
         }
     }
 
@@ -164,6 +166,17 @@ final class PopupModel {
 
     func displayName(_ code: LanguageCode) -> String {
         configuration.language(for: code)?.displayName ?? code.description
+    }
+
+    /// Shown instead of a capture when Accessibility is not granted (#28).
+    func requireAccessibility() {
+        guard !isDismissed else { return }
+        phase = .needsAccessibility
+    }
+
+    func openAccessibilitySettings() {
+        AccessibilitySettings.open()
+        dismiss()
     }
 
     /// Whether there is a result worth keeping. For Translate this is just

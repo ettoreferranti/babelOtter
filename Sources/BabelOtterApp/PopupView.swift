@@ -100,6 +100,10 @@ struct PopupView: View {
             }
         case .failed(let reason):
             Text(reason).foregroundStyle(.secondary)
+        case .needsAccessibility:
+            Text("babelOtter needs Accessibility permission to read your selection.")
+            Text("Turn it on for babelOtter in System Settings, then try again.")
+                .font(.caption).foregroundStyle(.secondary)
         }
     }
 
@@ -147,7 +151,21 @@ struct PopupView: View {
         .frame(maxHeight: 420)
     }
 
-    private var actions: some View {
+    @ViewBuilder private var actions: some View {
+        if model.phase == .needsAccessibility {
+            HStack {
+                Button("Open System Settings") { model.openAccessibilitySettings() }
+                    .keyboardShortcut(.defaultAction)
+                Spacer()
+                Button("Dismiss") { model.dismiss() }
+                    .keyboardShortcut(.cancelAction)
+            }
+        } else {
+            resultActions
+        }
+    }
+
+    private var resultActions: some View {
         HStack {
             // While the instruction field has focus, Return means
             // Regenerate. A default button would otherwise take Return

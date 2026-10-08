@@ -102,8 +102,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return item
     }
 
-    /// Shows the system prompt once; the grant itself happens in System Settings.
+    /// The system prompt, at first launch only. Afterwards a missing grant is
+    /// explained in the popup and the menu, never by a dialog (#28).
     private func promptForAccessibilityIfNeeded() {
+        let key = "promptedForAccessibility"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        UserDefaults.standard.set(true, forKey: key)
+        guard !AXIsProcessTrusted() else { return }
         let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
         _ = AXIsProcessTrustedWithOptions(options)
     }
@@ -197,11 +202,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// starting a new one.
     func startAction(_ action: Action) {
         monitor.refresh()
+        guard !isCapturing, currentModel?.isReplacing != true else { return }
         guard AXIsProcessTrusted() else {
-            promptForAccessibilityIfNeeded()
+            showAccessibilityNeeded(for: action)
             return
         }
-        guard !isCapturing, currentModel?.isReplacing != true else { return }
         guard let front = NSWorkspace.shared.frontmostApplication,
             front.processIdentifier != ProcessInfo.processInfo.processIdentifier
         else { return }
@@ -238,5 +243,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             panel.makeKeyNow()
             model.begin(with: outcome)
         }
+    }
+
+    /// No capture starts, so the panel may take focus at once: Return opens
+    /// System Settings, Escape dismisses. A second press replaces this popup
+    /// rather than stacking another.
+    private func showAccessibilityNeeded(for action: Action) {
+        currentModel?.dismiss()
+        let model = PopupModel(
+            action: action,
+            environment: environment,
+            close: { [weak self] in self?.panel.dismiss() },
+            reopen: { [weak self] model in
+                guard let self else { return }
+                self.currentModel = model
+                self.panel.show(PopupView(model: model))
+            })
+        model.requireAccessibility()
+        currentModel = model
+        panel.show(PopupView(model: model))
     }
 }
