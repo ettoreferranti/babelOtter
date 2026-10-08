@@ -126,6 +126,66 @@ public enum ReadinessCause: Sendable, Equatable {
     }
 }
 
+extension ReadinessCause {
+
+    /// The cause in a few words, as the header of its menu section. The full
+    /// `detail` stays in the icon's tooltip.
+    public var header: String {
+        switch self {
+        case .accessibilityMissing:
+            return "Accessibility isn't granted"
+        case .ollamaUnreachable:
+            return "Ollama isn't running"
+        case .modelMissing(let action, let model):
+            return "\(action.displayName): \(model) isn't installed"
+        case .hotKeyNotRegistered(_, let combination):
+            return "\(combination) is unavailable: use the menu"
+        case .hotKeyClashesWithSystem(_, let combination):
+            return "\(combination) is also a system shortcut"
+        }
+    }
+
+    /// The menu command under the header. Nil when nothing outside the menu
+    /// fixes it: a hotkey that never registered is worked round by the
+    /// menu's own action item.
+    public var remedy: ReadinessRemedy? {
+        switch self {
+        case .accessibilityMissing:
+            return .openAccessibilitySettings
+        case .ollamaUnreachable:
+            return .startOllama
+        case .modelMissing(_, let model):
+            return .copyPullCommand("ollama pull \(model)")
+        case .hotKeyNotRegistered:
+            return nil
+        case .hotKeyClashesWithSystem:
+            return .openKeyboardShortcutsSettings
+        }
+    }
+}
+
+/// What the menu offers to fix a cause. The app carries each one out.
+public enum ReadinessRemedy: Sendable, Equatable {
+    case openAccessibilitySettings
+    case startOllama
+    /// The command to paste into a terminal.
+    case copyPullCommand(String)
+    case openKeyboardShortcutsSettings
+
+    public var title: String {
+        switch self {
+        case .openAccessibilitySettings:
+            return "Open Accessibility Settings\u{2026}"
+        case .startOllama:
+            return "Start Ollama"
+        case .copyPullCommand(let command):
+            return "Copy \u{201C}\(command)\u{201D}"
+        case .openKeyboardShortcutsSettings:
+            return "Open Keyboard Shortcuts Settings\u{2026}"
+        }
+    }
+}
+
 /// The worst readiness and every cause, worst first.
 public struct ReadinessReport: Sendable, Equatable {
     public let readiness: Readiness

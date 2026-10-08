@@ -106,3 +106,11 @@ enum AccessibilitySettings {
         NSWorkspace.shared.open(url)
     }
 }
+
+enum KeyboardShortcutsSettings {
+    @MainActor static func open() {
+        let address = "x-apple.systempreferences:com.apple.Keyboard-Settings.extension"
+        guard let url = URL(string: address) else { return }
+        NSWorkspace.shared.open(url)
+    }
+}

@@ -142,11 +142,17 @@ The conversion is a pure kit function, `SystemShortcut.carbonModifiers(fromSymbo
 
 ### 4.3 Menu
 
-The Ollama and Accessibility lines are replaced by a status section:
+The Ollama and Accessibility lines are replaced by a status section at the top of the menu, followed by a separator. Status is shown as section headers (`NSMenuItem.sectionHeader`), so it reads as information and not as a disabled command, and each header is followed by the command that fixes it:
 
-- a headline: "Ready", "Degraded" or "Blocked";
-- one disabled line for each cause;
-- "Open Accessibility Settings…" only when `accessibilityMissing` is a cause.
+| Cause | Header | Command |
+|---|---|---|
+| Accessibility missing | Accessibility isn't granted | Open Accessibility Settings… |
+| Ollama unreachable | Ollama isn't running | Start Ollama (launches `com.electron.ollama`, or opens ollama.com/download when it isn't installed; checks again after 3 s) |
+| Model missing | Correct: `<model>` isn't installed | Copy "ollama pull `<model>`" |
+| Hotkey not registered | `<combination>` is unavailable: use the menu | none: the menu's own action item is the way round it |
+| Hotkey clashes with a system shortcut | `<combination>` is also a system shortcut | Open Keyboard Shortcuts Settings… |
+
+With no causes the section is the header "Ready"; before the first report, "Checking…". There is no "Degraded"/"Blocked" headline: the icon carries the level, and the full `detail` stays in the icon's tooltip. The header and command come from the kit (`ReadinessCause.header`, `.remedy`, `ReadinessRemedy.title`), so they are unit-tested.
 
 "Check Again" calls `refresh()`. The configuration-problem line and everything else stay as they are. The hotkey messages no longer write into the Ollama line; they reach the menu only as causes, which is the #26 fix.
 

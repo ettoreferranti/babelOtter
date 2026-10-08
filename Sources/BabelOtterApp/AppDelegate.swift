@@ -12,8 +12,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// most launches have nothing wrong with the config file, and a menu
     /// line reporting that would be noise.
     private let configLine = NSMenuItem(title: "", action: nil, keyEquivalent: "")
-    /// The readiness lines: a headline, one line per cause, and "Open
-    /// Accessibility Settings..." when that is a cause. Replaced as a block on
+    /// The readiness section at the top of the menu: a header per cause with
+    /// the command that fixes it, then a separator. Replaced as a block on
     /// every report, in place, so an open menu updates too.
     private var statusLines: [NSMenuItem] = []
     private(set) var environment = AppEnvironment.load()
@@ -115,8 +115,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func refreshStatusAction() { monitor.refresh() }
 
-    @objc private func openAccessibilitySettings() { AccessibilitySettings.open() }
-
     func menuWillOpen(_ menu: NSMenu) { monitor.refresh() }
 
     // MARK: - Readiness
@@ -162,22 +160,61 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard let menu = statusItem?.menu else { return }
         for item in statusLines { menu.removeItem(item) }
         statusLines = makeStatusLines(report)
-        var index = menu.index(of: configLine)
+        var index = 0
         for item in statusLines {
             menu.insertItem(item, at: index)
             index += 1
         }
     }
 
+    /// Status as section headers, so it reads as information, each followed
+    /// by the command that fixes it -- never a line that looks like a
+    /// disabled command.
     private func makeStatusLines(_ report: ReadinessReport?) -> [NSMenuItem] {
-        var lines = [NSMenuItem(title: Self.headline(report), action: nil, keyEquivalent: "")]
-        for cause in report?.causes ?? [] {
-            lines.append(NSMenuItem(title: cause.detail, action: nil, keyEquivalent: ""))
+        guard let report else { return [.sectionHeader(title: "Checking\u{2026}"), .separator()] }
+        guard !report.causes.isEmpty else { return [.sectionHeader(title: "Ready"), .separator()] }
+        var lines: [NSMenuItem] = []
+        for cause in report.causes {
+            lines.append(.sectionHeader(title: cause.header))
+            if let remedy = cause.remedy {
+                let item = action(remedy.title, #selector(performRemedy(_:)))
+                item.representedObject = remedy
+                lines.append(item)
+            }
         }
-        if report?.causes.contains(.accessibilityMissing) == true {
-            lines.append(action("Open Accessibility Settings\u{2026}", #selector(openAccessibilitySettings)))
-        }
+        lines.append(.separator())
         return lines
+    }
+
+    @objc private func performRemedy(_ sender: NSMenuItem) {
+        guard let remedy = sender.representedObject as? ReadinessRemedy else { return }
+        switch remedy {
+        case .openAccessibilitySettings:
+            AccessibilitySettings.open()
+        case .startOllama:
+            startOllama()
+        case .copyPullCommand(let command):
+            // Never while a capture or replacement owns the pasteboard.
+            guard !isCapturing, currentModel?.isReplacing != true else { return }
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(command, forType: .string)
+        case .openKeyboardShortcutsSettings:
+            KeyboardShortcutsSettings.open()
+        }
+    }
+
+    /// Launches the Ollama app when it is installed, else opens its download
+    /// page. A check follows once the daemon has had time to listen.
+    private func startOllama() {
+        guard let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.electron.ollama") else {
+            if let page = URL(string: "https://ollama.com/download") { NSWorkspace.shared.open(page) }
+            return
+        }
+        NSWorkspace.shared.openApplication(at: app, configuration: NSWorkspace.OpenConfiguration())
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(3))
+            self?.monitor.refresh()
+        }
     }
 
     @objc private func openConfiguration() {

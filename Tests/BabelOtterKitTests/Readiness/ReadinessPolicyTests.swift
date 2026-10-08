@@ -260,4 +260,40 @@ struct ReadinessPolicyTests {
         #expect(SystemShortcut.carbonModifiers(fromSymbolic: 0x400) == 0)
         #expect(SystemShortcut.comparedModifiers == 0x1B00)
     }
+
+    // MARK: - Menu: a short header per cause, and the command that fixes it
+
+    @Test("each cause has a short header for its menu section")
+    func headers() {
+        #expect(ReadinessCause.accessibilityMissing.header == "Accessibility isn't granted")
+        #expect(ReadinessCause.ollamaUnreachable(detail: "refused").header == "Ollama isn't running")
+        #expect(ReadinessCause.modelMissing(action: .correct, model: "m:1b").header
+            == "Correct: m:1b isn't installed")
+        #expect(ReadinessCause.hotKeyNotRegistered(action: .translate, combination: "Control-Option-T")
+            .header == "Control-Option-T is unavailable: use the menu")
+        #expect(ReadinessCause.hotKeyClashesWithSystem(action: .translate, combination: "Control-Option-T")
+            .header == "Control-Option-T is also a system shortcut")
+    }
+
+    @Test("each cause offers the command that fixes it, where there is one")
+    func remedies() {
+        #expect(ReadinessCause.accessibilityMissing.remedy == .openAccessibilitySettings)
+        #expect(ReadinessCause.ollamaUnreachable(detail: "refused").remedy == .startOllama)
+        #expect(ReadinessCause.modelMissing(action: .correct, model: "m:1b").remedy
+            == .copyPullCommand("ollama pull m:1b"))
+        #expect(ReadinessCause.hotKeyClashesWithSystem(action: .translate, combination: "C").remedy
+            == .openKeyboardShortcutsSettings)
+        // The menu's own Translate item is the way round a hotkey that never
+        // registered; no setting fixes it.
+        #expect(ReadinessCause.hotKeyNotRegistered(action: .translate, combination: "C").remedy == nil)
+    }
+
+    @Test("each remedy is titled as a menu command")
+    func remedyTitles() {
+        #expect(ReadinessRemedy.openAccessibilitySettings.title == "Open Accessibility Settings\u{2026}")
+        #expect(ReadinessRemedy.startOllama.title == "Start Ollama")
+        #expect(ReadinessRemedy.copyPullCommand("ollama pull m:1b").title
+            == "Copy \u{201C}ollama pull m:1b\u{201D}")
+        #expect(ReadinessRemedy.openKeyboardShortcutsSettings.title == "Open Keyboard Shortcuts Settings\u{2026}")
+    }
 }
