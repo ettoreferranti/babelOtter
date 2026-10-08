@@ -120,18 +120,18 @@ One `/api/tags` request, classified exactly as `health(configuredModel:)` does t
 
 ### 3.4 System shortcut modifiers
 
-`CopySymbolicHotKeys()` returns, for each system shortcut, a key code, a modifier value and an enabled flag. The header does not say how the modifiers are encoded: Carbon bits (`cmdKey = 0x100`, ...) or `NSEvent.ModifierFlags` bits (`.command = 0x100000`, ...). **The plan's first task settles this** by printing the entry for a known shortcut (Command-Shift-3, "Save picture of screen as a file") before anything depends on it.
+`CopySymbolicHotKeys()` returns, for each system shortcut, a key code, a modifier value and an enabled flag. The header does not say how the modifiers are encoded. **Measured 2026-10-08** on macOS 26 (230 entries): they are **Carbon bits**. Command-Shift-3 is key code 20 with `0x300` (`cmdKey 0x100 | shiftKey 0x200`). Function and arrow keys also carry `0x20000` (`kEventKeyModifierFnMask`).
 
-The conversion to Carbon bits is a pure kit function, `SystemShortcut.carbonModifiers(fromSymbolic:)`, written once the encoding is known and unit-tested against the values the probe printed. The AppKit side only reads the dictionaries and passes the raw numbers through it.
+The conversion is a pure kit function, `SystemShortcut.carbonModifiers(fromSymbolic:)`: it keeps only the four compared bits (`0x100 | 0x200 | 0x800 | 0x1000`) and drops the rest, `0x20000` included. The kit cannot import Carbon (`NoUIImportsTests`), so the four values are written as literals there, with this measurement cited. The AppKit side only reads the dictionaries and passes the raw numbers through it.
 
 ## 4. App (`BabelOtterApp`) — checked by use
 
 ### 4.1 `ReadinessMonitor` — `Sources/BabelOtterApp/ReadinessMonitor.swift`
 
-`@MainActor @Observable`. Publishes `report: ReadinessReport`.
+`@MainActor` final class. Holds `report: ReadinessReport?` (nil until the first check finishes) and calls `onChange` with each new report; `AppDelegate` is AppKit, so a callback is simpler than observation.
 
 - `refresh()` gathers the facts: `AXIsProcessTrusted()`, `client.probe()`, the models for `.translate` and `.correct` from the configuration (falling back to `Configuration.defaultModel`), the hotkey facts, and the system shortcuts from `CopySymbolicHotKeys()`. It then runs `ReadinessPolicy`. Reading the system shortcuts on every refresh means a shortcut changed in System Settings shows up within 30 s, without a relaunch. A refresh already in flight is joined, not duplicated.
-- The hotkey facts are set once by `AppDelegate` after registering the hotkeys. `HotKey` keeps its non-exclusive registration and reports success or failure instead of only returning nil.
+- The hotkey facts are set once by `AppDelegate` after registering the hotkeys. `HotKey` is unchanged: its non-exclusive registration already reports failure by returning nil, which `AppDelegate` records as `registered: false`.
 - **Triggers:** launch; a `Task` loop every 30 s; `NSWorkspace.didWakeNotification`; menu open (`NSMenuDelegate.menuWillOpen`); every action trigger. Menu open shows the last report at once, and the lines update in place when the new one arrives.
 
 ### 4.2 Icon
@@ -164,7 +164,7 @@ The popup reads "babelOtter needs Accessibility permission to read your selectio
 - **Probe hangs.** The client's existing timeout bounds it. The in-flight join means the 30 s loop never stacks probes.
 - **A clash is a warning, not a certainty.** When a system shortcut and babelOtter's hotkey share a combination, the system is expected to take the press. Manual check 5 confirms this; if babelOtter turns out to receive it anyway, the detail's "may not reach" wording stays true.
 - **Menu shortcuts inside other apps** are not detected. No API lists them.
-- **Rebuilt, unsigned builds.** macOS ties the Accessibility grant to the code signature. A local rebuild can lose the grant, or list it as granted while `AXIsProcessTrusted()` returns false. Blocked straight after a rebuild is this, not a bug. #82 (signing) removes it.
+- **Ad-hoc-signed builds.** macOS ties the Accessibility grant to the code signature. `Tools/make-app.sh` signs with the stable "babelOtter Dev" identity when it exists, which keeps the grant; without it the build is signed ad hoc, and each rebuild loses the grant or lists it as granted while `AXIsProcessTrusted()` returns false. Blocked straight after such a rebuild is this, not a bug. #82 (signing) removes it for good.
 - **Revocation while running** is covered by the same paths: the next check turns the icon blocked, and the next action shows the popup. Re-presenting the setup steps (`FR-ONB-02`, #71) is out of scope.
 - **Popup during capture.** Unchanged: `needsAccessibility` is shown before any capture starts, so it never races the clipboard tier.
 
@@ -183,7 +183,7 @@ The popup reads "babelOtter needs Accessibility permission to read your selectio
 - same key code, different modifiers → no cause; modifier bits other than the four compared are ignored;
 - a hotkey that is both unregistered and clashing → only `hotKeyNotRegistered`;
 - two hotkey problems → two causes, in `Action.allCases` order;
-- `SystemShortcut.carbonModifiers(fromSymbolic:)` against the values printed by the probe;
+- `SystemShortcut.carbonModifiers(fromSymbolic:)` against the measured values: `0x300` stays `0x300`, `0x21000` becomes `0x1000`, `0x1B00` (control, option, shift, command) is unchanged;
 - `DaemonStatus.unreachable.readiness == .degraded`.
 
 **App, manual checks:**
