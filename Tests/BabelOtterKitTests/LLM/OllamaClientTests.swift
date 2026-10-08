@@ -210,6 +210,32 @@ struct OllamaClientTests {
         #expect(status.detail.contains("refused"))
     }
 
+    @Test("probe lists the installed models from a single tags request")
+    func probeReachable() async throws {
+        let transport = FakeTransport(chunks: [
+            #"{"models":[{"name":"a","size":1},{"name":"b","size":2}]}"#
+        ])
+        let client = OllamaClient(endpoint: .loopback, transport: transport)
+        #expect(await client.probe() == .reachable(models: ["a", "b"]))
+        #expect(transport.requestedURLs.count == 1)
+        #expect(try #require(transport.requestedURLs.first).path().hasSuffix("/api/tags"))
+    }
+
+    @Test("probe turns an unreachable daemon into a result, not a thrown error")
+    func probeUnreachable() async {
+        let transport = FakeTransport(
+            chunks: [], failure: OllamaTransportError.unreachable(detail: "refused"))
+        let client = OllamaClient(endpoint: .loopback, transport: transport)
+        #expect(await client.probe() == .unreachable(detail: "refused"))
+    }
+
+    @Test("probe explains a bad HTTP status")
+    func probeExplainsHTTPFailures() async {
+        let transport = FakeTransport(chunks: [], failure: OllamaTransportError.httpStatus(503))
+        let client = OllamaClient(endpoint: .loopback, transport: transport)
+        #expect(await client.probe() == .unreachable(detail: "the daemon answered with HTTP 503"))
+    }
+
     @Test("health turns a bad HTTP status into a readable explanation")
     func healthExplainsHTTPFailures() async {
         let transport = FakeTransport(chunks: [], failure: OllamaTransportError.httpStatus(503))
