@@ -10,6 +10,16 @@ public enum Action: String, Sendable, Codable, CaseIterable {
     case correct
     case explain
     case repitch
+
+    /// The name the menu and the readiness causes show.
+    public var displayName: String {
+        switch self {
+        case .translate: return "Translate"
+        case .correct: return "Correct"
+        case .explain: return "Explain"
+        case .repitch: return "Re-pitch"
+        }
+    }
 }
 
 /// Everything the user can configure, as one value (spec section 6).

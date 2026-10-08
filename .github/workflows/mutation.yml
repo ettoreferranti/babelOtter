@@ -147,6 +147,7 @@ jobs:
           Sources/BabelOtterKit/Pipeline/ReplyStream.swift
           Sources/BabelOtterKit/Pipeline/Translator.swift
           Sources/BabelOtterKit/Privacy/UserText.swift
+          Sources/BabelOtterKit/Readiness/ReadinessPolicy.swift
           Sources/BabelOtterKit/Text/LanguageDetector.swift
           Sources/BabelOtterKit/Text/LocaleRuleApplier.swift
           Sources/BabelOtterKit/Text/PostProcessor.swift

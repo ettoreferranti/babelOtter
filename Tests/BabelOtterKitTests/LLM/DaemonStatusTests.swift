@@ -50,12 +50,13 @@ struct DaemonStatusTests {
         #expect(status == .modelMissing("mistral-small3.2:24b"))
     }
 
-    // FR-UI-03: ready, degraded, blocked.
+    // FR-UI-03: ready, degraded, blocked. Blocked is reserved for a missing
+    // system permission, so nothing about the daemon is ever blocked.
     @Test("each status maps to the readiness the menu bar shows")
     func readinessLevels() {
         #expect(DaemonStatus.ready.readiness == .ready)
         #expect(DaemonStatus.modelMissing("m").readiness == .degraded)
-        #expect(DaemonStatus.unreachable(detail: "x").readiness == .blocked)
+        #expect(DaemonStatus.unreachable(detail: "x").readiness == .degraded)
     }
 
     @Test("every status maps to some readiness, exhaustively")
@@ -80,8 +81,8 @@ struct DaemonStatusTests {
     /// because a cached "blocked" is exactly how an app ends up needing one.
     @Test("recovery needs no intermediate state: the next probe decides")
     func recoversWithoutRestart() {
-        let blocked = policy.status(probe: .unreachable(detail: "x"), configuredModel: "m")
-        #expect(blocked.readiness == .blocked)
+        let down = policy.status(probe: .unreachable(detail: "x"), configuredModel: "m")
+        #expect(down.readiness == .degraded)
         let recovered = policy.status(probe: .reachable(models: ["m"]), configuredModel: "m")
         #expect(recovered == .ready)
     }

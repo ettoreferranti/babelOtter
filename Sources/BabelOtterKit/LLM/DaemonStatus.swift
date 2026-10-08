@@ -6,13 +6,6 @@ public enum DaemonProbe: Sendable, Equatable {
     case unreachable(detail: String)
 }
 
-/// How ready babelOtter is, at the granularity the menu bar shows (`FR-UI-03`).
-public enum Readiness: Sendable, Equatable, CaseIterable {
-    case ready
-    case degraded
-    case blocked
-}
-
 /// The daemon's state, as the rest of the app needs to understand it.
 public enum DaemonStatus: Sendable, Equatable {
     case ready
@@ -22,17 +15,20 @@ public enum DaemonStatus: Sendable, Equatable {
     /// Nothing listening. `FR-OLL-02` offers to start Ollama.
     case unreachable(detail: String)
 
+    /// Nothing about the daemon is ever blocked. Blocked is reserved for a
+    /// missing system permission -- something babelOtter cannot work without
+    /// until the user changes a system setting. An unreachable daemon is
+    /// usually just not started, and the menu names it.
     public var readiness: Readiness {
         switch self {
         case .ready: return .ready
-        case .modelMissing: return .degraded
-        case .unreachable: return .blocked
+        case .modelMissing, .unreachable: return .degraded
         }
     }
 
-    /// Degraded is not blocked: a missing model is one confirmation away from
-    /// working, whereas an unreachable daemon needs the user to go and do
-    /// something. Both refuse to generate, and they refuse differently.
+    /// Neither a missing model nor an unreachable daemon can generate, and
+    /// they refuse differently: a missing model is one confirmation away from
+    /// working, whereas an unreachable daemon needs the user to start it.
     public var canGenerate: Bool {
         switch self {
         case .ready: return true
