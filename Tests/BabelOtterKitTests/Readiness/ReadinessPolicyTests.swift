@@ -144,9 +144,8 @@ struct ReadinessPolicyTests {
             .hotKeyClashesWithSystem(action: .translate, combination: "Control-Option-T")
         ])
         #expect(report.causes[0].detail
-            == "Control-Option-T is also a system shortcut, so it may not reach Translate."
-            + " Change it in System Settings \u{203A} Keyboard \u{203A} Keyboard Shortcuts,"
-            + " or use the menu.")
+            == "Control-Option-T is also a system shortcut, so pressing it runs both."
+            + " Change it in System Settings \u{203A} Keyboard \u{203A} Keyboard Shortcuts.")
     }
 
     @Test("a disabled system shortcut is no clash")
