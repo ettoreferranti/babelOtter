@@ -667,6 +667,19 @@ to treat "the app never answered" as tier 3, the same as an empty result --
 another case of #31's rule that capability is decided by attempting a capture,
 never by asking what is supported.
 
+### A hotkey shared with a system shortcut fires both
+
+Measured 2026-10-09 on macOS 26 (#92, manual check M10): with
+Control-Option-T also assigned to Screenshots › "Save picture of screen as a
+file", one press took the screenshot **and** opened babelOtter's Translate
+popup. Carbon hotkeys are non-exclusive in both directions: neither side
+consumes the press, and registration never reports the clash.
+
+So a clash does not lose the press; it adds a side effect. The readiness
+warning is still right to be degraded and to point at Keyboard Shortcuts, but
+the danger to name is the other action running too, not babelOtter missing the
+key.
+
 ### Not yet measured
 
 Chrome; the focus-taking panel variant (#52); whether Word or Teams expose text
