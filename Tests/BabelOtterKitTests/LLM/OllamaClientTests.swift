@@ -206,8 +206,43 @@ struct OllamaClientTests {
             chunks: [], failure: OllamaTransportError.unreachable(detail: "refused"))
         let client = OllamaClient(endpoint: .loopback, transport: transport)
         let status = await client.health(configuredModel: "m")
-        #expect(status.readiness == .blocked)
+        #expect(status.readiness == .degraded)
         #expect(status.detail.contains("refused"))
+    }
+
+    /// The readiness check probes every 30 s for as long as the app runs. A
+    /// session built per request was measured growing memory by about 13 KB
+    /// per request; one session for the transport's lifetime stays flat.
+    @Test("the real transport keeps one session for all its requests")
+    func transportReusesSession() {
+        let transport = URLSessionTransport(timeout: 5)
+        #expect(transport.session === transport.session)
+    }
+
+    @Test("probe lists the installed models from a single tags request")
+    func probeReachable() async throws {
+        let transport = FakeTransport(chunks: [
+            #"{"models":[{"name":"a","size":1},{"name":"b","size":2}]}"#
+        ])
+        let client = OllamaClient(endpoint: .loopback, transport: transport)
+        #expect(await client.probe() == .reachable(models: ["a", "b"]))
+        #expect(transport.requestedURLs.count == 1)
+        #expect(try #require(transport.requestedURLs.first).path().hasSuffix("/api/tags"))
+    }
+
+    @Test("probe turns an unreachable daemon into a result, not a thrown error")
+    func probeUnreachable() async {
+        let transport = FakeTransport(
+            chunks: [], failure: OllamaTransportError.unreachable(detail: "refused"))
+        let client = OllamaClient(endpoint: .loopback, transport: transport)
+        #expect(await client.probe() == .unreachable(detail: "refused"))
+    }
+
+    @Test("probe explains a bad HTTP status")
+    func probeExplainsHTTPFailures() async {
+        let transport = FakeTransport(chunks: [], failure: OllamaTransportError.httpStatus(503))
+        let client = OllamaClient(endpoint: .loopback, transport: transport)
+        #expect(await client.probe() == .unreachable(detail: "the daemon answered with HTTP 503"))
     }
 
     @Test("health turns a bad HTTP status into a readable explanation")
@@ -217,11 +252,11 @@ struct OllamaClientTests {
         #expect(await client.health(configuredModel: "m").detail.contains("503"))
     }
 
-    @Test("health on an unparseable catalogue is blocked, not silently ready")
+    @Test("health on an unparseable catalogue is degraded, not silently ready")
     func healthOnGarbage() async {
         let transport = FakeTransport(chunks: ["this is not json"])
         let client = OllamaClient(endpoint: .loopback, transport: transport)
-        #expect(await client.health(configuredModel: "m").readiness == .blocked)
+        #expect(await client.health(configuredModel: "m").readiness == .degraded)
     }
 
     /// NFR-P1: a chat request carries the user's selected text. Building a

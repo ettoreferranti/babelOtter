@@ -5,16 +5,26 @@ import Carbon.HIToolbox
 import SwiftUI
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private var statusItem: NSStatusItem?
-    private let ollamaLine = NSMenuItem(title: "Ollama: checking...", action: nil, keyEquivalent: "")
-    private let accessLine = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     /// Hidden unless `environment.configurationNote` has something to say --
     /// most launches have nothing wrong with the config file, and a menu
     /// line reporting that would be noise.
     private let configLine = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+    /// The readiness section at the top of the menu: a header per cause with
+    /// the command that fixes it, then a separator. Replaced as a block on
+    /// every report, in place, so an open menu updates too.
+    private var statusLines: [NSMenuItem] = []
     private(set) var environment = AppEnvironment.load()
+    private lazy var monitor = ReadinessMonitor(environment: environment)
+
+    private static let translateCombination = HotKeyCombination(
+        keyCode: UInt32(kVK_ANSI_T), modifiers: UInt32(controlKey | optionKey),
+        displayName: "Control-Option-T")
+    private static let correctCombination = HotKeyCombination(
+        keyCode: UInt32(kVK_ANSI_C), modifiers: UInt32(controlKey | optionKey),
+        displayName: "Control-Option-C")
     private var hotKey: HotKey?
     private var correctHotKey: HotKey?
     private let panel = PopupPanel()
@@ -32,16 +42,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         buildMenu()
-        hotKey = HotKey(
-            keyCode: UInt32(kVK_ANSI_T), modifiers: UInt32(controlKey | optionKey), id: 1
-        ) { [weak self] in self?.startAction(.translate) }
-        if hotKey == nil { ollamaLine.title = "Control-Option-T is taken by another app" }
-        correctHotKey = HotKey(
-            keyCode: UInt32(kVK_ANSI_C), modifiers: UInt32(controlKey | optionKey), id: 2
-        ) { [weak self] in self?.startAction(.correct) }
-        if correctHotKey == nil { ollamaLine.title = "Control-Option-C is taken by another app" }
+        registerHotKeys()
         promptForAccessibilityIfNeeded()
-        refreshStatus()
+        monitor.onChange = { [weak self] report in self?.render(report) }
+        render(nil)
+        monitor.start()
+    }
+
+    /// Registration stays non-exclusive. A failure is recorded as a fact and
+    /// reaches the menu as a cause, never written over another line (#26).
+    private func registerHotKeys() {
+        let translate = Self.translateCombination
+        hotKey = HotKey(keyCode: translate.keyCode, modifiers: translate.modifiers, id: 1) {
+            [weak self] in self?.startAction(.translate)
+        }
+        let correct = Self.correctCombination
+        correctHotKey = HotKey(keyCode: correct.keyCode, modifiers: correct.modifiers, id: 2) {
+            [weak self] in self?.startAction(.correct)
+        }
+        monitor.hotKeys = [
+            HotKeyFact(action: .translate, combination: translate, registered: hotKey != nil),
+            HotKeyFact(action: .correct, combination: correct, registered: correctHotKey != nil),
+        ]
     }
 
     private func buildMenu() {
@@ -57,10 +79,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let menu = NSMenu()
-        menu.addItem(action("Translate Selection (Control-Option-T)", #selector(translateSelectionAction)))
-        menu.addItem(action("Correct Selection (Control-Option-C)", #selector(correctSelectionAction)))
-        menu.addItem(ollamaLine)
-        menu.addItem(accessLine)
+        menu.delegate = self
+        menu.addItem(action(
+            "Translate Selection (\(Self.translateCombination.displayName))",
+            #selector(translateSelectionAction)))
+        menu.addItem(action(
+            "Correct Selection (\(Self.correctCombination.displayName))",
+            #selector(correctSelectionAction)))
         menu.addItem(configLine)
         menu.addItem(.separator())
         menu.addItem(action("Check Again", #selector(refreshStatusAction)))
@@ -77,23 +102,118 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return item
     }
 
-    /// Shows the system prompt once; the grant itself happens in System Settings.
+    /// The system prompt, at first launch only. Afterwards a missing grant is
+    /// explained in the popup and the menu, never by a dialog (#28).
     private func promptForAccessibilityIfNeeded() {
+        let key = "promptedForAccessibility"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        UserDefaults.standard.set(true, forKey: key)
+        guard !AXIsProcessTrusted() else { return }
         let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
         _ = AXIsProcessTrustedWithOptions(options)
     }
 
-    @objc private func refreshStatusAction() { refreshStatus() }
+    @objc private func refreshStatusAction() { monitor.refresh() }
 
-    func refreshStatus() {
-        accessLine.title = AXIsProcessTrusted()
-            ? "Accessibility: granted"
-            : "Accessibility: not granted (System Settings > Privacy & Security)"
-        let client = environment.client
-        let model = environment.configuration.models[.translate] ?? Configuration.defaultModel
-        Task {
-            let status = await client.health(configuredModel: model)
-            ollamaLine.title = "Ollama: \(status.detail)"
+    func menuWillOpen(_ menu: NSMenu) { monitor.refresh() }
+
+    // MARK: - Readiness
+
+    private func render(_ report: ReadinessReport?) {
+        renderIcon(report)
+        renderMenu(report)
+    }
+
+    private func renderIcon(_ report: ReadinessReport?) {
+        guard let button = statusItem?.button else { return }
+        let symbol: String?
+        switch report?.readiness {
+        case .degraded: symbol = "exclamationmark.triangle"
+        case .blocked: symbol = "xmark.octagon.fill"
+        case .ready, nil: symbol = nil
+        }
+        let image = symbol.flatMap { NSImage(systemSymbolName: $0, accessibilityDescription: nil) }
+        image?.isTemplate = true
+        button.image = image
+        button.imagePosition = .imageTrailing
+        let label = Self.iconLabel(report)
+        button.toolTip = label
+        button.setAccessibilityLabel(label)
+    }
+
+    private static func iconLabel(_ report: ReadinessReport?) -> String {
+        guard let report else { return "babelOtter: checking" }
+        guard let first = report.causes.first else { return "babelOtter: ready" }
+        return "babelOtter: \(headline(report).lowercased()). \(first.detail)"
+    }
+
+    private static func headline(_ report: ReadinessReport?) -> String {
+        guard let report else { return "Checking..." }
+        switch report.readiness {
+        case .ready: return "Ready"
+        case .degraded: return "Degraded"
+        case .blocked: return "Blocked"
+        }
+    }
+
+    private func renderMenu(_ report: ReadinessReport?) {
+        guard let menu = statusItem?.menu else { return }
+        for item in statusLines { menu.removeItem(item) }
+        statusLines = makeStatusLines(report)
+        var index = 0
+        for item in statusLines {
+            menu.insertItem(item, at: index)
+            index += 1
+        }
+    }
+
+    /// Status as section headers, so it reads as information, each followed
+    /// by the command that fixes it -- never a line that looks like a
+    /// disabled command.
+    private func makeStatusLines(_ report: ReadinessReport?) -> [NSMenuItem] {
+        guard let report else { return [.sectionHeader(title: "Checking\u{2026}"), .separator()] }
+        guard !report.causes.isEmpty else { return [.sectionHeader(title: "Ready"), .separator()] }
+        var lines: [NSMenuItem] = []
+        for cause in report.causes {
+            lines.append(.sectionHeader(title: cause.header))
+            if let remedy = cause.remedy {
+                let item = action(remedy.title, #selector(performRemedy(_:)))
+                item.representedObject = remedy
+                lines.append(item)
+            }
+        }
+        lines.append(.separator())
+        return lines
+    }
+
+    @objc private func performRemedy(_ sender: NSMenuItem) {
+        guard let remedy = sender.representedObject as? ReadinessRemedy else { return }
+        switch remedy {
+        case .openAccessibilitySettings:
+            AccessibilitySettings.open()
+        case .startOllama:
+            startOllama()
+        case .copyPullCommand(let command):
+            // Never while a capture or replacement owns the pasteboard.
+            guard !isCapturing, currentModel?.isReplacing != true else { return }
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(command, forType: .string)
+        case .openKeyboardShortcutsSettings:
+            KeyboardShortcutsSettings.open()
+        }
+    }
+
+    /// Launches the Ollama app when it is installed, else opens its download
+    /// page. A check follows once the daemon has had time to listen.
+    private func startOllama() {
+        guard let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.electron.ollama") else {
+            if let page = URL(string: "https://ollama.com/download") { NSWorkspace.shared.open(page) }
+            return
+        }
+        NSWorkspace.shared.openApplication(at: app, configuration: NSWorkspace.OpenConfiguration())
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(3))
+            self?.monitor.refresh()
         }
     }
 
@@ -118,11 +238,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// second press dismiss (and so cancel) the current popup before
     /// starting a new one.
     func startAction(_ action: Action) {
+        monitor.refresh()
+        guard !isCapturing, currentModel?.isReplacing != true else { return }
         guard AXIsProcessTrusted() else {
-            promptForAccessibilityIfNeeded()
+            showAccessibilityNeeded(for: action)
             return
         }
-        guard !isCapturing, currentModel?.isReplacing != true else { return }
         guard let front = NSWorkspace.shared.frontmostApplication,
             front.processIdentifier != ProcessInfo.processInfo.processIdentifier
         else { return }
@@ -159,5 +280,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             panel.makeKeyNow()
             model.begin(with: outcome)
         }
+    }
+
+    /// No capture starts, so the panel may take focus at once: Return opens
+    /// System Settings, Escape dismisses. A second press replaces this popup
+    /// rather than stacking another.
+    private func showAccessibilityNeeded(for action: Action) {
+        currentModel?.dismiss()
+        let model = PopupModel(
+            action: action,
+            environment: environment,
+            close: { [weak self] in self?.panel.dismiss() },
+            reopen: { [weak self] model in
+                guard let self else { return }
+                self.currentModel = model
+                self.panel.show(PopupView(model: model))
+            })
+        model.requireAccessibility()
+        currentModel = model
+        panel.show(PopupView(model: model))
     }
 }

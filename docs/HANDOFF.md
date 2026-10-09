@@ -1,6 +1,29 @@
-# Handoff — state as of 2026-10-05
+# Handoff — state as of 2026-10-08
 
 Read this first if you are picking babelOtter up in a new session.
+
+## Update 2026-10-08: readiness is built (#28, #29, the #26 bug)
+
+The menu bar icon shows readiness: the otter alone is ready, a triangle is degraded, a stop sign is blocked. The menu names each cause above the configuration line. Blocked means only that Accessibility is missing; Ollama unreachable, a missing model, an unregistered hotkey and a hotkey clashing with a system shortcut are degraded. Checks run every 30 s and on menu open, action trigger and wake. An action without Accessibility opens the popup with **Open System Settings**; the system prompt runs at first launch only.
+
+Spec: `docs/superpowers/specs/2026-10-06-readiness-design.md`. Plan: `docs/superpowers/plans/2026-10-08-readiness.md`.
+
+**Measured 2026-10-08:** `CopySymbolicHotKeys` reports Carbon modifier bits (Command-Shift-3 is key code 20, `0x300`); function and arrow keys add `0x20000`. Carbon hotkeys are non-exclusive, so registration never fails because another app holds the combination, and no API lists other apps' hotkeys.
+
+**Manual checks (yours):**
+
+| # | Do | Expect |
+|---|---|---|
+| M1 | Revoke Accessibility for babelOtter in System Settings | Within 30 s: stop sign; menu starts with the header "Accessibility isn't granted" and "Open Accessibility Settings…" under it |
+| M2 | With it revoked, press Control-Option-T in any app | Popup explains; Return or the button opens the Accessibility pane and closes the popup; Escape dismisses |
+| M3 | Grant it again | Within 30 s: the otter alone, header "Ready"; no dialog |
+| M4 | Stop Ollama (`pkill ollama` or quit the app) | Within 30 s: triangle; header "Ollama isn't running" with "Start Ollama". Click it: Ollama launches and the menu reads "Ready" within a few seconds |
+| M5 | Set `models.correct` in `config.json` to a model that is not installed, relaunch | Triangle; header "Correct: ... isn't installed" with "Copy “ollama pull ...”"; clicking it puts the command on the clipboard. Restore it |
+| M6 | Pause Ollama (`pkill -STOP ollama`), wait 90 s, open the menu, then `pkill -CONT ollama` | No hang and no pile-up: the menu opens at once, and the status updates once the probe times out or Ollama resumes |
+| M7 | Keep the menu open across a status change (open it, then stop Ollama and click Check Again) | The lines change in place; no duplicated header or command |
+| M8 | Remove the `correct` entry from `models` in `config.json`, relaunch | Ready (the default model is checked, not skipped), assuming it is installed |
+| M9 | With Accessibility revoked, press Control-Option-T three times quickly | One popup, replaced each time; nothing is captured |
+| M10 | In System Settings › Keyboard › Keyboard Shortcuts, assign Control-Option-T to a Screenshots entry | Within 30 s: triangle; header "Control-Option-T is also a system shortcut" with "Open Keyboard Shortcuts Settings…", which opens that pane Press it and note which one fires; record that in `docs/architecture.md` section 7. Restore the shortcut: ready again |
 
 ## Update 2026-10-05: the evaluation harness is built
 
