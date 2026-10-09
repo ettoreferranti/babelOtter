@@ -100,7 +100,7 @@ public struct ReadinessPolicy: Sendable {
 | `ollamaUnreachable(d)` | "Ollama is not reachable: `d`" |
 | `modelMissing(a, m)` | "`<Action>`: the model `m` is not installed." |
 | `hotKeyNotRegistered(a, c)` | "`<c>` couldn't be registered. Use the menu for `<Action>`." |
-| `hotKeyClashesWithSystem(a, c)` | "`<c>` is also a system shortcut, so it may not reach `<Action>`. Change it in System Settings › Keyboard › Keyboard Shortcuts, or use the menu." |
+| `hotKeyClashesWithSystem(a, c)` | "`<c>` is also a system shortcut, so pressing it runs both. Change it in System Settings › Keyboard › Keyboard Shortcuts." |
 
 No period follows the daemon's text, which may already end in one.
 
@@ -170,7 +170,7 @@ The popup reads "babelOtter needs Accessibility permission to read your selectio
 ## 5. Errors and edge cases
 
 - **Probe hangs.** The client's existing timeout bounds it. The in-flight join means the 30 s loop never stacks probes.
-- **A clash is a warning, not a certainty.** When a system shortcut and babelOtter's hotkey share a combination, the system is expected to take the press. Manual check 5 confirms this; if babelOtter turns out to receive it anyway, the detail's "may not reach" wording stays true.
+- **A clash is a warning, not a certainty.** When a system shortcut and babelOtter's hotkey share a combination, both fire: measured 2026-10-09 (manual check M10), one press took a screenshot and opened the Translate popup. The detail therefore warns that both run, not that babelOtter may miss the press.
 - **Menu shortcuts inside other apps** are not detected. No API lists them.
 - **Ad-hoc-signed builds.** macOS ties the Accessibility grant to the code signature. `Tools/make-app.sh` signs with the stable "babelOtter Dev" identity when it exists, which keeps the grant; without it the build is signed ad hoc, and each rebuild loses the grant or lists it as granted while `AXIsProcessTrusted()` returns false. Blocked straight after such a rebuild is this, not a bug. #82 (signing) removes it for good.
 - **Revocation while running** is covered by the same paths: the next check turns the icon blocked, and the next action shows the popup. Re-presenting the setup steps (`FR-ONB-02`, #71) is out of scope.

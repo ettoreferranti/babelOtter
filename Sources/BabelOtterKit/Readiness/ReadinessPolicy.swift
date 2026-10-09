@@ -118,10 +118,11 @@ public enum ReadinessCause: Sendable, Equatable {
             return "\(action.displayName): the model \(model) is not installed."
         case .hotKeyNotRegistered(let action, let combination):
             return "\(combination) couldn't be registered. Use the menu for \(action.displayName)."
-        case .hotKeyClashesWithSystem(let action, let combination):
-            return "\(combination) is also a system shortcut, so it may not reach \(action.displayName)."
-                + " Change it in System Settings \u{203A} Keyboard \u{203A} Keyboard Shortcuts,"
-                + " or use the menu."
+        case .hotKeyClashesWithSystem(_, let combination):
+            // Measured: neither hotkey consumes the press, so both actions run
+            // (docs/architecture.md section 7).
+            return "\(combination) is also a system shortcut, so pressing it runs both."
+                + " Change it in System Settings \u{203A} Keyboard \u{203A} Keyboard Shortcuts."
         }
     }
 }
