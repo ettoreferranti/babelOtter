@@ -19,14 +19,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// Set once, when the configuration folder cannot be watched.
     private var watchProblems: [String] = []
 
-    private static let translateCombination = HotKeyCombination(
-        keyCode: UInt32(kVK_ANSI_T), modifiers: UInt32(controlKey | optionKey),
-        displayName: "Control-Option-T")
-    private static let correctCombination = HotKeyCombination(
-        keyCode: UInt32(kVK_ANSI_C), modifiers: UInt32(controlKey | optionKey),
-        displayName: "Control-Option-C")
-    private var hotKey: HotKey?
-    private var correctHotKey: HotKey?
+    private var hotKeys: [Action: HotKey] = [:]
+    /// The combinations in use; the launch ones until the first plan, so a
+    /// typo in the file at launch still leaves Control-Option-T and -C.
+    private var combinations = HotKeyPlan.launchCombinations
+    private var hotKeyIssues: [HotKeyIssue] = []
+    private var actionItems: [Action: NSMenuItem] = [:]
+    private let layoutReader = KeyboardLayoutReader()
     private let panel = PopupPanel()
     private var currentModel: PopupModel?
     /// A clipboard capture must always run to its own restore -- cancelling
@@ -42,8 +41,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         buildMenu()
-        registerHotKeys()
+        updateHotKeys()
         startWatching()
+        layoutReader.onChange = { [weak self] in self?.layoutChanged() }
+        layoutReader.start()
         pushConfigurationProblems()
         promptForAccessibilityIfNeeded()
         monitor.onChange = { [weak self] report in self?.render(report) }
@@ -51,21 +52,78 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         monitor.start()
     }
 
-    /// Registration stays non-exclusive. A failure is recorded as a fact and
-    /// reaches the menu as a cause, never written over another line (#26).
-    private func registerHotKeys() {
-        let translate = Self.translateCombination
-        hotKey = HotKey(keyCode: translate.keyCode, modifiers: translate.modifiers, id: 1) {
-            [weak self] in self?.startAction(.translate)
+    /// Registration stays non-exclusive; a failure reaches the menu as a
+    /// cause (#26). Every changed hotkey is released before any is
+    /// registered, so Translate and Correct can swap combinations in one save.
+    private func updateHotKeys() {
+        let plan = HotKeyPlan.make(
+            bindings: source.configuration.hotkeys, previous: combinations,
+            layout: KeyboardLayoutReader.current())
+        let changed = changedActions(to: plan.combinations)
+        for action in changed {
+            hotKeys[action]?.unregister()
+            hotKeys[action] = nil
         }
-        let correct = Self.correctCombination
-        correctHotKey = HotKey(keyCode: correct.keyCode, modifiers: correct.modifiers, id: 2) {
-            [weak self] in self?.startAction(.correct)
+        for action in changed {
+            guard let combination = plan.combinations[action] else { continue }
+            hotKeys[action] = HotKey(
+                keyCode: combination.keyCode, modifiers: combination.modifiers,
+                id: Self.hotKeyID(action)
+            ) { [weak self] in self?.startAction(action) }
         }
-        monitor.hotKeys = [
-            HotKeyFact(action: .translate, combination: translate, registered: hotKey != nil),
-            HotKeyFact(action: .correct, combination: correct, registered: correctHotKey != nil),
-        ]
+        combinations = plan.combinations
+        hotKeyIssues = plan.issues
+        for action in HotKeyPlan.actions {
+            actionItems[action]?.title = Self.menuTitle(action, combinations[action])
+        }
+        var facts: [HotKeyFact] = []
+        for action in HotKeyPlan.actions {
+            if let combination = combinations[action] {
+                facts.append(HotKeyFact(
+                    action: action, combination: combination, registered: hotKeys[action] != nil))
+            }
+        }
+        monitor.hotKeys = facts
+    }
+
+    /// An action whose keys are the same and still registered is left alone;
+    /// one whose registration failed is retried.
+    private func changedActions(to wanted: [Action: HotKeyCombination]) -> [Action] {
+        var changed: [Action] = []
+        for action in HotKeyPlan.actions {
+            let new = wanted[action]
+            if let old = combinations[action], let new, old.sameKeys(as: new), hotKeys[action] != nil {
+                continue
+            }
+            if combinations[action] == nil, new == nil, hotKeys[action] == nil {
+                continue
+            }
+            changed.append(action)
+        }
+        return changed
+    }
+
+    private static func hotKeyID(_ action: Action) -> UInt32 {
+        switch action {
+        case .translate: return 1
+        case .correct: return 2
+        case .explain: return 3
+        case .repitch: return 4
+        }
+    }
+
+    /// "Translate Selection (Control-Option-T)", or without the combination
+    /// when the hotkey is off.
+    private static func menuTitle(_ action: Action, _ combination: HotKeyCombination?) -> String {
+        let base = "\(action.displayName) Selection"
+        guard let combination else { return base }
+        return "\(base) (\(combination.displayName))"
+    }
+
+    private func layoutChanged() {
+        updateHotKeys()
+        pushConfigurationProblems()
+        monitor.refresh()
     }
 
     // MARK: - Configuration
@@ -89,12 +147,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         source.reload()
         environment = AppEnvironment(configuration: source.configuration)
         monitor.update(configuration: source.configuration)
+        updateHotKeys()
         pushConfigurationProblems()
         monitor.refresh()
     }
 
     private func pushConfigurationProblems() {
-        monitor.configurationProblems = source.problems + watchProblems
+        var problems = source.problems + watchProblems
+        for issue in hotKeyIssues {
+            problems.append(issue.description)
+        }
+        monitor.configurationProblems = problems
     }
 
     private func buildMenu() {
@@ -104,12 +167,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         let menu = NSMenu()
         menu.delegate = self
-        menu.addItem(action(
-            "Translate Selection (\(Self.translateCombination.displayName))",
-            #selector(translateSelectionAction)))
-        menu.addItem(action(
-            "Correct Selection (\(Self.correctCombination.displayName))",
-            #selector(correctSelectionAction)))
+        let translateItem = action(Self.menuTitle(.translate, nil), #selector(translateSelectionAction))
+        let correctItem = action(Self.menuTitle(.correct, nil), #selector(correctSelectionAction))
+        actionItems = [.translate: translateItem, .correct: correctItem]
+        menu.addItem(translateItem)
+        menu.addItem(correctItem)
         menu.addItem(.separator())
         menu.addItem(action("Check Again", #selector(refreshStatusAction)))
         menu.addItem(action("Open Configuration Folder", #selector(openConfiguration)))
