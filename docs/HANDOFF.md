@@ -2,6 +2,25 @@
 
 Read this first if you are picking babelOtter up in a new session.
 
+## Update 2026-10-12: hotkeys are configurable and config.json reloads live (#26)
+
+Hotkeys are set in `config.json` under `hotkeys` (`"translate": "control+option+T"`, `null` for none) and resolved through the current keyboard layout. Every save to `config.json` applies within about half a second; a broken file or hotkey keeps what was in use and shows as a readiness cause with **Show config.json in Finder**. Design: `docs/superpowers/specs/2026-10-12-configurable-hotkeys-design.md`.
+
+**Manual checks (yours):**
+
+| # | Do | Expect |
+|---|---|---|
+| H1 | Change `translate` to `control+option+Y` and save | Within a second the menu reads "Translate Selection (Control-Option-Y)"; Control-Option-Y translates; Control-Option-T no longer does |
+| H2 | Save `config.json` with a missing comma | Triangle; header "config.json: … still using the previous settings" with "Show config.json in Finder"; translating still works. Fix it: ready |
+| H3 | Set `translate` to `contrl+option+T` | Triangle; the header names "contrl"; Control-Option-T still translates |
+| H4 | On the Swiss German layout, set `translate` to `control+option+Z` and press the key labelled Z; switch to the US layout and press the key labelled Z | It translates both times |
+| H5 | Set `correct` to `null` | The menu item reads "Correct Selection"; Control-Option-C does nothing |
+| H6 | Set both to `control+option+T` | Header "…is also the Translate hotkey"; Control-Option-C still corrects |
+| H7 | Change `models.translate` to a model that is not installed | Within a second, triangle and "Translate: … isn't installed" |
+| H8 | Move `config.json` to the Desktop, then back | Header "config.json: the file is missing…", then ready again |
+| H9 | Edit `config.json` once in TextEdit and once in VS Code | Both saves apply |
+| H10 | Swap the two hotkeys in one save | Control-Option-C translates and Control-Option-T corrects; no "is also" header |
+
 ## Update 2026-10-12: closing M1b
 
 #27 is closed. Still to build: #26 (hotkeys you can assign, applied without a restart) and #52 (audience inferred from the source text, profile remembered per app). The stories below are built; one manual pass decides whether they close.
