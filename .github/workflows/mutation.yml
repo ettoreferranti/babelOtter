@@ -133,6 +133,7 @@ jobs:
           Sources/BabelOtterKit/Capture/ResultCustody.swift
           Sources/BabelOtterKit/Config/AudienceProfile.swift
           Sources/BabelOtterKit/Config/Configuration.swift
+          Sources/BabelOtterKit/Config/ConfigurationReload.swift
           Sources/BabelOtterKit/Config/ConfigurationStore.swift
           Sources/BabelOtterKit/Config/Glossary.swift
           Sources/BabelOtterKit/Config/HotKeyBindings.swift
