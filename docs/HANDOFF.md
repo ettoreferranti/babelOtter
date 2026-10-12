@@ -1,6 +1,32 @@
-# Handoff — state as of 2026-10-08
+# Handoff — state as of 2026-10-12
 
 Read this first if you are picking babelOtter up in a new session.
+
+## Update 2026-10-12: closing M1b
+
+#27 is closed. Still to build: #26 (hotkeys you can assign, applied without a restart) and #52 (audience inferred from the source text, profile remembered per app). The stories below are built; one manual pass decides whether they close.
+
+**Manual checks for #48, #49, #50, #51 and #54.** Run on `main` with Ollama up and the default models installed. Tick each that holds; note any that do not.
+
+| # | Story | Do | Expect |
+|---|---|---|---|
+| C1 | #54 | In Mail, select a paragraph of English in a message you are writing, press Control-Option-T | The popup streams a de-CH translation; Replace puts it in place of the selection |
+| C2 | #54 | Translate a few paragraphs with a bulleted list | Paragraphs and list markers survive |
+| C3 | #54 | Translate English containing "street" or "large" | No `ß` anywhere in the German |
+| C4 | #54 | Translate text containing a do-not-translate term and a glossary term from `config.json` | The first appears verbatim; the second uses the configured rendering |
+| C5 | #49 | Translate a typical paragraph and watch the popup | First words appear within about 2 s; the view follows the text without flicker; a spinner shows while it streams |
+| C6 | #49 | Watch the end of a stream | The streamed text is replaced by the final, post-processed text (for example `ß` gone) |
+| C7 | #50 | Look at Replace and Copy while streaming, then after it finishes | Disabled while streaming, enabled when finished |
+| C8 | #50 | Press Copy (or Shift-Command-C) on a finished result | The final text is on the clipboard. **Known gap:** the popup closes at once with no confirmation; the criterion asks the popup to confirm |
+| C9 | #50 | Press Regenerate on a finished result | A new translation runs with the same direction, profile and style note |
+| C10 | #50 | Press Escape while it streams | The popup closes and the request stops (Ollama's CPU/GPU load drops) |
+| C11 | #48 | Trigger in TextEdit with a selection | TextEdit stays frontmost (its menu bar stays), the selection stays selected, and the popup appears near the mouse pointer, fully on screen, before any text arrives (aim: under 150 ms) |
+| C12 | #48 | After capture, type in the popup's instruction field and press Return | Typing goes to the popup; TextEdit stays frontmost; babelOtter never becomes the active app |
+| C13 | #48 | With two displays: selection on one, mouse pointer on the other, press the hotkey | **Likely gap:** the popup goes to the pointer's display, not the selection's. Passes only if both are on the same display |
+| C14 | #51 | Translate one short word whose language is ambiguous (for example "Hand") | The popup asks which language to translate into instead of guessing |
+| C15 | #51 | On a finished translation, press Swap in the header | It re-runs in the opposite direction; `config.json` is unchanged |
+
+C8 and C13 are expected to fail as the code stands; if they do, they are small follow-ups on #50 and #48 rather than reasons to keep the whole story open.
 
 ## Update 2026-10-08: readiness is built (#28, #29, the #26 bug)
 
