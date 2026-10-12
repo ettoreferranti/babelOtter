@@ -166,4 +166,15 @@ struct ConfigurationStoreTests {
         #expect(loaded.problems.isEmpty)
         #expect(loaded.configuration.hotkeys == nil)
     }
+
+    /// One read decides both "is there a file" and "what is in it", so a file
+    /// replaced between two reads can never pass for a clean load of the
+    /// defaults (#26 review).
+    @Test("a load says whether the file was there")
+    func fileFound() throws {
+        let store = ConfigurationStore(directory: try temporaryDirectory())
+        #expect(store.load().fileFound == false)
+        try store.save(.default)
+        #expect(store.load().fileFound == true)
+    }
 }

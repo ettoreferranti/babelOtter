@@ -67,6 +67,8 @@ public enum HotKeyProblem: Error, Sendable, Equatable {
     case needsModifier
     case notOnLayout(String)
     case sharedWith(Action)
+    /// The previous combination could not be kept: another action now has it.
+    case previousTakenBy(Action)
 
     public var detail: String {
         switch self {
@@ -86,6 +88,8 @@ public enum HotKeyProblem: Error, Sendable, Equatable {
             return "\"\(character)\" can't be typed on the current keyboard layout"
         case .sharedWith(let action):
             return "is also the \(action.displayName) hotkey"
+        case .previousTakenBy(let action):
+            return "so this action has no hotkey: its previous one is now the \(action.displayName) hotkey"
         }
     }
 }

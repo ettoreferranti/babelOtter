@@ -56,13 +56,17 @@ public struct HotKeyPlan: Sendable, Equatable {
             case .success(let combination):
                 if let owner = owner(of: combination, in: combinations) {
                     issues += [HotKeyIssue(action: action, text: text, problem: .sharedWith(owner))]
-                    keepPrevious(for: action, from: previous, into: &combinations)
+                    if let taker = keepPrevious(for: action, from: previous, into: &combinations) {
+                        issues += [HotKeyIssue(action: action, text: text, problem: .previousTakenBy(taker))]
+                    }
                 } else {
                     combinations[action] = combination
                 }
             case .failure(let problem):
                 issues += [HotKeyIssue(action: action, text: text, problem: problem)]
-                keepPrevious(for: action, from: previous, into: &combinations)
+                if let taker = keepPrevious(for: action, from: previous, into: &combinations) {
+                    issues += [HotKeyIssue(action: action, text: text, problem: .previousTakenBy(taker))]
+                }
             }
         }
         return HotKeyPlan(combinations: combinations, issues: issues)
@@ -103,13 +107,17 @@ public struct HotKeyPlan: Sendable, Equatable {
     }
 
     /// The previous combination, unless another action now holds it.
+    /// Returns that action when it does, so losing the hotkey is reported
+    /// rather than left to the menu title to reveal.
     private static func keepPrevious(
         for action: Action, from previous: [Action: HotKeyCombination],
         into combinations: inout [Action: HotKeyCombination]
-    ) {
-        guard let kept = previous[action] else { return }
-        if owner(of: kept, in: combinations) == nil {
-            combinations[action] = kept
+    ) -> Action? {
+        guard let kept = previous[action] else { return nil }
+        if let taker = owner(of: kept, in: combinations) {
+            return taker
         }
+        combinations[action] = kept
+        return nil
     }
 }

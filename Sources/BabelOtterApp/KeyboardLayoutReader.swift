@@ -5,18 +5,23 @@ import Foundation
 /// What each key types on the keyboard layout in use, and when that layout
 /// changes (#26).
 @MainActor
-final class KeyboardLayoutReader {
+final class KeyboardLayoutReader: NSObject {
 
     var onChange: (@MainActor () -> Void)?
-    private var observer: (any NSObjectProtocol)?
 
+    /// `.deliverImmediately`: babelOtter is an accessory app that is almost
+    /// never active, and distributed notifications are otherwise held back
+    /// while an app is inactive -- the hotkeys would stay on the old layout
+    /// until babelOtter happened to be activated.
     func start() {
-        let name = Notification.Name(kTISNotifySelectedKeyboardInputSourceChanged as String)
-        observer = DistributedNotificationCenter.default().addObserver(
-            forName: name, object: nil, queue: .main
-        ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.onChange?() }
-        }
+        DistributedNotificationCenter.default().addObserver(
+            self, selector: #selector(layoutDidChange),
+            name: Notification.Name(kTISNotifySelectedKeyboardInputSourceChanged as String),
+            object: nil, suspensionBehavior: .deliverImmediately)
+    }
+
+    @objc private func layoutDidChange(_ notification: Notification) {
+        onChange?()
     }
 
     /// The current layout; the ASCII-capable one when the current input

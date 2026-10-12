@@ -26,11 +26,11 @@ final class ConfigurationSource {
                 .map { home.appending(path: $0) })
         do {
             let store = try ConfigurationStore.inApplicationSupport(locator: locator)
-            let exists = FileManager.default.fileExists(atPath: store.fileURL.path)
+            let loaded = store.load()
             let result = ConfigurationReload.apply(
-                previous: .default, loaded: store.load(), fileExists: exists, isLaunch: true)
+                previous: .default, loaded: loaded, fileExists: loaded.fileFound, isLaunch: true)
             var problems = Self.summaries(result.problems)
-            if !exists {
+            if !loaded.fileFound {
                 do {
                     try store.save(result.configuration)
                 } catch {
@@ -51,9 +51,12 @@ final class ConfigurationSource {
     /// fixes the file clears them.
     func reload() {
         guard let store else { return }
-        let exists = FileManager.default.fileExists(atPath: store.fileURL.path)
+        // One read for both presence and content: an editor that deletes
+        // and rewrites must never make a vanished file look like a clean
+        // load of the defaults.
+        let loaded = store.load()
         let result = ConfigurationReload.apply(
-            previous: configuration, loaded: store.load(), fileExists: exists, isLaunch: false)
+            previous: configuration, loaded: loaded, fileExists: loaded.fileFound, isLaunch: false)
         configuration = result.configuration
         problems = Self.summaries(result.problems)
     }

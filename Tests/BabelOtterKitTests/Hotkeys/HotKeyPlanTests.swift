@@ -82,6 +82,7 @@ struct HotKeyPlanTests {
         let result = plan(.text("control+option+C"), .text("control+option+C"))
         #expect(result.combinations[.translate]?.keyCode == 0x08)
         #expect(result.combinations[.correct] == nil)
+        #expect(result.issues.last?.problem == .previousTakenBy(.translate))
     }
 
     @Test("a Correct typo keeps its previous combination only if Translate has not taken it")
@@ -89,7 +90,16 @@ struct HotKeyPlanTests {
         let result = plan(.text("control+option+C"), .text("contrl+option+X"))
         #expect(result.combinations[.translate]?.keyCode == 0x08)
         #expect(result.combinations[.correct] == nil)
-        #expect(result.issues.count == 1)
+        #expect(result.issues == [
+            HotKeyIssue(action: .correct, text: "contrl+option+X", problem: .unknownPart("contrl")),
+            HotKeyIssue(action: .correct, text: "contrl+option+X", problem: .previousTakenBy(.translate)),
+        ])
+    }
+
+    @Test("losing the previous hotkey is said in so many words")
+    func previousTakenDetail() {
+        #expect(HotKeyProblem.previousTakenBy(.translate).detail
+            == "so this action has no hotkey: its previous one is now the Translate hotkey")
     }
 
     @Test("swapping the two combinations in one save is no duplicate")

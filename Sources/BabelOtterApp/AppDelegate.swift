@@ -26,6 +26,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var hotKeyIssues: [HotKeyIssue] = []
     private var actionItems: [Action: NSMenuItem] = [:]
     private let layoutReader = KeyboardLayoutReader()
+    /// The layout the hotkeys were last resolved against.
+    private var lastLayout = KeyLayout(characters: [:])
     private let panel = PopupPanel()
     private var currentModel: PopupModel?
     /// A clipboard capture must always run to its own restore -- cancelling
@@ -56,9 +58,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// cause (#26). Every changed hotkey is released before any is
     /// registered, so Translate and Correct can swap combinations in one save.
     private func updateHotKeys() {
+        lastLayout = KeyboardLayoutReader.current()
         let plan = HotKeyPlan.make(
-            bindings: source.configuration.hotkeys, previous: combinations,
-            layout: KeyboardLayoutReader.current())
+            bindings: source.configuration.hotkeys, previous: combinations, layout: lastLayout)
         let changed = changedActions(to: plan.combinations)
         for action in changed {
             hotKeys[action]?.unregister()
@@ -200,7 +202,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func refreshStatusAction() { monitor.refresh() }
 
-    func menuWillOpen(_ menu: NSMenu) { monitor.refresh() }
+    func menuWillOpen(_ menu: NSMenu) {
+        // A backstop for a layout change whose notification was held back
+        // while babelOtter was inactive.
+        if KeyboardLayoutReader.current() != lastLayout {
+            layoutChanged()
+            return
+        }
+        monitor.refresh()
+    }
+
+    /// Selects config.json, or opens its folder when the file is missing --
+    /// which is exactly when this command is offered for "the file is
+    /// missing".
+    private func showConfiguration() {
+        guard let store = source.store else { return }
+        if FileManager.default.fileExists(atPath: store.fileURL.path(percentEncoded: false)) {
+            NSWorkspace.shared.activateFileViewerSelecting([store.fileURL])
+        } else {
+            NSWorkspace.shared.open(store.directory)
+        }
+    }
 
     // MARK: - Readiness
 
@@ -286,9 +308,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         case .openKeyboardShortcutsSettings:
             KeyboardShortcutsSettings.open()
         case .showConfiguration:
-            let file = FileManager.default.homeDirectoryForCurrentUser
-                .appending(path: "Library/Application Support/ch.babelotter/config.json")
-            NSWorkspace.shared.activateFileViewerSelecting([file])
+            showConfiguration()
         }
     }
 

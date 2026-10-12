@@ -16,6 +16,16 @@ public struct ConfigurationProblem: Sendable, Equatable {
 public struct LoadedConfiguration: Sendable, Equatable {
     public let configuration: Configuration
     public let problems: [ConfigurationProblem]
+    /// Whether there was a file to read. Decided by the same read as the
+    /// content, so a file replaced between two reads can never pass for a
+    /// clean load of the defaults (#26).
+    public let fileFound: Bool
+
+    public init(configuration: Configuration, problems: [ConfigurationProblem], fileFound: Bool = true) {
+        self.configuration = configuration
+        self.problems = problems
+        self.fileFound = fileFound
+    }
 }
 
 extension JSONEncoder {
@@ -71,7 +81,7 @@ public struct ConfigurationStore: Sendable {
         guard let data = FileManager.default.contents(atPath: fileURL.path(percentEncoded: false))
         else {
             // No file is not a problem: it is what a first launch looks like.
-            return LoadedConfiguration(configuration: .default, problems: [])
+            return LoadedConfiguration(configuration: .default, problems: [], fileFound: false)
         }
         do {
             let configuration = try JSONDecoder().decode(Configuration.self, from: data)
