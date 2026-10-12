@@ -153,4 +153,17 @@ struct ConfigurationStoreTests {
             try ConfigurationStore.inApplicationSupport(locator: locator)
         }
     }
+
+    @Test("a file written before hotkeys existed still loads, with no problems")
+    func fileWithoutHotkeys() throws {
+        let store = ConfigurationStore(directory: try temporaryDirectory())
+        try store.save(.default)
+        let data = try Data(contentsOf: store.fileURL)
+        var object = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        object["hotkeys"] = nil
+        try JSONSerialization.data(withJSONObject: object).write(to: store.fileURL)
+        let loaded = store.load()
+        #expect(loaded.problems.isEmpty)
+        #expect(loaded.configuration.hotkeys == nil)
+    }
 }

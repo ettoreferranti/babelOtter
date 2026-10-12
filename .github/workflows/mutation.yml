@@ -135,6 +135,7 @@ jobs:
           Sources/BabelOtterKit/Config/Configuration.swift
           Sources/BabelOtterKit/Config/ConfigurationStore.swift
           Sources/BabelOtterKit/Config/Glossary.swift
+          Sources/BabelOtterKit/Config/HotKeyBindings.swift
           Sources/BabelOtterKit/Config/LanguageConfig.swift
           Sources/BabelOtterKit/LLM/BlockCountPolicy.swift
           Sources/BabelOtterKit/LLM/OllamaEndpoint.swift
