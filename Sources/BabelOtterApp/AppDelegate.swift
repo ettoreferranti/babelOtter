@@ -8,16 +8,16 @@ import SwiftUI
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private var statusItem: NSStatusItem?
-    /// Hidden unless `environment.configurationNote` has something to say --
-    /// most launches have nothing wrong with the config file, and a menu
-    /// line reporting that would be noise.
-    private let configLine = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     /// The readiness section at the top of the menu: a header per cause with
     /// the command that fixes it, then a separator. Replaced as a block on
     /// every report, in place, so an open menu updates too.
     private var statusLines: [NSMenuItem] = []
-    private(set) var environment = AppEnvironment.load()
-    private lazy var monitor = ReadinessMonitor(environment: environment)
+    private let source = ConfigurationSource()
+    private(set) lazy var environment = AppEnvironment(configuration: source.configuration)
+    private lazy var monitor = ReadinessMonitor(configuration: source.configuration)
+    private lazy var watcher: ConfigurationWatcher? = makeWatcher()
+    /// Set once, when the configuration folder cannot be watched.
+    private var watchProblems: [String] = []
 
     private static let translateCombination = HotKeyCombination(
         keyCode: UInt32(kVK_ANSI_T), modifiers: UInt32(controlKey | optionKey),
@@ -43,6 +43,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         buildMenu()
         registerHotKeys()
+        startWatching()
+        pushConfigurationProblems()
         promptForAccessibilityIfNeeded()
         monitor.onChange = { [weak self] report in self?.render(report) }
         render(nil)
@@ -66,17 +68,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         ]
     }
 
+    // MARK: - Configuration
+
+    private func makeWatcher() -> ConfigurationWatcher? {
+        guard let store = source.store else { return nil }
+        return ConfigurationWatcher(directory: store.directory, file: store.fileURL)
+    }
+
+    private func startWatching() {
+        guard let watcher else { return }
+        watcher.onChange = { [weak self] in self?.configurationChanged() }
+        if !watcher.start() {
+            watchProblems = ["changes need a restart: the folder can't be watched"]
+        }
+    }
+
+    /// Every saved change, applied in one place (#26). A popup already open
+    /// keeps the environment it started with.
+    private func configurationChanged() {
+        source.reload()
+        environment = AppEnvironment(configuration: source.configuration)
+        monitor.update(configuration: source.configuration)
+        pushConfigurationProblems()
+        monitor.refresh()
+    }
+
+    private func pushConfigurationProblems() {
+        monitor.configurationProblems = source.problems + watchProblems
+    }
+
     private func buildMenu() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         item.button?.title = "\u{1F9A6}"
         item.button?.toolTip = "babelOtter"
-
-        if let note = environment.configurationNote {
-            configLine.title = "Configuration: \(note)"
-            configLine.isHidden = false
-        } else {
-            configLine.isHidden = true
-        }
 
         let menu = NSMenu()
         menu.delegate = self
@@ -86,7 +110,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(action(
             "Correct Selection (\(Self.correctCombination.displayName))",
             #selector(correctSelectionAction)))
-        menu.addItem(configLine)
         menu.addItem(.separator())
         menu.addItem(action("Check Again", #selector(refreshStatusAction)))
         menu.addItem(action("Open Configuration Folder", #selector(openConfiguration)))
