@@ -200,6 +200,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             NSPasteboard.general.setString(command, forType: .string)
         case .openKeyboardShortcutsSettings:
             KeyboardShortcutsSettings.open()
+        case .showConfiguration:
+            let file = FileManager.default.homeDirectoryForCurrentUser
+                .appending(path: "Library/Application Support/ch.babelotter/config.json")
+            NSWorkspace.shared.activateFileViewerSelecting([file])
         }
     }
 
