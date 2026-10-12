@@ -106,7 +106,7 @@ At launch `previous` is Control-Option-T (`0x11`, `0x1800`) and Control-Option-C
 
 ### 5.1 `ConfigurationWatcher` — `Sources/BabelOtterApp/ConfigurationWatcher.swift`
 
-- A `DispatchSource` file-system source on the configuration **folder** (`O_EVTONLY`, `.write`), because editors save by writing a new file and renaming it over the old one, which a watch on the file itself would lose.
+- Two `DispatchSource` file-system sources (`O_EVTONLY`): one on the configuration **folder** (`.write`), which sees a save that writes a new file and renames it over the old one (TextEdit, most macOS editors); and one on **`config.json` itself** (`.write`, `.extend`, `.delete`, `.rename`), which sees a save that writes into the existing file (VS Code, vim with some settings) and leaves the folder untouched. The file source is re-armed after every settled change, because a rename-over save leaves it watching the old, unlinked file.
 - Debounced: a change starts a 300 ms timer; further changes restart it. Then it reads `config.json`'s bytes and calls `onChange` only if they differ from the last bytes seen. The launch load seeds those bytes, so babelOtter's own first-launch save does not trigger a reload.
 - If the folder cannot be opened, it reports that once, as the configuration problem "changes need a restart: the folder can't be watched".
 
@@ -117,14 +117,18 @@ At launch `previous` is Control-Option-T (`0x11`, `0x1800`) and Control-Option-C
 
 ### 5.3 `HotKey`
 
-- Gains `deinit` calling `UnregisterEventHotKey` and removing its entry from `actions`. Today a registration is never released, so a changed hotkey would keep firing under its old combination.
+- Gains `unregister()`, calling `UnregisterEventHotKey` and removing its entry from `actions`. Today a registration is never released, so a changed hotkey would keep firing under its old combination. An explicit call rather than `deinit`: a `deinit` cannot reach main-actor state under Swift 6.1, which CI builds with, and `isolated deinit` needs 6.2.
 
-### 5.4 `AppDelegate`
+### 5.4 `ConfigurationSource` — `Sources/BabelOtterApp/ConfigurationSource.swift`
+
+Takes over the loading `AppEnvironment.load()` does today: the store, the first-launch save, the storage-location notes. It holds the configuration in use and its problems as summaries (`"retentionDays: expected Int, found something else"`), and `reload()` runs `ConfigurationReload.apply` against the configuration in use. `AppEnvironment` shrinks to the configuration and the client built from it.
+
+### 5.5 `AppDelegate`
 
 One method, `apply(configuration:problems:plan:)`, used at launch, on a save and on a layout change:
 
-1. `environment` becomes a new `AppEnvironment` with the configuration, the problems, and a client built with its timeout. Popups take `environment` when they open, so an open popup is unaffected.
-2. For each action whose combination changed: release the old `HotKey` first, then register the new one, so a combination never collides with its own previous registration. Unchanged ones are left alone.
+1. `environment` becomes a new `AppEnvironment` with the configuration and a client built with its timeout. Popups take `environment` when they open, so an open popup is unaffected.
+2. For the actions whose combination changed: release all their old `HotKey`s first, then register the new ones, so a combination never collides with a registration it is replacing, including when Translate and Correct swap combinations in one save. Unchanged ones are left alone.
 3. The Translate and Correct menu items are retitled ("Translate Selection (Control-Option-Z)", or "Translate Selection" with no hotkey).
 4. `ReadinessMonitor.update(models:hotKeys:configurationProblems:)` replaces what it copied at launch, then `refresh()` runs.
 
