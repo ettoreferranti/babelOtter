@@ -3,7 +3,7 @@ import Foundation
 
 /// Where the configuration comes from, and what is wrong with it.
 ///
-/// Reads `~/Library/Application Support/ch.babelotter/config.json`, writing
+/// Reads `~/Library/Application Support/ch.lingoswen/config.json`, writing
 /// the defaults there on first launch so the file can be edited by hand
 /// until settings exist (M3). Every failure falls back so the app still
 /// starts; `problems` is what makes a fallback visible (NFR-P7, FR-CFG-03).

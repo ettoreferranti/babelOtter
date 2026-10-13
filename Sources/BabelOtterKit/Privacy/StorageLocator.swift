@@ -37,7 +37,7 @@ public struct StorageLocator: Sendable {
         self.resolve = resolve
     }
 
-    /// `~/Library/Application Support/ch.babelotter` -- never validated here;
+    /// `~/Library/Application Support/ch.lingoswen` -- never validated here;
     /// callers pass the result to ``validate(_:)`` or ``prepare(_:)``.
     ///
     /// Deliberately non-throwing: the body is pure URL appending and has no
@@ -69,7 +69,7 @@ public struct StorageLocator: Sendable {
     ///   walks up to the deepest existing ancestor and resolves symlinks
     ///   there -- before comparing. Without this, a symlink planted at or
     ///   above the candidate (e.g. `~/Library/Application
-    ///   Support/ch.babelotter` replaced with a symlink into `~/Documents`,
+    ///   Support/ch.lingoswen` replaced with a symlink into `~/Documents`,
     ///   or `~/Documents` itself being a symlink into `~/Library/Mobile
     ///   Documents/...`, which is exactly what Desktop & Documents sync does)
     ///   would dodge a purely lexical comparison. Both sides are resolved,

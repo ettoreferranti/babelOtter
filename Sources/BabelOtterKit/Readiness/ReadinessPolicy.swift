@@ -116,7 +116,7 @@ public enum ReadinessCause: Sendable, Equatable {
     public var detail: String {
         switch self {
         case .accessibilityMissing:
-            return "Accessibility is not granted, so babelOtter can't read your selection."
+            return "Accessibility is not granted, so lingoSwen can't read your selection."
         case .configurationProblem(let text):
             return "config.json: \(text)"
         case .ollamaUnreachable(let detail):

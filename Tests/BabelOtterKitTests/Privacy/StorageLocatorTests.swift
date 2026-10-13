@@ -41,7 +41,7 @@ struct StorageLocatorTests {
     }
 
     @Test("accepts paths outside every synced tree", arguments: [
-        "/Users/example/Library/Application Support/ch.babelotter/history.sqlite",
+        "/Users/example/Library/Application Support/ch.lingoswen/history.sqlite",
         "/Users/example/.babelotter/history.sqlite",
     ])
     func acceptsSafePaths(path: String) throws {
@@ -79,7 +79,7 @@ struct StorageLocatorTests {
     func resolvesApplicationSupport() {
         let directory = locator.applicationSupportDirectory()
         #expect(directory.path(percentEncoded: false)
-            == "/Users/example/Library/Application Support/ch.babelotter")
+            == "/Users/example/Library/Application Support/ch.lingoswen")
     }
 
     @Test("prepare creates the directory with owner-only permissions")
@@ -103,7 +103,7 @@ struct StorageLocatorTests {
 
     @Test("prepare refuses a synced directory")
     func prepareRefusesSyncedDirectory() {
-        let synced = URL(filePath: "/Users/example/Documents/ch.babelotter")
+        let synced = URL(filePath: "/Users/example/Documents/ch.lingoswen")
         #expect(throws: StorageLocationError.self) { try locator.prepare(synced) }
     }
 
@@ -167,7 +167,7 @@ struct StorageLocatorTests {
 
         let appSupportParent = sandbox.appending(path: "Library/Application Support")
         try FileManager.default.createDirectory(at: appSupportParent, withIntermediateDirectories: true)
-        let appSupportBabelotter = appSupportParent.appending(path: "ch.babelotter")
+        let appSupportBabelotter = appSupportParent.appending(path: "ch.lingoswen")
         try FileManager.default.createSymbolicLink(at: appSupportBabelotter, withDestinationURL: hidden)
 
         let sandboxLocator = StorageLocator(home: sandbox, iCloudRoots: [sandbox.appending(path: "Documents")])
@@ -194,7 +194,7 @@ struct StorageLocatorTests {
         try FileManager.default.createSymbolicLink(at: appSupportLink, withDestinationURL: appSupportAlias)
 
         let sandboxLocator = StorageLocator(home: sandbox, iCloudRoots: [sandbox.appending(path: "Documents")])
-        let candidate = appSupportLink.appending(path: "ch.babelotter/history.sqlite")
+        let candidate = appSupportLink.appending(path: "ch.lingoswen/history.sqlite")
 
         #expect(throws: StorageLocationError.self) { try sandboxLocator.validate(candidate) }
     }
@@ -226,7 +226,7 @@ struct StorageLocatorTests {
         defer { try? FileManager.default.removeItem(at: sandbox) }
 
         let sandboxLocator = StorageLocator(home: sandbox, iCloudRoots: [sandbox.appending(path: "Documents")])
-        let candidate = sandbox.appending(path: "Library/Application Support/ch.babelotter/history.sqlite")
+        let candidate = sandbox.appending(path: "Library/Application Support/ch.lingoswen/history.sqlite")
 
         try sandboxLocator.validate(candidate)
     }
@@ -244,19 +244,19 @@ struct StorageLocatorTests {
             iCloudRoots: [URL(filePath: "/Users/example/Documents")],
             resolve: { _ in URL(filePath: "/Users/example/Documents/resolved-target") }
         )
-        let innocuousLooking = URL(filePath: "/Users/example/Library/Application Support/ch.babelotter/history.sqlite")
+        let innocuousLooking = URL(filePath: "/Users/example/Library/Application Support/ch.lingoswen/history.sqlite")
         #expect(throws: StorageLocationError.self) { try spoofingLocator.validate(innocuousLooking) }
     }
 
     @Test("validate() rejects when the injected resolver maps a root onto the candidate's real location")
     func validateHonorsResolvedRoot() {
-        let candidate = URL(filePath: "/Users/example/Library/Application Support/ch.babelotter/history.sqlite")
+        let candidate = URL(filePath: "/Users/example/Library/Application Support/ch.lingoswen/history.sqlite")
         let rootLooksSafeButResolvesToCandidate = StorageLocator(
             home: home,
             iCloudRoots: [URL(filePath: "/Users/example/SomeAliasNameThatLooksSafe")],
             resolve: { url in
                 url.path(percentEncoded: false).hasSuffix("SomeAliasNameThatLooksSafe")
-                    ? URL(filePath: "/Users/example/Library/Application Support/ch.babelotter")
+                    ? URL(filePath: "/Users/example/Library/Application Support/ch.lingoswen")
                     : url
             }
         )

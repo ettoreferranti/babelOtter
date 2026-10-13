@@ -20,7 +20,7 @@ public enum CaptureRefusal: Sendable, Equatable {
         case .clipboardRefused(let application):
             return
                 "\(application) cannot be read without the clipboard, and strict capture is on. "
-                + "Turn it off in Settings to use babelOtter here."
+                + "Turn it off in Settings to use lingoSwen here."
         }
     }
 
