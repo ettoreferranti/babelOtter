@@ -1,6 +1,22 @@
-# Handoff — state as of 2026-10-12
+# Handoff — state as of 2026-10-13
 
 Read this first if you are picking babelOtter up in a new session.
+
+## Update 2026-10-13: the app is now lingoSwen, with Swen as its picture
+
+The app the user sees is **lingoSwen**: bundle `build/lingoSwen.app`, executable `lingoSwen`, bundle ID `ch.lingoswen`, data in `~/Library/Application Support/ch.lingoswen` (moved by hand from `ch.babelotter` on the one dev machine; there is no migration code). Swen (`Tools/app/Mascot.png`) replaces the otter emoji in the menu bar and popup header and is the app icon, which `Tools/make-app.sh` generates from the same picture. The repo, the Swift package and module names (`BabelOtterKit`, `BabelOtterApp`, `babelotter-eval`), the signing identity "babelOtter Dev" and the design docs keep the old name.
+
+M1b manual checks C1-C15 ran on 2026-10-13: #48, #49, #50, #51 and #54 are closed. C8 and C13 failed as expected and continue as #96 (Copy confirms) and #97 (popup on the selection's display). Left in M1b: #52, #96, #97.
+
+**Manual checks (yours):**
+
+| # | Do | Expect |
+|---|---|---|
+| R1 | Look at the menu bar | Swen, in colour, where the otter was; with Ollama stopped, the triangle beside it |
+| R2 | Open the menu | "Quit lingoSwen"; the hover tip reads "lingoSwen: ready" |
+| R3 | Translate a selection | The popup header shows Swen and "lingoSwen" |
+| R4 | System Settings > Privacy & Security > Accessibility | lingoSwen with Swen's icon; grant it (it is a new app to macOS) and remove the old babelOtter entry |
+| R5 | Show config.json in Finder | Opens `ch.lingoswen`, holding your config with the hotkeys, glossary and do-not-translate entries |
 
 ## Update 2026-10-12: hotkeys are configurable and config.json reloads live (#26)
 

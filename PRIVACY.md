@@ -1,6 +1,6 @@
 # Privacy Model
 
-babelOtter is built around one inviolable rule. This document states that
+lingoSwen is built around one inviolable rule. This document states that
 rule, the threat model behind it, how the rule is *enforced* rather than
 merely promised, and — honestly — the one place where macOS can undo it.
 
@@ -8,15 +8,15 @@ merely promised, and — honestly — the one place where macOS can undo it.
 
 ## NFR-P1 — The inviolable rule
 
-> **babelOtter never transmits your content. The clipboard path can expose it
+> **lingoSwen never transmits your content. The clipboard path can expose it
 > to Universal Clipboard if Handoff is enabled.**
 
-The first sentence is the rule, and it is absolute: babelOtter opens exactly
+The first sentence is the rule, and it is absolute: lingoSwen opens exactly
 one socket, to loopback, and an architecture test fails the build if a second
 call site appears.
 
 The second sentence is not a loophole in that rule — it is macOS doing
-something babelOtter neither asks for nor can observe. It is stated up front
+something lingoSwen neither asks for nor can observe. It is stated up front
 rather than buried, because the alternative wording, "no user content ever
 leaves this machine", would have been a promise this program is not in a
 position to keep on its own.
@@ -31,16 +31,16 @@ There is no opt-out because there is nothing to opt out of.
 
 ## NFR-P2 — Permitted network activity
 
-babelOtter itself opens **no non-loopback connections**. Ever.
+lingoSwen itself opens **no non-loopback connections**. Ever.
 
 | Traffic | Who opens it | Carries user content? |
 |---|---|---|
-| `http://127.0.0.1:11434` — inference, streaming | babelOtter | Yes — loopback only |
-| `http://127.0.0.1:11434/api/pull` — model download | babelOtter | **No** — model name only |
-| Actual model bytes from ollama.com | **the Ollama daemon**, not babelOtter | No |
+| `http://127.0.0.1:11434` — inference, streaming | lingoSwen | Yes — loopback only |
+| `http://127.0.0.1:11434/api/pull` — model download | lingoSwen | **No** — model name only |
+| Actual model bytes from ollama.com | **the Ollama daemon**, not lingoSwen | No |
 | `git push` / CI | you, manually | No — source code only |
 
-Model downloads are delegated: babelOtter asks the *local* Ollama daemon to
+Model downloads are delegated: lingoSwen asks the *local* Ollama daemon to
 fetch a model, and Ollama makes the outbound connection. The app's own egress
 stays loopback-only, so the architectural invariant holds without exception.
 Downloads always require explicit confirmation showing model name and size.
@@ -74,7 +74,7 @@ dependency count.
 
 ## Storage
 
-Everything lives under `~/Library/Application Support/ch.babelotter/`:
+Everything lives under `~/Library/Application Support/ch.lingoswen/`:
 
 - **Not** iCloud-synced (unlike `~/Documents` and `~/Desktop`, which are).
 - Marked excluded-from-backup.
@@ -82,7 +82,7 @@ Everything lives under `~/Library/Application Support/ch.babelotter/`:
 - History retention is configurable and there is an unconditional
   **Clear all history** control.
 
-Nothing babelOtter writes ever lands inside the repository. See `.gitignore`.
+Nothing lingoSwen writes ever lands inside the repository. See `.gitignore`.
 
 ---
 
@@ -109,17 +109,17 @@ apps, and the only replacement path for everything except native AppKit text.
 A product that refused to use it would not work in most of the places people
 write.
 
-**The exposure, measured.** When babelOtter uses the clipboard it places your
+**The exposure, measured.** When lingoSwen uses the clipboard it places your
 text on the general pasteboard and restores what was there before. If Handoff
 is enabled, another Apple device signed in to your account can read the
 pasteboard.
 
-It reads it **at the moment you paste there**, not when babelOtter copies.
+It reads it **at the moment you paste there**, not when lingoSwen copies.
 Measured across two Macs on 2026-09-20: an item left on the pasteboard pasted
 verbatim on the other machine, while an item restored after 250ms did not —
 that machine received the restored clipboard instead.
 
-So the exposure is not "everything babelOtter touches reaches your other
+So the exposure is not "everything lingoSwen touches reaches your other
 devices". It is:
 
 > Your text is readable by another device for as long as it sits on the
@@ -130,17 +130,17 @@ Small, but not zero, and stated that way rather than rounded down to nothing.
 
 **Concealment does not help.** The test item was marked
 `org.nspasteboard.ConcealedType` and `com.apple.is-sensitive` and synced
-anyway. babelOtter still sets them, because clipboard managers honour them and
+anyway. lingoSwen still sets them, because clipboard managers honour them and
 keeping your text out of a clipboard history app is worth something — but they
 are not a defence against Handoff, and an earlier version of this document
 recorded that as unverified rather than as known.
 
-**babelOtter cannot tell whether Handoff is on.**
+**lingoSwen cannot tell whether Handoff is on.**
 `com.apple.coreservices.useractivityd` exposes no readable setting for it, so
 the app cannot warn you only when it matters; it has to assume it always
 might.
 
-**What babelOtter does about it**
+**What lingoSwen does about it**
 
 - Restores your previous clipboard contents the instant the operation
   completes, on every path including failures. Since the transfer happens at
@@ -154,12 +154,12 @@ might.
 
 ### Strict capture
 
-Reading and writing expose different things, so babelOtter lets you refuse one
+Reading and writing expose different things, so lingoSwen lets you refuse one
 without losing the other.
 
 **Reading** puts your *existing* text on the pasteboard — an email you
 received, a document you did not write, something you may not have chosen to
-put anywhere. **Writing** puts babelOtter's *own output* there, which you have
+put anywhere. **Writing** puts lingoSwen's *own output* there, which you have
 just read and approved.
 
 `strictCaptureOnly` refuses the clipboard for reading only. Replacement
@@ -167,7 +167,7 @@ continues to use it, because there is no alternative: Accessibility writes were
 measured returning success while changing nothing on every web surface tried.
 
 **What it costs**, from the table in `docs/architecture.md` section 7: with
-strict capture on, babelOtter cannot read a selection in **Microsoft Teams,
+strict capture on, lingoSwen cannot read a selection in **Microsoft Teams,
 Word, OneNote or VS Code** at all, and says so rather than falling back. It
 keeps TextEdit, Preview, Outlook, Safari and Mail — including both mail
 clients, which is most of what makes it worth having.
@@ -181,26 +181,26 @@ The only way to remove the exposure entirely is to turn Handoff off:
 **If this matters to you today**, disable Handoff:
 `System Settings → General → AirDrop & Handoff → Handoff: off`.
 
-### Ollama's network binding is not under babelOtter's control
+### Ollama's network binding is not under lingoSwen's control
 
 Ollama may bind to all interfaces (`*:11434`) rather than loopback, making it
 reachable from your local network. This is inbound exposure of your Ollama
-instance, not babelOtter leaking data, but it undermines the guarantee at the
+instance, not lingoSwen leaking data, but it undermines the guarantee at the
 system level. To restrict it:
 
 ```sh
 launchctl setenv OLLAMA_HOST 127.0.0.1:11434   # then restart Ollama
 ```
 
-babelOtter's Privacy panel warns when it detects a non-loopback binding.
+lingoSwen's Privacy panel warns when it detects a non-loopback binding.
 
 ### Ollama keeps its own logs
 
 `~/.ollama/logs/` may contain prompt text depending on Ollama's log level.
-These are local files, but they are outside babelOtter's control and are not
+These are local files, but they are outside lingoSwen's control and are not
 covered by our redaction policy. They can be cleared manually.
 
-### OS-level traffic babelOtter cannot prevent
+### OS-level traffic lingoSwen cannot prevent
 
 macOS itself performs Gatekeeper / XProtect checks and may report app-launch
 hashes to Apple. This is operating-system behaviour, carries no user content,

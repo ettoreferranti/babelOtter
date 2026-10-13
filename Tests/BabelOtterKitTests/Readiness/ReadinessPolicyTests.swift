@@ -68,7 +68,7 @@ struct ReadinessPolicyTests {
         #expect(report.readiness == .blocked)
         #expect(report.causes == [.accessibilityMissing])
         #expect(ReadinessCause.accessibilityMissing.detail
-            == "Accessibility is not granted, so babelOtter can't read your selection.")
+            == "Accessibility is not granted, so lingoSwen can't read your selection.")
     }
 
     @Test("an unreachable daemon is one degraded cause, with no model causes")

@@ -34,6 +34,11 @@ struct PopupView: View {
 
     private var header: some View {
         HStack {
+            if let mascot = Mascot.image {
+                Image(nsImage: mascot).resizable().scaledToFit().frame(height: 22)
+            } else {
+                Text(Mascot.fallback).font(.headline)
+            }
             Text(headerTitle).font(.headline)
             Spacer()
             if model.action != .correct, let direction = model.direction {
@@ -47,8 +52,8 @@ struct PopupView: View {
     }
 
     private var headerTitle: String {
-        if model.action == .correct { return "\u{1F9A6} Correct" }
-        return "\u{1F9A6} babelOtter"
+        if model.action == .correct { return "Correct" }
+        return "lingoSwen"
     }
 
     /// Audience and a one-off instruction. Both re-run the translation.
@@ -101,8 +106,8 @@ struct PopupView: View {
         case .failed(let reason):
             Text(reason).foregroundStyle(.secondary)
         case .needsAccessibility:
-            Text("babelOtter needs Accessibility permission to read your selection.")
-            Text("Turn it on for babelOtter in System Settings, then try again.")
+            Text("lingoSwen needs Accessibility permission to read your selection.")
+            Text("Turn it on for lingoSwen in System Settings, then try again.")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }

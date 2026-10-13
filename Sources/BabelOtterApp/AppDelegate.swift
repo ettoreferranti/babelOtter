@@ -164,8 +164,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func buildMenu() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        item.button?.title = "\u{1F9A6}"
-        item.button?.toolTip = "babelOtter"
+        item.button?.attributedTitle = Mascot.menuBarTitle()
+        item.button?.toolTip = "lingoSwen"
 
         let menu = NSMenu()
         menu.delegate = self
@@ -178,7 +178,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(action("Check Again", #selector(refreshStatusAction)))
         menu.addItem(action("Open Configuration Folder", #selector(openConfiguration)))
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Quit babelOtter", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        menu.addItem(withTitle: "Quit lingoSwen", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         item.menu = menu
         statusItem = item
     }
@@ -249,9 +249,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private static func iconLabel(_ report: ReadinessReport?) -> String {
-        guard let report else { return "babelOtter: checking" }
-        guard let first = report.causes.first else { return "babelOtter: ready" }
-        return "babelOtter: \(headline(report).lowercased()). \(first.detail)"
+        guard let report else { return "lingoSwen: checking" }
+        guard let first = report.causes.first else { return "lingoSwen: ready" }
+        return "lingoSwen: \(headline(report).lowercased()). \(first.detail)"
     }
 
     private static func headline(_ report: ReadinessReport?) -> String {
@@ -328,7 +328,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func openConfiguration() {
         let home = FileManager.default.homeDirectoryForCurrentUser
-        NSWorkspace.shared.open(home.appending(path: "Library/Application Support/ch.babelotter"))
+        NSWorkspace.shared.open(home.appending(path: "Library/Application Support/\(BabelOtter.bundleIdentifier)"))
     }
 
     @objc private func translateSelectionAction() { startAction(.translate) }

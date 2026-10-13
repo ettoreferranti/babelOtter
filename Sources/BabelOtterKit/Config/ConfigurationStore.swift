@@ -58,7 +58,7 @@ public struct ConfigurationStore: Sendable {
         directory.appending(path: Self.fileName)
     }
 
-    /// The production factory: `~/Library/Application Support/ch.babelotter`,
+    /// The production factory: `~/Library/Application Support/ch.lingoswen`,
     /// refused outright if that path is inside a synced tree (NFR-P7).
     public static func inApplicationSupport(locator: StorageLocator) throws -> ConfigurationStore {
         let directory = locator.applicationSupportDirectory()
