@@ -1,4 +1,6 @@
-# babelOtter 🦦
+<p align="center"><img src="Tools/app/Mascot.png" alt="Swen, the lingoSwen mascot" width="160"></p>
+
+# lingoSwen
 
 A private, system-wide translation and language-tutoring agent for macOS,
 powered entirely by a local LLM running on [Ollama](https://ollama.com).
@@ -7,25 +9,26 @@ Highlight text anywhere in macOS, hit a hotkey, and get a translation,
 a correction, or an explanation — without a single byte of your writing
 leaving your machine.
 
-> **Status: M1a done; a Translate prototype is on `main`, verified by hand in
-> Teams, Word and Outlook.** M1a's pipeline — capture, language detection, structure
-> preservation, prompt building, streaming, response parsing, config — is
-> merged to `main`, with the privacy mechanisms below and a CI pipeline that
-> gates on all of them plus mutation testing of `BabelOtterKit` at ≥80%.
+> lingoSwen was called babelOtter until October 2026. The repository, the Swift
+> package and its modules (`BabelOtterKit`, `BabelOtterApp`, `babelotter-eval`)
+> keep the old name; the app you run is lingoSwen.
+
+> **Status: M1b nearly done.** M1a's pipeline — capture, language detection,
+> structure preservation, prompt building, streaming, response parsing, config —
+> is on `main`, with the privacy mechanisms below and a CI pipeline that gates on
+> all of them plus mutation testing of `BabelOtterKit` at ≥80%.
 >
-> On top of that, a thin slice of M1b is merged: a menu bar app, a global hotkey
-> (**Control-Option-T**), selection capture, a streaming popup, and
-> **Replace** / **Copy**, plus an audience picker (du/Sie) and a one-line
-> instruction field. `swift test` runs 466 tests in 47 suites, all green. It
-> has been checked by hand in Teams, Word and Outlook; the full per-app
-> checklist in [`docs/HANDOFF.md`](docs/HANDOFF.md) says which apps are still
-> unexercised. **Correct** (**Control-Option-C**) is also built — a streamed
-> correction with an inline diff, itemised errors and unapplied suggestions —
-> checked live against the local model, with the manual per-app checks still
-> to run; see [`docs/HANDOFF.md`](docs/HANDOFF.md). **Explain** and
-> **Re-pitch** below are not built yet, and neither are audience inference, a
-> settings window, onboarding or history — see
-> [`docs/HANDOFF.md`](docs/HANDOFF.md) for exactly what is done and skipped.
+> The menu bar app is built on top: **Translate** (**Control-Option-T**) and
+> **Correct** (**Control-Option-C**) on any selection, a streaming popup with
+> **Replace** / **Copy** / **Regenerate**, an audience picker (du/Sie), a
+> one-line instruction field, and a one-click swap of the detected direction.
+> The menu bar icon shows readiness (Accessibility, Ollama, models, hotkeys),
+> each problem with the command that fixes it. Hotkeys are set in `config.json`,
+> follow the current keyboard layout, and every save applies without a restart.
+> `swift test` runs 654 tests in 63 suites, all green. Still open in M1b: #52
+> (audience inferred from the source text), #96 and #97; **Explain**,
+> **Re-pitch**, a settings window, onboarding and history are not built yet —
+> see [`docs/HANDOFF.md`](docs/HANDOFF.md) for exactly what is done and skipped.
 >
 > **To build and run it:**
 >
@@ -42,7 +45,7 @@ leaving your machine.
 > it, the script signs ad hoc and warns.
 >
 > Configuration lives at
-> `~/Library/Application Support/ch.babelotter/config.json` (menu bar icon >
+> `~/Library/Application Support/ch.lingoswen/config.json` (menu bar icon >
 > *Open Configuration Folder*), written with defaults on first launch.
 >
 > Requirements are captured as GitHub issues
@@ -54,7 +57,7 @@ leaving your machine.
 
 ## What it does
 
-Select text in any application, then trigger babelOtter from a global hotkey
+Select text in any application, then trigger lingoSwen from a global hotkey
 or the menu bar. A preview popup appears near your cursor, streams the result
 live, and waits for you to decide — it never touches your text until you say so.
 
@@ -70,7 +73,7 @@ Every result offers **Replace / Copy / Regenerate / Dismiss**.
 ### Audience profiles
 
 Writing to students and writing to colleagues are not the same register.
-babelOtter models this as first-class named profiles — Students, Colleagues,
+lingoSwen models this as first-class named profiles — Students, Colleagues,
 Administration, Informal, or whatever you define — each carrying its own
 register, tone guidance and glossary bias. The profile is **inferred from your
 source text**, shown in the popup, and switchable in one click. You can also
@@ -92,14 +95,14 @@ own locale rules.
 
 ## 🔒 Privacy
 
-babelOtter is built around one inviolable rule:
+lingoSwen is built around one inviolable rule:
 
-> **babelOtter never transmits your content. The clipboard path can expose it
+> **lingoSwen never transmits your content. The clipboard path can expose it
 > to Universal Clipboard if Handoff is enabled.**
 
 No telemetry. No analytics. No crash reporting. No remote config. The app opens
 **no non-loopback connections** — even model downloads are delegated to your
-local Ollama daemon, so babelOtter's own egress is loopback-only and provably so.
+local Ollama daemon, so lingoSwen's own egress is loopback-only and provably so.
 
 This is enforced in code and proven by tests, not merely promised: a
 loopback-only endpoint type that ignores `OLLAMA_HOST`, an architecture test
