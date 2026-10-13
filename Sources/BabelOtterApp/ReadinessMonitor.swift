@@ -15,10 +15,12 @@ final class ReadinessMonitor {
     private(set) var report: ReadinessReport?
     /// Set once by `AppDelegate`, after registering the hotkeys.
     var hotKeys: [HotKeyFact] = []
+    /// Set by `AppDelegate` at launch and on every reload.
+    var configurationProblems: [String] = []
     var onChange: (@MainActor (ReadinessReport) -> Void)?
 
     private let client: OllamaClient
-    private let models: [Action: String]
+    private var models: [Action: String]
     private var inFlight: Task<Void, Never>?
     private var loop: Task<Void, Never>?
     private var wakeObserver: (any NSObjectProtocol)?
@@ -29,15 +31,24 @@ final class ReadinessMonitor {
     /// joined by every Check Again, menu open and hotkey press until it ends.
     private static let probeTimeout: TimeInterval = 5
 
+    init(configuration: Configuration) {
+        client = OllamaClient.loopback(timeout: Self.probeTimeout)
+        models = Self.models(for: configuration)
+    }
+
+    /// A reload changes the models checked from the next check on (#26).
+    func update(configuration: Configuration) {
+        models = Self.models(for: configuration)
+    }
+
     /// Only the actions that exist are checked. One without a configured
     /// model falls back to the default, as the pipeline does.
-    init(environment: AppEnvironment) {
-        client = OllamaClient.loopback(timeout: Self.probeTimeout)
+    private static func models(for configuration: Configuration) -> [Action: String] {
         var models: [Action: String] = [:]
         for action in [Action.translate, .correct] {
-            models[action] = environment.configuration.models[action] ?? Configuration.defaultModel
+            models[action] = configuration.models[action] ?? Configuration.defaultModel
         }
-        self.models = models
+        return models
     }
 
     func start() {
@@ -67,7 +78,8 @@ final class ReadinessMonitor {
         let probe = await client.probe()
         let facts = ReadinessFacts(
             accessibilityGranted: granted, probe: probe, models: models,
-            hotKeys: hotKeys, systemShortcuts: Self.systemShortcuts())
+            hotKeys: hotKeys, systemShortcuts: Self.systemShortcuts(),
+            configurationProblems: configurationProblems)
         let report = ReadinessPolicy().report(for: facts)
         self.report = report
         inFlight = nil

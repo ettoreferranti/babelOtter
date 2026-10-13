@@ -49,6 +49,9 @@ public struct Configuration: Sendable, Equatable, Codable {
     /// Off by default: turning it on means no capture at all in Teams, Word,
     /// OneNote or VS Code, which is a product decision rather than a detail.
     public var strictCaptureOnly: Bool
+    /// Optional so a file written before #26 still loads: nil means each
+    /// action's default.
+    public var hotkeys: HotKeyBindings?
 
     public init(
         languages: [LanguageConfig],
@@ -60,7 +63,8 @@ public struct Configuration: Sendable, Equatable, Codable {
         retentionDays: Int,
         detectionConfidenceFloor: Double,
         minimumLengthForDetection: Int,
-        strictCaptureOnly: Bool = false
+        strictCaptureOnly: Bool = false,
+        hotkeys: HotKeyBindings? = nil
     ) {
         self.languages = languages
         self.profiles = profiles
@@ -72,6 +76,7 @@ public struct Configuration: Sendable, Equatable, Codable {
         self.detectionConfidenceFloor = detectionConfidenceFloor
         self.minimumLengthForDetection = minimumLengthForDetection
         self.strictCaptureOnly = strictCaptureOnly
+        self.hotkeys = hotkeys
     }
 
     public var enabledLanguages: [LanguageConfig] {
@@ -123,6 +128,7 @@ extension Configuration {
         retentionDays: 90,
         detectionConfidenceFloor: 0.65,
         minimumLengthForDetection: 12,
-        strictCaptureOnly: false
+        strictCaptureOnly: false,
+        hotkeys: HotKeyBindings.defaults
     )
 }

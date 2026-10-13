@@ -301,7 +301,7 @@ struct OllamaClientTests {
     }
 
     /// `loopback(timeout:)` is the one production call site that wires the
-    /// app to the real transport (`AppEnvironment.load()`), so it is worth
+    /// app to the real transport (`AppEnvironment(configuration:)`), so it is worth
     /// its own assertion rather than trusting the default-argument plumbing
     /// by inspection. `endpoint` is `internal` in `OllamaClient` for exactly
     /// this read.

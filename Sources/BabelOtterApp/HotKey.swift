@@ -16,8 +16,10 @@ final class HotKey {
     private static var handlerInstalled = false
 
     private var reference: EventHotKeyRef?
+    private let id: UInt32
 
     init?(keyCode: UInt32, modifiers: UInt32, id: UInt32, action: @escaping @MainActor () -> Void) {
+        self.id = id
         Self.installHandlerOnce()
         let hotKeyID = EventHotKeyID(signature: OSType(0x4254_4F54), id: id)  // "BTOT"
         var reference: EventHotKeyRef?
@@ -26,6 +28,17 @@ final class HotKey {
         guard status == noErr, let reference else { return nil }
         self.reference = reference
         Self.actions[id] = action
+    }
+
+    /// Releases the registration (#26). Explicit rather than `deinit`: a
+    /// deinit cannot reach main-actor state under Swift 6.1, and a hotkey
+    /// left registered would keep firing under its old combination.
+    func unregister() {
+        if let reference {
+            UnregisterEventHotKey(reference)
+        }
+        reference = nil
+        Self.actions[id] = nil
     }
 
     private static func installHandlerOnce() {

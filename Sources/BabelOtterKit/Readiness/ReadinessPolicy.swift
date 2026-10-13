@@ -75,22 +75,27 @@ public struct ReadinessFacts: Sendable, Equatable {
     public let models: [Action: String]
     public let hotKeys: [HotKeyFact]
     public let systemShortcuts: [SystemShortcut]
+    /// What is wrong with config.json, each worded to follow "config.json: ".
+    public let configurationProblems: [String]
 
     public init(
         accessibilityGranted: Bool, probe: DaemonProbe, models: [Action: String],
-        hotKeys: [HotKeyFact], systemShortcuts: [SystemShortcut]
+        hotKeys: [HotKeyFact], systemShortcuts: [SystemShortcut],
+        configurationProblems: [String] = []
     ) {
         self.accessibilityGranted = accessibilityGranted
         self.probe = probe
         self.models = models
         self.hotKeys = hotKeys
         self.systemShortcuts = systemShortcuts
+        self.configurationProblems = configurationProblems
     }
 }
 
 /// One reason babelOtter is not fully ready, worded for a menu line.
 public enum ReadinessCause: Sendable, Equatable {
     case accessibilityMissing
+    case configurationProblem(String)
     case ollamaUnreachable(detail: String)
     case modelMissing(action: Action, model: String)
     case hotKeyNotRegistered(action: Action, combination: String)
@@ -102,7 +107,8 @@ public enum ReadinessCause: Sendable, Equatable {
         switch self {
         case .accessibilityMissing:
             return .blocked
-        case .ollamaUnreachable, .modelMissing, .hotKeyNotRegistered, .hotKeyClashesWithSystem:
+        case .configurationProblem, .ollamaUnreachable, .modelMissing, .hotKeyNotRegistered,
+            .hotKeyClashesWithSystem:
             return .degraded
         }
     }
@@ -111,6 +117,8 @@ public enum ReadinessCause: Sendable, Equatable {
         switch self {
         case .accessibilityMissing:
             return "Accessibility is not granted, so babelOtter can't read your selection."
+        case .configurationProblem(let text):
+            return "config.json: \(text)"
         case .ollamaUnreachable(let detail):
             // No period of ours: the daemon's text may already end in one.
             return "Ollama is not reachable: \(detail)"
@@ -135,6 +143,8 @@ extension ReadinessCause {
         switch self {
         case .accessibilityMissing:
             return "Accessibility isn't granted"
+        case .configurationProblem(let text):
+            return "config.json: \(text)"
         case .ollamaUnreachable:
             return "Ollama isn't running"
         case .modelMissing(let action, let model):
@@ -153,6 +163,8 @@ extension ReadinessCause {
         switch self {
         case .accessibilityMissing:
             return .openAccessibilitySettings
+        case .configurationProblem:
+            return .showConfiguration
         case .ollamaUnreachable:
             return .startOllama
         case .modelMissing(_, let model):
@@ -172,6 +184,7 @@ public enum ReadinessRemedy: Sendable, Equatable {
     /// The command to paste into a terminal.
     case copyPullCommand(String)
     case openKeyboardShortcutsSettings
+    case showConfiguration
 
     public var title: String {
         switch self {
@@ -183,6 +196,8 @@ public enum ReadinessRemedy: Sendable, Equatable {
             return "Copy \u{201C}\(command)\u{201D}"
         case .openKeyboardShortcutsSettings:
             return "Open Keyboard Shortcuts Settings\u{2026}"
+        case .showConfiguration:
+            return "Show config.json in Finder"
         }
     }
 }
@@ -213,12 +228,16 @@ public struct ReadinessPolicy: Sendable {
 
     public init() {}
 
-    /// Order: Accessibility, then the daemon, then each action's model, then
-    /// each action's hotkey. The only blocked cause comes first.
+    /// Order: Accessibility, configuration problems, then the daemon, then
+    /// each action's model, then each action's hotkey. The only blocked
+    /// cause comes first.
     public func report(for facts: ReadinessFacts) -> ReadinessReport {
         var causes: [ReadinessCause] = []
         if !facts.accessibilityGranted {
             causes += [.accessibilityMissing]
+        }
+        for problem in facts.configurationProblems {
+            causes += [.configurationProblem(problem)]
         }
         causes += daemonCauses(facts)
         for action in Action.allCases {

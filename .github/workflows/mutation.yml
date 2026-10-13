@@ -133,9 +133,14 @@ jobs:
           Sources/BabelOtterKit/Capture/ResultCustody.swift
           Sources/BabelOtterKit/Config/AudienceProfile.swift
           Sources/BabelOtterKit/Config/Configuration.swift
+          Sources/BabelOtterKit/Config/ConfigurationReload.swift
           Sources/BabelOtterKit/Config/ConfigurationStore.swift
           Sources/BabelOtterKit/Config/Glossary.swift
+          Sources/BabelOtterKit/Config/HotKeyBindings.swift
           Sources/BabelOtterKit/Config/LanguageConfig.swift
+          Sources/BabelOtterKit/Hotkeys/HotKeyPlan.swift
+          Sources/BabelOtterKit/Hotkeys/HotKeySpec.swift
+          Sources/BabelOtterKit/Hotkeys/KeyLayout.swift
           Sources/BabelOtterKit/LLM/BlockCountPolicy.swift
           Sources/BabelOtterKit/LLM/OllamaEndpoint.swift
           Sources/BabelOtterKit/LLM/PromptBuilder.swift

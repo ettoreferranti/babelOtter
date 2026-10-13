@@ -41,11 +41,13 @@ struct ReadinessPolicyTests {
         probe: DaemonProbe = .reachable(models: ["m"]),
         models: [Action: String] = [.translate: "m", .correct: "m"],
         hotKeys: [HotKeyFact] = ReadinessPolicyTests.bothRegistered,
-        systemShortcuts: [SystemShortcut] = []
+        systemShortcuts: [SystemShortcut] = [],
+        configurationProblems: [String] = []
     ) -> ReadinessFacts {
         ReadinessFacts(
             accessibilityGranted: accessibility, probe: probe, models: models,
-            hotKeys: hotKeys, systemShortcuts: systemShortcuts)
+            hotKeys: hotKeys, systemShortcuts: systemShortcuts,
+            configurationProblems: configurationProblems)
     }
 
     @Test("everything in order is ready, with no causes")
@@ -294,5 +296,36 @@ struct ReadinessPolicyTests {
         #expect(ReadinessRemedy.copyPullCommand("ollama pull m:1b").title
             == "Copy \u{201C}ollama pull m:1b\u{201D}")
         #expect(ReadinessRemedy.openKeyboardShortcutsSettings.title == "Open Keyboard Shortcuts Settings\u{2026}")
+    }
+
+    // MARK: - Configuration problems (#26)
+
+    @Test("a configuration problem is degraded, names the file, and offers the file")
+    func configurationProblemCause() {
+        let cause = ReadinessCause.configurationProblem("retentionDays: expected Int")
+        #expect(cause.readiness == .degraded)
+        #expect(cause.header == "config.json: retentionDays: expected Int")
+        #expect(cause.detail == "config.json: retentionDays: expected Int")
+        #expect(cause.remedy == .showConfiguration)
+        #expect(ReadinessRemedy.showConfiguration.title == "Show config.json in Finder")
+    }
+
+    @Test("configuration problems come after Accessibility and before the daemon, in order")
+    func configurationProblemOrder() {
+        let report = policy.report(for: facts(
+            accessibility: false, probe: .unreachable(detail: "refused"),
+            configurationProblems: ["a", "b"]))
+        #expect(report.causes == [
+            .accessibilityMissing,
+            .configurationProblem("a"),
+            .configurationProblem("b"),
+            .ollamaUnreachable(detail: "refused"),
+        ])
+    }
+
+    @Test("a configuration problem alone is degraded")
+    func configurationProblemAlone() {
+        let report = policy.report(for: facts(configurationProblems: ["x"]))
+        #expect(report.readiness == .degraded)
     }
 }

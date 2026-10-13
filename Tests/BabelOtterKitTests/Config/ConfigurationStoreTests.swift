@@ -153,4 +153,28 @@ struct ConfigurationStoreTests {
             try ConfigurationStore.inApplicationSupport(locator: locator)
         }
     }
+
+    @Test("a file written before hotkeys existed still loads, with no problems")
+    func fileWithoutHotkeys() throws {
+        let store = ConfigurationStore(directory: try temporaryDirectory())
+        try store.save(.default)
+        let data = try Data(contentsOf: store.fileURL)
+        var object = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        object["hotkeys"] = nil
+        try JSONSerialization.data(withJSONObject: object).write(to: store.fileURL)
+        let loaded = store.load()
+        #expect(loaded.problems.isEmpty)
+        #expect(loaded.configuration.hotkeys == nil)
+    }
+
+    /// One read decides both "is there a file" and "what is in it", so a file
+    /// replaced between two reads can never pass for a clean load of the
+    /// defaults (#26 review).
+    @Test("a load says whether the file was there")
+    func fileFound() throws {
+        let store = ConfigurationStore(directory: try temporaryDirectory())
+        #expect(store.load().fileFound == false)
+        try store.save(.default)
+        #expect(store.load().fileFound == true)
+    }
 }
