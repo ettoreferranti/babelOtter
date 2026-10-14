@@ -181,9 +181,9 @@ struct PopupView: View {
             // Not Command-C: the result text is selectable, and a user
             // copying part of it with Command-C must not have that hijacked
             // into copying (and dismissing over) the whole translation.
-            Button("Copy") { model.copy() }
+            Button(model.copied ? "\u{2713} Copied" : "Copy") { model.copy() }
                 .keyboardShortcut("c", modifiers: [.command, .shift])
-                .disabled(!model.canReplace)
+                .disabled(!model.canReplace && !model.copied)
             Spacer()
             Button("Dismiss") { model.dismiss() }
                 .keyboardShortcut(.cancelAction)

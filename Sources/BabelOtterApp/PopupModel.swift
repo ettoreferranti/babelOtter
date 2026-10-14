@@ -56,6 +56,9 @@ final class PopupModel {
     /// save/write/restore `NSPasteboard.general`, and letting a second one
     /// start mid-flight would interleave the two on the same pasteboard.
     private(set) var isReplacing = false
+    /// Set by Copy: the popup says so for `copiedPause`, then closes (#96).
+    private(set) var copied = false
+    static let copiedPause: Duration = .milliseconds(800)
 
     init(
         action: Action, environment: AppEnvironment, close: @escaping @MainActor () -> Void,
@@ -110,7 +113,7 @@ final class PopupModel {
     }
 
     var canRegenerate: Bool {
-        guard !isReplacing else { return false }
+        guard !isReplacing, !copied else { return false }
         if action == .correct {
             guard snapshot != nil else { return false }
         } else {
@@ -184,7 +187,7 @@ final class PopupModel {
     /// copy over the original (Replace stays disabled per the design: "No
     /// errors found").
     var canReplace: Bool {
-        guard phase == .finished else { return false }
+        guard phase == .finished, !copied else { return false }
         if action == .correct {
             return correction?.hasNoErrors == false
         }
@@ -194,7 +197,13 @@ final class PopupModel {
     func copy() {
         guard canReplace else { return }
         SystemPasteboard().write(text, concealed: false)
-        dismiss()
+        copied = true
+        Task { [weak self] in
+            try? await Task.sleep(for: Self.copiedPause)
+            // Escape during the pause has already closed it.
+            guard let self, !self.isDismissed else { return }
+            self.dismiss()
+        }
     }
 
     /// Pastes the translation over the original selection, through the
