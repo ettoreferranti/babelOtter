@@ -1,6 +1,19 @@
-# Handoff — state as of 2026-10-13
+# Handoff — state as of 2026-10-15
 
 Read this first if you are picking babelOtter up in a new session.
+
+## Update 2026-10-15: the audience is inferred from the text (#52)
+
+Translate asks the model, in the same request, which audience the text addresses, and to quote the words that show it (`audience_evidence`). The guess counts only when that quote really occurs in the text: it is then shown beside the picker as "✦ guessed from the text, change if wrong". Otherwise the audience last picked in this app applies, then the last pick anywhere, then Colleagues, labelled as such. Evidence was added after measuring: asked only for an audience, the default model never answered "unclear" and guessed from the topic, overriding a remembered audience. Picking an audience re-runs and is remembered for that app (`UserDefaults`, ids only). Correct never infers. The rules live in `BabelOtterKit/Config/AudienceSession.swift`. Spec: `docs/superpowers/specs/2026-10-15-audience-inference-design.md`.
+
+Local model check (about a minute): `BABELOTTER_INTEGRATION=1 swift test --filter AudienceInferenceIntegrationTests`.
+
+**Manual check (yours):**
+
+| # | Do | Expect |
+|---|---|---|
+| A1 | Translate an English email starting "Dear students" | Beside the picker, "detecting..." then "✦ guessed from the text, change if wrong", with Students selected |
+| A2 | Pick Colleagues in the picker | The translation runs again in the du register; the note disappears |
 
 ## Update 2026-10-14: Copy confirms (#96); the popup opens by the selection (#97)
 

@@ -6,6 +6,10 @@ public struct PromptRequest: Sendable {
     public let source: LanguageConfig
     public let target: LanguageConfig
     public let profile: AudienceProfile
+    /// #52: when not empty, the model chooses the audience from these and
+    /// `profile` is the fallback for a text with no clear sign. Correct
+    /// ignores it.
+    public let inferAudienceFrom: [AudienceProfile]
     public let glossary: [GlossaryEntry]
     public let doNotTranslate: [String]
     public let styleNote: String?
@@ -16,6 +20,7 @@ public struct PromptRequest: Sendable {
         source: LanguageConfig,
         target: LanguageConfig,
         profile: AudienceProfile,
+        inferAudienceFrom: [AudienceProfile] = [],
         glossary: [GlossaryEntry] = [],
         doNotTranslate: [String] = [],
         styleNote: String? = nil,
@@ -25,6 +30,7 @@ public struct PromptRequest: Sendable {
         self.source = source
         self.target = target
         self.profile = profile
+        self.inferAudienceFrom = inferAudienceFrom
         self.glossary = glossary
         self.doNotTranslate = doNotTranslate
         self.styleNote = styleNote
@@ -65,7 +71,7 @@ public struct PromptBuilder: Sendable {
 
         // The schema goes last, so it is the final instruction the model reads
         // and a style note asking for plain prose cannot override it.
-        sections.append(schema(for: request.action))
+        sections.append(schema(for: request))
         sections.append(blocks(request))
 
         return sections.joined(separator: "\n\n")
@@ -145,6 +151,9 @@ public struct PromptBuilder: Sendable {
     private func audience(_ request: PromptRequest) -> String? {
         let profile = request.profile
         guard request.action == .correct else {
+            if !request.inferAudienceFrom.isEmpty {
+                return inferredAudience(request)
+            }
             var lines = [
                 "Audience: \(profile.name).",
                 #"Address the reader as "\#(profile.register.rawValue)"."#,
@@ -158,6 +167,47 @@ public struct PromptBuilder: Sendable {
         return
             #"The text is addressed to \#(profile.name), who should be addressed as "\#(profile.register.rawValue)". "#
             + "A mismatch is a register error."
+    }
+
+    /// #52: the model picks the audience the text addresses and writes for
+    /// it. `request.profile` is the fallback for a text with no clear sign.
+    private func inferredAudience(_ request: PromptRequest) -> String {
+        var lines = ["Audiences (id: name, form of address, tone):"]
+        for profile in request.inferAudienceFrom {
+            var line = #"- \#(profile.id): \#(profile.name), "\#(profile.register.rawValue)". \#(profile.toneGuidance)"#
+            if !profile.glossaryBias.isEmpty {
+                line += " Prefers: " + profile.glossaryBias.joined(separator: ", ") + "."
+            }
+            lines.append(line)
+        }
+        lines.append(
+            "Decide which of these audiences the text addresses and write for it. "
+                // Measured 2026-10-15: without this the default model always
+                // picked an audience, from the topic, for a text naming no
+                // reader at all.
+                + "Only decide on an audience when the text itself shows who it is written to: "
+                + "a greeting, a name, how the reader is addressed, or content only that "
+                + "audience would receive. The topic alone is not a sign. "
+                + #"Put its id in "detected_audience". If the text gives no clear sign, put ""#
+                + AudienceInference.unclear
+                + #"" and write for "\#(request.profile.id)". "#
+                // Measured 2026-10-15: told to write for the fallback, the
+                // model then named the fallback as what it had detected.
+                + #""detected_audience" reports what the text shows, not whom you write for: "#
+                + #"with no clear sign it is ""# + AudienceInference.unclear
+                + #"", even though you then write for "\#(request.profile.id)". "#
+                + #"In "audience_evidence" copy the exact words of the text that show its reader "#
+                + #"(a greeting, a name), or "" when there are none."#)
+        return lines.joined(separator: "\n")
+    }
+
+    /// `audience_evidence` only when the audience is inferred, and before
+    /// `blocks`, so it arrives early in the stream.
+    private func translateShape(_ request: PromptRequest) -> String {
+        if request.inferAudienceFrom.isEmpty {
+            return #"{"detected_source": "...", "detected_audience": "...", "blocks": ["..."]}"#
+        }
+        return #"{"detected_source": "...", "detected_audience": "...", "audience_evidence": "...", "blocks": ["..."]}"#
     }
 
     private func glossarySection(_ request: PromptRequest) -> String? {
@@ -183,11 +233,11 @@ public struct PromptBuilder: Sendable {
         return "Additional instruction from the user: \(note)"
     }
 
-    private func schema(for action: Action) -> String {
+    private func schema(for request: PromptRequest) -> String {
         let shape: String
-        switch action {
+        switch request.action {
         case .translate, .repitch:
-            shape = #"{"detected_source": "...", "detected_audience": "...", "blocks": ["..."]}"#
+            shape = translateShape(request)
         case .correct:
             // Allowed values as prose, never "a|b": the model copied that
             // notation into its answers (measured 2026-09-30).

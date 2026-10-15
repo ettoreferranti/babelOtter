@@ -13,6 +13,7 @@ struct PromptBuilderTests {
         action: Action = .translate,
         target: LanguageConfig = .swissGerman,
         profile: AudienceProfile = .administration,
+        inferFrom: [AudienceProfile] = [],
         glossary: [GlossaryEntry] = [],
         doNotTranslate: [String] = [],
         styleNote: String? = nil,
@@ -23,11 +24,51 @@ struct PromptBuilderTests {
             source: .english,
             target: target,
             profile: profile,
+            inferAudienceFrom: inferFrom,
             glossary: glossary,
             doNotTranslate: doNotTranslate,
             styleNote: styleNote,
             blocks: blocks
         )
+    }
+
+    @Test("inferring lists every audience with its id and names the fallback")
+    func inferringListsAudiences() {
+        let prompt = builder.build(request(profile: .colleagues, inferFrom: AudienceProfile.shippedDefaults))
+        for profile in AudienceProfile.shippedDefaults {
+            #expect(prompt.contains("- \(profile.id): \(profile.name)"))
+        }
+        #expect(prompt.contains("Decide which of these audiences the text addresses"))
+        #expect(prompt.contains(#"put "unclear" and write for "colleagues""#))
+        #expect(prompt.contains("The topic alone is not a sign."))
+        #expect(prompt.contains("reports what the text shows, not whom you write for"))
+        #expect(prompt.contains(#""detected_audience": "...", "audience_evidence": "...", "blocks""#))
+        #expect(prompt.contains(#"In "audience_evidence" copy the exact words of the text that show its reader"#))
+        #expect(!prompt.contains("Audience: Colleagues."))
+    }
+
+    @Test("inferring keeps each audience's preferred terms")
+    func inferringKeepsGlossaryBias() {
+        var students = AudienceProfile.students
+        students.glossaryBias = ["Modul", "Semester"]
+        let prompt = builder.build(request(profile: .colleagues, inferFrom: [students, .colleagues]))
+        #expect(prompt.contains("Prefers: Modul, Semester."))
+        #expect(prompt.components(separatedBy: "Prefers:").count == 2, "only the audience that has them")
+    }
+
+    @Test("an empty list is the fixed audience, unchanged")
+    func emptyListIsFixed() {
+        let prompt = builder.build(request(profile: .students, inferFrom: []))
+        #expect(prompt.contains("Audience: Students."))
+        #expect(!prompt.contains("Decide which"))
+        #expect(!prompt.contains("audience_evidence"))
+    }
+
+    @Test("Correct never infers")
+    func correctNeverInfers() {
+        let prompt = builder.build(request(action: .correct, profile: .students, inferFrom: AudienceProfile.shippedDefaults))
+        #expect(!prompt.contains("Decide which"))
+        #expect(prompt.contains("addressed to Students"))
     }
 
     @Test("both language display names appear")

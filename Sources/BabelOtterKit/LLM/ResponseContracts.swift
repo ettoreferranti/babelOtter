@@ -52,6 +52,32 @@ public struct TranslateResponse: Sendable, Equatable, Codable {
     public let detectedAudience: String?
     /// Required. Without blocks there is no result to show.
     public let blocks: [String]
+    /// #52: the words in the text that show who it is for, asked for only
+    /// when the audience is inferred. Last, with a default, so existing
+    /// memberwise uses stay valid.
+    public var audienceEvidence: String? = nil
+}
+
+extension TranslateResponse {
+
+    private enum CodingKeys: String, CodingKey {
+        case detectedSource
+        case detectedAudience
+        case audienceEvidence
+        case blocks
+    }
+
+    /// The optional fields are read leniently: one of them in the wrong shape
+    /// (an array where a string belongs) is dropped, while `blocks`, the
+    /// text that is shown and pasted, is still read strictly. Keys arrive
+    /// already converted from snake_case by the decoder's strategy.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        detectedSource = try? container.decodeIfPresent(String.self, forKey: .detectedSource)
+        detectedAudience = try? container.decodeIfPresent(String.self, forKey: .detectedAudience)
+        audienceEvidence = try? container.decodeIfPresent(String.self, forKey: .audienceEvidence)
+        blocks = try container.decode([String].self, forKey: .blocks)
+    }
 }
 
 /// The correct contract (spec section 7).

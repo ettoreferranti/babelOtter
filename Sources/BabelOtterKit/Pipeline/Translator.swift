@@ -22,6 +22,10 @@ extension OllamaClient: ChatStreaming {}
 
 public enum TranslationEvent: Sendable, Equatable {
     case started(Direction)
+    /// The audience this translation writes for, once known: as soon as the
+    /// model's `detected_audience` has arrived when inferring, at once when
+    /// fixed. Exactly once per translation, always before `finished` (#52).
+    case audience(AudienceProfile, inferred: Bool)
     /// The model sent another piece of its reply. Carries nothing; it exists
     /// so an idle timeout can tell a slow but live reply from a stalled one,
     /// even while the preview is not changing.
@@ -37,6 +41,9 @@ public struct TranslationResult: Sendable, Equatable {
     /// Things the user should know before pasting: lost structure, a
     /// protected term that did not come back.
     public let warnings: [String]
+    /// The audience the text was written for, and whether the model chose it.
+    public let audience: AudienceProfile
+    public let audienceInferred: Bool
 }
 
 public enum TranslationError: Error, Equatable {
@@ -103,12 +110,21 @@ public struct Translator: Sendable {
         _ text: UserText, direction: Direction, profile: AudienceProfile,
         styleNote: String? = nil
     ) -> LazyStream<TranslationEvent> {
+        translate(text, direction: direction, audience: .fixed(profile), styleNote: styleNote)
+    }
+
+    /// `.infer` asks the model to choose the audience from the text (#52);
+    /// the choice is reported as `.audience` and fixed for the retry.
+    public func translate(
+        _ text: UserText, direction: Direction, audience: AudienceRequest,
+        styleNote: String? = nil
+    ) -> LazyStream<TranslationEvent> {
         LazyStream { [self] in
             AsyncThrowingStream { continuation in
                 let task = Task {
                     do {
                         try await run(
-                            text, direction: direction, profile: profile, styleNote: styleNote
+                            text, direction: direction, audience: audience, styleNote: styleNote
                         ) {
                             continuation.yield($0)
                         }
@@ -126,19 +142,48 @@ public struct Translator: Sendable {
 
     private var enabledCodes: [LanguageCode] { configuration.enabledLanguages.map(\.code) }
 
+    /// The audience one translation settled on, so it is reported once and
+    /// the retry and the result use the same one.
+    private final class AudienceReport: @unchecked Sendable {
+        var profile: AudienceProfile?
+        var inferred = false
+    }
+
     private struct Context {
         let source: LanguageConfig
         let target: LanguageConfig
-        let profile: AudienceProfile
+        var audience: AudienceRequest
+        let report: AudienceReport
+        /// The selection as the user wrote it, where a quoted sign of the
+        /// reader must occur.
+        let sourceText: String
         let styleNote: String?
         let glossary: [GlossaryEntry]
         let terms: [String]
         let model: String
         let processor: PostProcessor
+
+        /// The audience the prompt writes for: the reported one once known,
+        /// else the fixed one or the fallback.
+        var writingFor: AudienceProfile {
+            if let reported = report.profile { return reported }
+            switch audience {
+            case .fixed(let profile):
+                return profile
+            case .infer(_, let fallback):
+                return fallback
+            }
+        }
+
+        /// The audiences to choose from, or none for a fixed audience.
+        var choices: [AudienceProfile] {
+            guard case .infer(let profiles, _) = audience else { return [] }
+            return profiles
+        }
     }
 
     private func run(
-        _ text: UserText, direction: Direction, profile: AudienceProfile, styleNote: String?,
+        _ text: UserText, direction: Direction, audience: AudienceRequest, styleNote: String?,
         emit: (TranslationEvent) -> Void
     ) async throws {
         guard let source = configuration.language(for: direction.source) else {
@@ -148,21 +193,26 @@ public struct Translator: Sendable {
             throw TranslationError.languageNotConfigured(direction.target)
         }
         let context = Context(
-            source: source, target: target, profile: profile, styleNote: styleNote,
+            source: source, target: target, audience: audience, report: AudienceReport(),
+            sourceText: text.value,
+            styleNote: styleNote,
             glossary: configuration.glossary.entries(
                 for: LanguagePair(source: direction.source, target: direction.target)),
             terms: configuration.doNotTranslate,
             model: configuration.models[.translate] ?? Configuration.defaultModel,
             processor: PostProcessor(target: target))
         emit(.started(direction))
+        if case .fixed = audience { settle(nil, nil, context, emit) }
 
         let extracted = StructureExtractor.extract(text.value)
         let masked = extracted.blocks.map { TokenProtector.mask($0, terms: context.terms) }
         let raw = try await generate(masked, context, emit)
 
         guard case .decoded(let response) = ResponseParser.parseTranslate(raw) else {
+            settle(nil, nil, context, emit)
             return emit(.finished(unparsed(raw, masked.first, direction, context)))
         }
+        settle(response.detectedAudience, response.audienceEvidence, context, emit)
         let decision = BlockCountPolicy().decide(
             expected: extracted.skeleton.blockCount, received: response.blocks.count, attempt: 0)
         switch decision {
@@ -174,9 +224,12 @@ public struct Translator: Sendable {
                 finished.map(\.text), to: extracted.skeleton)
             emit(.finished(TranslationResult(
                 text: UserText(output), direction: direction,
-                warnings: warnings(finished.flatMap(\.problems)))))
+                warnings: warnings(finished.flatMap(\.problems)),
+                audience: context.writingFor, audienceInferred: context.report.inferred)))
         case .retryWholeText:
-            try await retryWholeText(text, direction, context, emit)
+            var fixed = context
+            fixed.audience = .fixed(context.writingFor)
+            try await retryWholeText(text, direction, fixed, emit)
         case .degrade(let reason):
             emit(.finished(joined(response.blocks, masked.first, direction, context, reason)))
         }
@@ -203,7 +256,8 @@ public struct Translator: Sendable {
         let finished = context.processor.finish(response.blocks[0], protected: whole)
         emit(.finished(TranslationResult(
             text: UserText(finished.text), direction: direction,
-            warnings: warnings(finished.problems))))
+            warnings: warnings(finished.problems),
+            audience: context.writingFor, audienceInferred: context.report.inferred)))
     }
 
     private func generate(
@@ -211,11 +265,18 @@ public struct Translator: Sendable {
     ) async throws -> String {
         let prompt = PromptBuilder().build(PromptRequest(
             action: .translate, source: context.source, target: context.target,
-            profile: context.profile, glossary: context.glossary,
+            profile: context.writingFor, inferAudienceFrom: context.choices,
+            glossary: context.glossary,
             doNotTranslate: context.terms, styleNote: context.styleNote,
             blocks: blocks.map(\.text)))
         let raw = try await ReplyStream.collect(
             chat: chat, model: context.model, prompt: prompt, key: "blocks",
+            onRaw: { reply in
+                guard !context.choices.isEmpty else { return }
+                guard let detected = PartialField.string(named: "detected_audience", in: reply) else { return }
+                guard let evidence = PartialField.string(named: "audience_evidence", in: reply) else { return }
+                settle(detected, evidence, context, emit)
+            },
             onDelta: { emit(.progress) },
             onPartial: { emit(.preview(UserText(preview($0, blocks, context)))) })
         guard !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -247,12 +308,15 @@ public struct Translator: Sendable {
         let format = "The model's reply was not in the expected format, so it is shown as it came."
         guard let protected else {
             let text = LocaleRuleApplier.apply(context.processor.rules, to: raw, protecting: [])
-            return TranslationResult(text: UserText(text), direction: direction, warnings: [format])
+            return TranslationResult(
+                text: UserText(text), direction: direction, warnings: [format],
+                audience: context.writingFor, audienceInferred: context.report.inferred)
         }
         let finished = context.processor.finish(raw, protected: protected)
         return TranslationResult(
             text: UserText(finished.text), direction: direction,
-            warnings: [format] + warnings(finished.problems))
+            warnings: [format] + warnings(finished.problems),
+            audience: context.writingFor, audienceInferred: context.report.inferred)
     }
 
     private func joined(
@@ -265,7 +329,31 @@ public struct Translator: Sendable {
         }
         return TranslationResult(
             text: UserText(texts.joined(separator: "\n")), direction: direction,
-            warnings: [reason])
+            warnings: [reason],
+            audience: context.writingFor, audienceInferred: context.report.inferred)
+    }
+
+    /// Reports the audience if it has not been yet: when inferring, the
+    /// model's answer if it names a configured audience and quotes words the
+    /// text really contains, else the fallback; the fixed one otherwise.
+    private func settle(
+        _ detected: String?, _ evidence: String?, _ context: Context,
+        _ emit: (TranslationEvent) -> Void
+    ) {
+        guard context.report.profile == nil else { return }
+        var chosen = context.writingFor
+        var inferred = false
+        if case .infer(let profiles, _) = context.audience {
+            if let matched = AudienceInference.match(detected, in: profiles) {
+                if AudienceInference.isEvidence(evidence, in: context.sourceText) {
+                    chosen = matched
+                    inferred = true
+                }
+            }
+        }
+        context.report.profile = chosen
+        context.report.inferred = inferred
+        emit(.audience(chosen, inferred: inferred))
     }
 
     private func warnings(_ problems: [ProtectionProblem]) -> [String] {

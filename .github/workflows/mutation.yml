@@ -155,7 +155,9 @@ jobs:
           Sources/BabelOtterKit/Capture/ReplacementOutcome.swift
           Sources/BabelOtterKit/Capture/CapturePolicy.swift
           Sources/BabelOtterKit/Capture/ResultCustody.swift
+          Sources/BabelOtterKit/Config/AudienceInference.swift
           Sources/BabelOtterKit/Config/AudienceProfile.swift
+          Sources/BabelOtterKit/Config/AudienceSession.swift
           Sources/BabelOtterKit/Config/Configuration.swift
           Sources/BabelOtterKit/Config/ConfigurationReload.swift
           Sources/BabelOtterKit/Config/ConfigurationStore.swift
@@ -173,6 +175,7 @@ jobs:
           Sources/BabelOtterKit/Pipeline/CorrectionCheck.swift
           Sources/BabelOtterKit/Pipeline/Corrector.swift
           Sources/BabelOtterKit/Pipeline/PartialBlocks.swift
+          Sources/BabelOtterKit/Pipeline/PartialField.swift
           Sources/BabelOtterKit/Pipeline/ReplyStream.swift
           Sources/BabelOtterKit/Pipeline/Translator.swift
           Sources/BabelOtterKit/Popup/PopupPlacement.swift

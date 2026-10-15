@@ -43,7 +43,7 @@ public enum PartialBlocks {
         return blocks
     }
 
-    private static func skipWhitespace(_ scalars: [Unicode.Scalar], from start: Int) -> Int {
+    static func skipWhitespace(_ scalars: [Unicode.Scalar], from start: Int) -> Int {
         var index = start
         while index < scalars.count {
             guard scalars[index].properties.isWhitespace else { break }
@@ -53,7 +53,7 @@ public enum PartialBlocks {
     }
 
     /// A JSON string body, starting just after its opening quote.
-    private static func readString(
+    static func readString(
         _ scalars: [Unicode.Scalar], from start: Int
     ) -> (text: String, next: Int, closed: Bool) {
         var text = String.UnicodeScalarView()

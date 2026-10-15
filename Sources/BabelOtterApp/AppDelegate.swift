@@ -365,6 +365,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         let model = PopupModel(
             action: action,
+            application: source,
             environment: environment,
             close: { [weak self] in self?.panel.dismiss() },
             reopen: { [weak self] model in
@@ -400,6 +401,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         currentModel?.dismiss()
         let model = PopupModel(
             action: action,
+            application: nil,
             environment: environment,
             close: { [weak self] in self?.panel.dismiss() },
             reopen: { [weak self] model in

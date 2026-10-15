@@ -17,6 +17,25 @@ struct ResponseContractsTests {
         #expect(decoded.blocks == ["hallo"])
     }
 
+    @Test("the audience evidence decodes when present")
+    func audienceEvidence() throws {
+        let json = #"{"detected_audience": "students", "audience_evidence": "Dear students", "blocks": ["a"]}"#
+        let decoded = try decoder.decode(TranslateResponse.self, from: Data(json.utf8))
+        #expect(decoded.audienceEvidence == "Dear students")
+        let without = try decoder.decode(TranslateResponse.self, from: Data(#"{"blocks": ["a"]}"#.utf8))
+        #expect(without.audienceEvidence == nil)
+    }
+
+    @Test("a wrongly typed optional field is dropped, not the whole reply")
+    func wrongTypedOptionalField() throws {
+        let json = #"{"detected_source": 1, "detected_audience": ["students"], "audience_evidence": ["Dear"], "blocks": ["a"]}"#
+        let decoded = try decoder.decode(TranslateResponse.self, from: Data(json.utf8))
+        #expect(decoded.blocks == ["a"])
+        #expect(decoded.detectedSource == nil)
+        #expect(decoded.detectedAudience == nil)
+        #expect(decoded.audienceEvidence == nil)
+    }
+
     @Test("a translate response missing both optional fields still decodes")
     func optionalFieldsAbsent() throws {
         let decoded = try decoder.decode(

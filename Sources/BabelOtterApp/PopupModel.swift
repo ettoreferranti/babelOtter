@@ -18,7 +18,12 @@ final class PopupModel {
     }
 
     let action: Action
-    private(set) var phase: Phase = .capturing
+    private(set) var phase: Phase = .capturing {
+        didSet {
+            // A run that fails never reports its audience (#52).
+            if case .failed = phase { audience.runEnded() }
+        }
+    }
     private(set) var direction: Direction?
     private(set) var text = ""
     private(set) var warnings: [String] = []
@@ -26,10 +31,8 @@ final class PopupModel {
     /// Set only by Correct, once its stream finishes. Never mutated by
     /// Translate.
     private(set) var correction: CorrectionResult?
-    /// The audience profile, which carries the register (du/Sie). Starts at
-    /// the one last chosen, so a user who writes to one audience all day
-    /// picks it once.
-    private(set) var profileID: String
+    /// Where the audience came from and what each run is told (#52).
+    private(set) var audience: AudienceSession
     /// Free text for this invocation only ("shorter", "use Sie"). Never
     /// saved: it can quote the user's own text.
     var instruction = ""
@@ -61,7 +64,8 @@ final class PopupModel {
     static let copiedPause: Duration = .milliseconds(800)
 
     init(
-        action: Action, environment: AppEnvironment, close: @escaping @MainActor () -> Void,
+        action: Action, application: SourceApplication?, environment: AppEnvironment,
+        close: @escaping @MainActor () -> Void,
         reopen: @escaping @MainActor (PopupModel) -> Void
     ) {
         self.action = action
@@ -70,32 +74,26 @@ final class PopupModel {
         self.corrector = Corrector(configuration: environment.configuration, chat: environment.client)
         self.close = close
         self.reopen = reopen
-        self.profileID = Self.initialProfileID(in: environment.configuration)
+        self.audience = AudienceSession(
+            profiles: environment.configuration.profiles, action: action,
+            application: application, memory: UserDefaultsAudienceMemory())
     }
 
     // MARK: - Profile and instruction
 
-    /// UserDefaults holds only the profile's id -- never text -- as a
-    /// per-machine convenience. An id that no longer names a configured
-    /// profile falls back to Colleagues.
-    private static let lastProfileKey = "lastProfileID"
-
-    private static func initialProfileID(in configuration: Configuration) -> String {
-        let saved = UserDefaults.standard.string(forKey: lastProfileKey)
-        if let saved, configuration.profile(id: saved) != nil { return saved }
-        return configuration.profile(id: AudienceProfile.colleagues.id)?.id
-            ?? configuration.profiles.first?.id ?? AudienceProfile.colleagues.id
-    }
-
     var profiles: [AudienceProfile] { configuration.profiles }
 
-    /// Switching audience re-runs the translation already on screen, since
+    var profileID: String { audience.audience.id }
+
+    /// The text beside the picker, and whether it marks a guess.
+    var audienceNote: String? { audience.note }
+    var audienceInferred: Bool { audience.origin == .inferred }
+
+    /// Picking another audience re-runs the result already on screen, since
     /// the whole point is to see it in the other register.
     func selectProfile(_ id: String) {
-        guard !isDismissed, id != profileID, configuration.profile(id: id) != nil else { return }
-        profileID = id
-        UserDefaults.standard.set(id, forKey: Self.lastProfileKey)
-        regenerate()
+        guard !isDismissed else { return }
+        if audience.choose(id) { regenerate() }
     }
 
     /// Runs the translation (or correction) again with the current audience
@@ -281,10 +279,6 @@ final class PopupModel {
         watchdog = nil
     }
 
-    private var profile: AudienceProfile {
-        configuration.profile(id: profileID) ?? .colleagues
-    }
-
     /// Holds one run's `consumer` and `watchdog` so each can cancel the
     /// other without going through `self`. See the comment in
     /// `consume(_:apply:fail:)`.
@@ -381,10 +375,12 @@ final class PopupModel {
         warnings = []
         message = nil
         phase = .translating
+        audience.runStarted()
 
         consume(
             translator.translate(
-                snapshot.text, direction: direction, profile: profile, styleNote: styleNote),
+                snapshot.text, direction: direction, audience: audience.request,
+                styleNote: styleNote),
             apply: { $0.apply($1) },
             fail: Self.describe)
     }
@@ -393,6 +389,8 @@ final class PopupModel {
         switch event {
         case .started(let direction):
             self.direction = direction
+        case .audience(let profile, let inferred):
+            audience.apply(reported: profile, inferred: inferred)
         case .progress:
             break
         case .preview(let partial):
@@ -413,7 +411,7 @@ final class PopupModel {
         message = nil
         phase = .translating
         consume(
-            corrector.correct(snapshot.text, profile: profile, styleNote: styleNote),
+            corrector.correct(snapshot.text, profile: audience.audience, styleNote: styleNote),
             apply: { model, event in model.applyCorrection(event) },
             fail: Self.describeCorrection)
     }
