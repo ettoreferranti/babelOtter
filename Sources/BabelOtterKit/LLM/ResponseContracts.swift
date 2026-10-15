@@ -52,6 +52,10 @@ public struct TranslateResponse: Sendable, Equatable, Codable {
     public let detectedAudience: String?
     /// Required. Without blocks there is no result to show.
     public let blocks: [String]
+    /// #52: the words in the text that show who it is for, asked for only
+    /// when the audience is inferred. Last, with a default, so existing
+    /// memberwise uses stay valid.
+    public var audienceEvidence: String? = nil
 }
 
 /// The correct contract (spec section 7).

@@ -123,9 +123,12 @@ struct TranslatorTests {
 
     @Test("an inferred audience is reported once, before the result, and carried by it")
     func inferredAudience() async throws {
-        let chat = ScriptedChat([["{\"detected_audience\": \"students\", \"blocks\": [\"Hallo\"]}"]])
+        let chat = ScriptedChat([[
+            "{\"detected_audience\": \"students\", \"audience_evidence\": \"Dear students\", \"blocks\": [\"Hallo\"]}",
+        ]])
         let events = try await collect(translator(chat).translate(
-            UserText("Hello"), direction: Direction(source: english, target: german), audience: inferring))
+            UserText("Dear students, hello"), direction: Direction(source: english, target: german),
+            audience: inferring))
 
         #expect(audiences(events) == [.audience(.students, inferred: true)])
         let reported = try #require(index(of: { $0 == .audience(.students, inferred: true) }, in: events))
@@ -139,10 +142,12 @@ struct TranslatorTests {
     @Test("the audience is reported as soon as it arrives, before the text")
     func audienceBeforeText() async throws {
         let chat = ScriptedChat([[
-            "{\"detected_audience\": \"students\", \"blocks\": [\"Hal", "lo\"]}",
+            "{\"detected_audience\": \"students\", \"audience_evidence\": \"Dear students\", \"blocks\": [\"Hal",
+            "lo\"]}",
         ]])
         let events = try await collect(translator(chat).translate(
-            UserText("Hello"), direction: Direction(source: english, target: german), audience: inferring))
+            UserText("Dear students, hello"), direction: Direction(source: english, target: german),
+            audience: inferring))
 
         let reported = try #require(index(of: { $0 == .audience(.students, inferred: true) }, in: events))
         let firstPreview = try #require(index(of: { event in
@@ -150,6 +155,47 @@ struct TranslatorTests {
             return true
         }, in: events))
         #expect(reported < firstPreview)
+    }
+
+    @Test("an audience without evidence is not a guess: the fallback")
+    func noEvidenceFallsBack() async throws {
+        let chat = ScriptedChat([["{\"detected_audience\": \"administration\", \"audience_evidence\": \"\", \"blocks\": [\"Hallo\"]}"]])
+        let events = try await collect(translator(chat).translate(
+            UserText("The room is closed on Friday."), direction: Direction(source: english, target: german),
+            audience: inferring))
+
+        #expect(audiences(events) == [.audience(.colleagues, inferred: false)])
+    }
+
+    @Test("evidence the text does not contain is not a guess either")
+    func evidenceNotInTextFallsBack() async throws {
+        let chat = ScriptedChat([[
+            "{\"detected_audience\": \"administration\", \"audience_evidence\": \"Dear office\", \"blocks\": [\"Hallo\"]}",
+        ]])
+        let events = try await collect(translator(chat).translate(
+            UserText("The room is closed on Friday."), direction: Direction(source: english, target: german),
+            audience: inferring))
+
+        #expect(audiences(events) == [.audience(.colleagues, inferred: false)])
+    }
+
+    @Test("the early report waits for the evidence, then reports at once")
+    func earlyReportWaitsForEvidence() async throws {
+        let chat = ScriptedChat([[
+            "{\"detected_audience\": \"students\", ",
+            "\"audience_evidence\": \"Dear students\", \"blocks\": [\"Hal",
+            "lo\"]}",
+        ]])
+        let events = try await collect(translator(chat).translate(
+            UserText("Dear students, hello"), direction: Direction(source: english, target: german),
+            audience: inferring))
+
+        let reported = try #require(index(of: { $0 == .audience(.students, inferred: true) }, in: events))
+        let progress = events.prefix(reported).filter { $0 == .progress }.count
+        // Each piece is read before its own progress event, so a report on
+        // the second piece follows exactly one; on the first, none.
+        #expect(progress == 1, "on the second piece, which completes the evidence")
+        #expect(audiences(events).count == 1)
     }
 
     @Test("unclear means the fallback, not presented as inferred")
@@ -164,9 +210,12 @@ struct TranslatorTests {
 
     @Test("the model naming the fallback is still an inference")
     func fallbackNamedExplicitly() async throws {
-        let chat = ScriptedChat([["{\"detected_audience\": \"colleagues\", \"blocks\": [\"Hallo\"]}"]])
+        let chat = ScriptedChat([[
+            "{\"detected_audience\": \"colleagues\", \"audience_evidence\": \"Hi Anna\", \"blocks\": [\"Hallo\"]}",
+        ]])
         let events = try await collect(translator(chat).translate(
-            UserText("Hello"), direction: Direction(source: english, target: german), audience: inferring))
+            UserText("Hi Anna, hello"), direction: Direction(source: english, target: german),
+            audience: inferring))
 
         #expect(audiences(events) == [.audience(.colleagues, inferred: true)])
     }
@@ -195,11 +244,11 @@ struct TranslatorTests {
     @Test("the whole-text retry writes for the reported audience, fixed")
     func retryIsFixed() async throws {
         let chat = ScriptedChat([
-            ["{\"detected_audience\": \"students\", \"blocks\": [\"only one\"]}"],
+            ["{\"detected_audience\": \"students\", \"audience_evidence\": \"Dear students\", \"blocks\": [\"only one\"]}"],
             ["{\"blocks\": [\"Erste Zeile.\\nZweite Zeile.\"]}"],
         ])
         let events = try await collect(translator(chat).translate(
-            UserText("First line.\nSecond line."),
+            UserText("Dear students.\nSecond line."),
             direction: Direction(source: english, target: german), audience: inferring))
 
         #expect(chat.prompts.count == 2)

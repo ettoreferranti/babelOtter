@@ -71,7 +71,7 @@ public struct PromptBuilder: Sendable {
 
         // The schema goes last, so it is the final instruction the model reads
         // and a style note asking for plain prose cannot override it.
-        sections.append(schema(for: request.action))
+        sections.append(schema(for: request))
         sections.append(blocks(request))
 
         return sections.joined(separator: "\n\n")
@@ -179,10 +179,32 @@ public struct PromptBuilder: Sendable {
         }
         lines.append(
             "Decide which of these audiences the text addresses and write for it. "
+                // Measured 2026-10-15: without this the default model always
+                // picked an audience, from the topic, for a text naming no
+                // reader at all.
+                + "Only decide on an audience when the text itself shows who it is written to: "
+                + "a greeting, a name, how the reader is addressed, or content only that "
+                + "audience would receive. The topic alone is not a sign. "
                 + #"Put its id in "detected_audience". If the text gives no clear sign, put ""#
                 + AudienceInference.unclear
-                + #"" and write for "\#(request.profile.id)"."#)
+                + #"" and write for "\#(request.profile.id)". "#
+                // Measured 2026-10-15: told to write for the fallback, the
+                // model then named the fallback as what it had detected.
+                + #""detected_audience" reports what the text shows, not whom you write for: "#
+                + #"with no clear sign it is ""# + AudienceInference.unclear
+                + #"", even though you then write for "\#(request.profile.id)". "#
+                + #"In "audience_evidence" copy the exact words of the text that show its reader "#
+                + #"(a greeting, a name), or "" when there are none."#)
         return lines.joined(separator: "\n")
+    }
+
+    /// `audience_evidence` only when the audience is inferred, and before
+    /// `blocks`, so it arrives early in the stream.
+    private func translateShape(_ request: PromptRequest) -> String {
+        if request.inferAudienceFrom.isEmpty {
+            return #"{"detected_source": "...", "detected_audience": "...", "blocks": ["..."]}"#
+        }
+        return #"{"detected_source": "...", "detected_audience": "...", "audience_evidence": "...", "blocks": ["..."]}"#
     }
 
     private func glossarySection(_ request: PromptRequest) -> String? {
@@ -208,11 +230,11 @@ public struct PromptBuilder: Sendable {
         return "Additional instruction from the user: \(note)"
     }
 
-    private func schema(for action: Action) -> String {
+    private func schema(for request: PromptRequest) -> String {
         let shape: String
-        switch action {
+        switch request.action {
         case .translate, .repitch:
-            shape = #"{"detected_source": "...", "detected_audience": "...", "blocks": ["..."]}"#
+            shape = translateShape(request)
         case .correct:
             // Allowed values as prose, never "a|b": the model copied that
             // notation into its answers (measured 2026-09-30).

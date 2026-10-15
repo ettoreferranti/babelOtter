@@ -22,6 +22,7 @@
 | What is remembered | Only an audience chosen in the picker, per application bundle ID, as its id | A guess is a suggestion, not a choice. Ids only, never text (`NFR-P3`) |
 | After the audience is known | It is fixed for every later run in this popup: the translator's own retry, Regenerate, a style note, Swap | The label must never change under the user. Re-inferring on Regenerate could flip it |
 | An answer that names no configured audience | The fallback, labelled as the fallback | #52: "the closest or default profile is selected and not presented as certain" |
+| When an answer counts as a guess | Only when the model also quotes words of the text that show the reader (`audience_evidence`), and those words really occur in the text; otherwise the fallback | Amended 2026-10-15 after measuring: asked only for an audience, the default model never answered `"unclear"` and guessed from the topic, overriding a remembered Students with Administration three times out of three. A quote that is not in the text is checkable locally |
 | Where the logic lives | In the kit, as `AudienceSession`; the popup only displays it | So every rule above is a unit test under the mutation gate, not a manual check |
 
 ## 3. The prompt
@@ -32,7 +33,7 @@ When inferring, the audience section instead lists every configured audience, on
 
 > Decide which of these audiences the text addresses and write for it. Put its id in `detected_audience`. If the text gives no clear sign, put `"unclear"` and write for `<fallback id>`.
 
-The reply schema is unchanged: `{"detected_source": "…", "detected_audience": "…", "blocks": ["…"]}`. `detected_audience` comes before `blocks`, so it arrives early in the stream.
+It also says that the topic alone is not a sign, that `detected_audience` reports what the text shows rather than whom the model writes for, and asks for the exact words that show the reader in `audience_evidence` (empty when there are none). When inferring, the reply schema is `{"detected_source": "…", "detected_audience": "…", "audience_evidence": "…", "blocks": ["…"]}`; with a fixed audience it is unchanged. Both audience fields come before `blocks`, so they arrive early in the stream.
 
 ## 4. Components
 

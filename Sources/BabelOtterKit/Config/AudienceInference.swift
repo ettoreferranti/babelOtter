@@ -30,4 +30,24 @@ public enum AudienceInference {
         }
         return nil
     }
+
+    /// Whether the model's quoted sign of the reader really occurs in the
+    /// text, ignoring case and how the space is laid out. Measured
+    /// 2026-10-15: asked only for an audience, the default model never said
+    /// `unclear`, and guessed from the topic instead; a quote it cannot find
+    /// in the text is how a guess shows itself.
+    public static func isEvidence(_ quote: String?, in text: String) -> Bool {
+        guard let quote else { return false }
+        let wanted = normalized(quote)
+        if wanted.count < 2 { return false }
+        return normalized(text).contains(wanted)
+    }
+
+    private static func normalized(_ text: String) -> String {
+        var words: [String] = []
+        for word in text.lowercased().components(separatedBy: .whitespacesAndNewlines) where !word.isEmpty {
+            words.append(word)
+        }
+        return words.joined(separator: " ")
+    }
 }

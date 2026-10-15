@@ -39,6 +39,22 @@ struct AudienceInferenceTests {
         #expect(AudienceInference.match("parents", in: profiles) == nil)
     }
 
+    @Test("evidence counts only when the quote occurs in the text")
+    func evidence() {
+        let text = "Dear students,\n\nthe exam takes place on 12 January."
+        #expect(AudienceInference.isEvidence("Dear students", in: text))
+        #expect(AudienceInference.isEvidence("  dear   STUDENTS ", in: text))
+        #expect(!AudienceInference.isEvidence("Dear colleagues", in: text))
+        #expect(!AudienceInference.isEvidence(nil, in: text))
+        #expect(!AudienceInference.isEvidence("", in: text))
+        #expect(!AudienceInference.isEvidence("D", in: text))
+    }
+
+    @Test("line breaks in the text and the quote compare as single spaces")
+    func evidenceAcrossLines() {
+        #expect(AudienceInference.isEvidence("Hi Anna, the", in: "Hi Anna,\nthe PR is merged"))
+    }
+
     @Test("the prompt's word for no sign is unclear")
     func unclearWord() {
         #expect(AudienceInference.unclear == "unclear")

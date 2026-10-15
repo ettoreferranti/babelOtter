@@ -40,6 +40,10 @@ struct PromptBuilderTests {
         }
         #expect(prompt.contains("Decide which of these audiences the text addresses"))
         #expect(prompt.contains(#"put "unclear" and write for "colleagues""#))
+        #expect(prompt.contains("The topic alone is not a sign."))
+        #expect(prompt.contains("reports what the text shows, not whom you write for"))
+        #expect(prompt.contains(#""detected_audience": "...", "audience_evidence": "...", "blocks""#))
+        #expect(prompt.contains(#"In "audience_evidence" copy the exact words of the text that show its reader"#))
         #expect(!prompt.contains("Audience: Colleagues."))
     }
 
@@ -48,6 +52,7 @@ struct PromptBuilderTests {
         let prompt = builder.build(request(profile: .students, inferFrom: []))
         #expect(prompt.contains("Audience: Students."))
         #expect(!prompt.contains("Decide which"))
+        #expect(!prompt.contains("audience_evidence"))
     }
 
     @Test("Correct never infers")

@@ -154,6 +154,9 @@ public struct Translator: Sendable {
         let target: LanguageConfig
         var audience: AudienceRequest
         let report: AudienceReport
+        /// The selection as the user wrote it, where a quoted sign of the
+        /// reader must occur.
+        let sourceText: String
         let styleNote: String?
         let glossary: [GlossaryEntry]
         let terms: [String]
@@ -191,6 +194,7 @@ public struct Translator: Sendable {
         }
         let context = Context(
             source: source, target: target, audience: audience, report: AudienceReport(),
+            sourceText: text.value,
             styleNote: styleNote,
             glossary: configuration.glossary.entries(
                 for: LanguagePair(source: direction.source, target: direction.target)),
@@ -198,17 +202,17 @@ public struct Translator: Sendable {
             model: configuration.models[.translate] ?? Configuration.defaultModel,
             processor: PostProcessor(target: target))
         emit(.started(direction))
-        if case .fixed = audience { settle(nil, context, emit) }
+        if case .fixed = audience { settle(nil, nil, context, emit) }
 
         let extracted = StructureExtractor.extract(text.value)
         let masked = extracted.blocks.map { TokenProtector.mask($0, terms: context.terms) }
         let raw = try await generate(masked, context, emit)
 
         guard case .decoded(let response) = ResponseParser.parseTranslate(raw) else {
-            settle(nil, context, emit)
+            settle(nil, nil, context, emit)
             return emit(.finished(unparsed(raw, masked.first, direction, context)))
         }
-        settle(response.detectedAudience, context, emit)
+        settle(response.detectedAudience, response.audienceEvidence, context, emit)
         let decision = BlockCountPolicy().decide(
             expected: extracted.skeleton.blockCount, received: response.blocks.count, attempt: 0)
         switch decision {
@@ -270,7 +274,8 @@ public struct Translator: Sendable {
             onRaw: { reply in
                 guard !context.choices.isEmpty else { return }
                 guard let detected = PartialField.string(named: "detected_audience", in: reply) else { return }
-                settle(detected, context, emit)
+                guard let evidence = PartialField.string(named: "audience_evidence", in: reply) else { return }
+                settle(detected, evidence, context, emit)
             },
             onDelta: { emit(.progress) },
             onPartial: { emit(.preview(UserText(preview($0, blocks, context)))) })
@@ -328,19 +333,22 @@ public struct Translator: Sendable {
             audience: context.writingFor, audienceInferred: context.report.inferred)
     }
 
-    /// Reports the audience if it has not been yet: the model's answer when
-    /// inferring (nil, `unclear` or unknown means the fallback), the fixed
-    /// one otherwise.
+    /// Reports the audience if it has not been yet: when inferring, the
+    /// model's answer if it names a configured audience and quotes words the
+    /// text really contains, else the fallback; the fixed one otherwise.
     private func settle(
-        _ detected: String?, _ context: Context, _ emit: (TranslationEvent) -> Void
+        _ detected: String?, _ evidence: String?, _ context: Context,
+        _ emit: (TranslationEvent) -> Void
     ) {
         guard context.report.profile == nil else { return }
         var chosen = context.writingFor
         var inferred = false
         if case .infer(let profiles, _) = context.audience {
             if let matched = AudienceInference.match(detected, in: profiles) {
-                chosen = matched
-                inferred = true
+                if AudienceInference.isEvidence(evidence, in: context.sourceText) {
+                    chosen = matched
+                    inferred = true
+                }
             }
         }
         context.report.profile = chosen
