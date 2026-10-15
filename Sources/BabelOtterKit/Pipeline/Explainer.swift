@@ -110,10 +110,12 @@ public struct Explainer: Sendable {
         configuration.enabledLanguages.first { $0.code.baseSubtag == code } ?? fallback
     }
 
-    /// Refuses any guess that is not German. "Can't tell" goes through:
-    /// short German fragments are common.
+    /// Refuses only a confident guess that is not German. Anything less goes
+    /// through: unlike Correct, Explain is for German the user does not
+    /// follow, and dialect or German mixed with English is exactly what
+    /// the recognizer is unsure of (spec 2026-10-15, final review).
     private func gate(_ text: UserText) throws {
-        guard let guess = detector.detect(text.value).languageCode else { return }
+        guard case .confident(let guess, _) = detector.detect(text.value) else { return }
         guard guess.baseSubtag == Self.german else { throw ExplanationFailure.notGerman }
     }
 

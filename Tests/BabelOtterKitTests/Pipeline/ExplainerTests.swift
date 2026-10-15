@@ -24,9 +24,10 @@ private final class ScriptedChat: ChatStreaming, @unchecked Sendable {
 
 private struct FixedRecognizer: LanguageRecognizing {
     let code: String?
+    var confidence: Double = 0.99
     func hypotheses(for text: String) -> [LanguageCode: Double] {
         guard let code else { return [:] }
-        return [LanguageCode(code): 0.99]
+        return [LanguageCode(code): confidence]
     }
 }
 
@@ -61,7 +62,7 @@ private func reply(_ summary: String, _ notes: [String] = []) -> [String] {
 struct ExplainerTests {
 
     private func explainer(
-        _ chat: ScriptedChat, language: String? = "de",
+        _ chat: ScriptedChat, language: String? = "de", confidence: Double = 0.99,
         configure: (inout Configuration) -> Void = { _ in }
     ) -> Explainer {
         var configuration = Configuration.default
@@ -69,7 +70,7 @@ struct ExplainerTests {
         configure(&configuration)
         return Explainer(
             configuration: configuration, chat: chat,
-            recognizer: FixedRecognizer(code: language))
+            recognizer: FixedRecognizer(code: language, confidence: confidence))
     }
 
     private let idiom = "Das ist nicht mein Bier."
@@ -99,6 +100,15 @@ struct ExplainerTests {
     func sendsWhenUnsure() async throws {
         let chat = ScriptedChat([reply("A greeting.")])
         _ = try await collect(explainer(chat, language: nil).explain(UserText("Moin")))
+        #expect(chat.prompts.count == 1)
+    }
+
+    @Test("a guess below the confidence floor is not a refusal: dialect and mixed text are sent")
+    func sendsBelowFloorGuess() async throws {
+        let chat = ScriptedChat([reply("A greeting in dialect.")])
+        _ = try await collect(
+            explainer(chat, language: "nl", confidence: 0.4)
+                .explain(UserText("Gr\u{00FC}ezi mitenand, wie g\u{00F6}hts?")))
         #expect(chat.prompts.count == 1)
     }
 
