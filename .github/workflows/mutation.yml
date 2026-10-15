@@ -45,15 +45,39 @@ jobs:
             echo "Xcode_16.4.app not present on this image; using the default Xcode."
           fi
 
-      - name: Install muter
-        # Verified invocation from the Task 3 spike (Refs #18), run on Swift
-        # 6.4 / Xcode 27. NOT yet verified on this job's Swift 6.1.2 / Xcode
-        # 16.4 image — that is exactly what this job exists to find out. No
-        # `|| true` and no continue-on-error here: if muter cannot install on
-        # this toolchain, this step must fail the job, not skip the gate.
+      - name: Install muter (tag 16, patched to read crash logs)
+        # The same source the Homebrew formula builds -- tag 16, same
+        # sha256 -- with one line changed (#94). muter reads each mutant's
+        # test log with `try String(contentsOf:)`, which throws when the file
+        # is not valid UTF-8, and its catch-all then records the mutant as
+        # `buildError` with an empty log. On this image's Swift 6.1, a test
+        # process that crashes (an out-of-range index, as many killed mutants
+        # do) can stop its output partway through a multi-byte character
+        # (the test output is full of arrows and German), so a mutant the
+        # suite caught was intermittently reported as never built, at a
+        # different place every run. Decoding leniently turns the stray bytes
+        # into U+FFFD and lets muter classify the run as it should. Reproduced
+        # and verified against stock and patched muter on 2026-10-15.
+        #
+        # No `|| true` and no continue-on-error: if muter cannot be built or
+        # the patch no longer applies, this step must fail the job, not skip
+        # the gate.
         run: |
-          brew tap muter-mutation-testing/formulae
-          brew install muter-mutation-testing/formulae/muter
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          curl -fsSL -o muter.zip https://github.com/muter-mutation-testing/muter/archive/refs/tags/16.zip
+          echo "de8c5f73f5f2810e83e6c72a5a429d0328f90df25842f8c581b4e66a3c694076  muter.zip" | shasum -a 256 -c -
+          unzip -q muter.zip
+          file=muter-16/Sources/muterCore/MutationTesting/MutationTestingIODelegate.swift
+          export OLD='let contents = try String(contentsOf: testLogUrl)'
+          export NEW='let contents = String(decoding: try Data(contentsOf: testLogUrl), as: UTF8.self)'
+          perl -pi -e 's/\Q$ENV{OLD}\E/$ENV{NEW}/' "$file"
+          if ! grep -qF "$NEW" "$file"; then
+            echo "::error::The muter log-decoding patch did not apply to $file. See #94."
+            exit 1
+          fi
+          make -C muter-16 install prefix="$RUNNER_TEMP/muter"
+          echo "$RUNNER_TEMP/muter/bin" >> "$GITHUB_PATH"
 
       - name: Show muter version and toolchain
         # Deliberately its own step, run before any mutation testing: the
@@ -207,12 +231,18 @@ jobs:
             echo "::error::Pass 1 was handed no files to mutate. That is not a passing run of zero mutants; it means the file list step produced nothing."
             exit 1
           fi
-          # muter intermittently emits a mutant that fails to compile. Proven
+          # muter intermittently reported a mutant as never built. Proven
           # nondeterministic on 2026-09-20: the same commit and the same
           # toolchain produced a buildError on one run of this job and a clean
           # 0-never-built on a plain re-run, with no code change between them.
           # Four consecutive reds were chased by restructuring whichever line
           # had failed; each time the next run failed somewhere else.
+          #
+          # The cause, found 2026-10-15 (#94): those mutants did build. Their
+          # tests crashed, and a crash log cut mid-character made muter's log
+          # read throw. The install step patches that. The retry stays as a
+          # tripwire: its warning in a run's log now means a buildError still
+          # happened, which is worth investigating, not normal.
           #
           # So a buildError is retried once, and only a *persistent* one fails
           # the build. That keeps the guarantee this gate exists for -- a mutant
@@ -257,12 +287,18 @@ jobs:
             echo "::error::Pass 2 was handed no files to mutate. That is not a passing run of zero mutants; it means the file list step produced nothing."
             exit 1
           fi
-          # muter intermittently emits a mutant that fails to compile. Proven
+          # muter intermittently reported a mutant as never built. Proven
           # nondeterministic on 2026-09-20: the same commit and the same
           # toolchain produced a buildError on one run of this job and a clean
           # 0-never-built on a plain re-run, with no code change between them.
           # Four consecutive reds were chased by restructuring whichever line
           # had failed; each time the next run failed somewhere else.
+          #
+          # The cause, found 2026-10-15 (#94): those mutants did build. Their
+          # tests crashed, and a crash log cut mid-character made muter's log
+          # read throw. The install step patches that. The retry stays as a
+          # tripwire: its warning in a run's log now means a buildError still
+          # happened, which is worth investigating, not normal.
           #
           # So a buildError is retried once, and only a *persistent* one fails
           # the build. That keeps the guarantee this gate exists for -- a mutant
