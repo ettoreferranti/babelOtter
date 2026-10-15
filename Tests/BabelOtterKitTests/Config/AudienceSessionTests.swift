@@ -140,16 +140,39 @@ struct AudienceSessionTests {
         #expect(session(in: mail, memory: memory).origin == .rememberedForApp)
     }
 
-    @Test("choosing the audience shown, or an unknown one, does nothing")
+    @Test("once reported, choosing the audience shown, or an unknown one, does nothing")
     func chooseNothing() {
         let memory = Memory()
         var current = session(memory: memory)
+        current.apply(reported: .colleagues, inferred: false)
         let sameAgain = current.choose("colleagues")
         let unknown = current.choose("parents")
         #expect(!sameAgain)
         #expect(!unknown)
         #expect(memory.last == nil)
         #expect(current.origin == .standard)
+    }
+
+    @Test("picking the audience shown while detecting is a pick: kept, remembered, re-run")
+    func pickTheShownOneWhileDetecting() {
+        let memory = Memory()
+        var current = session(memory: memory)
+        let rerun = current.choose("colleagues")
+        #expect(rerun)
+        #expect(current.origin == .chosen)
+        #expect(memory.perApp == ["com.apple.mail": "colleagues"])
+        current.apply(reported: .students, inferred: true)
+        #expect(current.audience == .colleagues)
+    }
+
+    @Test("a run that ends without a report stops saying detecting, and the next one infers again")
+    func failedRunStopsDetecting() {
+        var current = session()
+        current.runEnded()
+        #expect(current.note == "default")
+        #expect(current.request == .infer(profiles: profiles, fallback: .colleagues))
+        current.runStarted()
+        #expect(current.note == "detecting...")
     }
 
     @Test("a stale report after a choice does not override it")

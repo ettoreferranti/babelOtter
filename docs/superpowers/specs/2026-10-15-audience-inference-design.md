@@ -50,7 +50,7 @@ It also says that the topic alone is not a sign, that `detected_audience` report
   - `starting`: the fallback chain's audience and origin (app, anywhere, Colleagues, then the first configured audience); a remembered id that no longer exists is skipped.
   - `request`: what the next run should be told. Translate's first run is `.infer` with the fallback; every later run, and every Correct run, is `.fixed` with the audience shown.
   - `apply(event)`: records an `.audience` event, setting origin to `inferred` for a match or keeping the fallback's origin otherwise.
-  - `choose(id)`: sets the audience and origin `chosen`, remembers it for this app and anywhere, and reports that a re-run is needed. Choosing the audience already shown does nothing.
+  - `choose(id)`: sets the audience and origin `chosen`, remembers it for this app and anywhere, and reports that a re-run is needed. Choosing the audience already shown does nothing once the audience is known; while detecting, it counts as a pick (the shown audience is only the fallback then, and the guess could replace it).
   - `note`: the text beside the picker for the current origin, including the application's name for `rememberedForApp`.
 
 ### App (`BabelOtterApp`)

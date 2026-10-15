@@ -174,8 +174,11 @@ public struct PromptBuilder: Sendable {
     private func inferredAudience(_ request: PromptRequest) -> String {
         var lines = ["Audiences (id: name, form of address, tone):"]
         for profile in request.inferAudienceFrom {
-            lines.append(
-                #"- \#(profile.id): \#(profile.name), "\#(profile.register.rawValue)". \#(profile.toneGuidance)"#)
+            var line = #"- \#(profile.id): \#(profile.name), "\#(profile.register.rawValue)". \#(profile.toneGuidance)"#
+            if !profile.glossaryBias.isEmpty {
+                line += " Prefers: " + profile.glossaryBias.joined(separator: ", ") + "."
+            }
+            lines.append(line)
         }
         lines.append(
             "Decide which of these audiences the text addresses and write for it. "

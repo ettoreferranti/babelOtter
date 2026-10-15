@@ -33,6 +33,9 @@ public struct AudienceSession {
     public private(set) var audience: AudienceProfile
     public private(set) var origin: AudienceOrigin
     private var settled = false
+    /// False once a run has ended without reporting its audience (it
+    /// failed), so the note stops saying "detecting..." beside the error.
+    private var awaitingReport = true
 
     private let profiles: [AudienceProfile]
     private let action: Action
@@ -68,7 +71,9 @@ public struct AudienceSession {
 
     /// The text beside the picker. Nil for an audience the user picked.
     public var note: String? {
-        if isDetecting { return "detecting..." }
+        if isDetecting {
+            if awaitingReport { return "detecting..." }
+        }
         switch origin {
         case .chosen:
             return nil
@@ -93,12 +98,27 @@ public struct AudienceSession {
         if inferred { origin = .inferred }
     }
 
+    /// A run is starting: until it reports, the note says "detecting...".
+    public mutating func runStarted() {
+        awaitingReport = true
+    }
+
+    /// A run ended without reporting its audience. Its fallback's note is
+    /// shown; the next run still infers.
+    public mutating func runEnded() {
+        awaitingReport = false
+    }
+
     /// Picks an audience: remembered for this application and overall.
-    /// Returns whether the result must be generated again.
+    /// Returns whether the result must be generated again. Picking the
+    /// audience already shown does nothing, except while detecting: the
+    /// shown one is then only the fallback, and the guess could replace it.
     @discardableResult
     public mutating func choose(_ id: String) -> Bool {
         guard let profile = Self.find(id, in: profiles) else { return false }
-        if profile.id == audience.id { return false }
+        if profile.id == audience.id {
+            if !isDetecting { return false }
+        }
         audience = profile
         origin = .chosen
         settled = true

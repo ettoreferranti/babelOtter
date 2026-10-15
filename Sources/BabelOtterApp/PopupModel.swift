@@ -18,7 +18,12 @@ final class PopupModel {
     }
 
     let action: Action
-    private(set) var phase: Phase = .capturing
+    private(set) var phase: Phase = .capturing {
+        didSet {
+            // A run that fails never reports its audience (#52).
+            if case .failed = phase { audience.runEnded() }
+        }
+    }
     private(set) var direction: Direction?
     private(set) var text = ""
     private(set) var warnings: [String] = []
@@ -370,6 +375,7 @@ final class PopupModel {
         warnings = []
         message = nil
         phase = .translating
+        audience.runStarted()
 
         consume(
             translator.translate(

@@ -47,6 +47,15 @@ struct PromptBuilderTests {
         #expect(!prompt.contains("Audience: Colleagues."))
     }
 
+    @Test("inferring keeps each audience's preferred terms")
+    func inferringKeepsGlossaryBias() {
+        var students = AudienceProfile.students
+        students.glossaryBias = ["Modul", "Semester"]
+        let prompt = builder.build(request(profile: .colleagues, inferFrom: [students, .colleagues]))
+        #expect(prompt.contains("Prefers: Modul, Semester."))
+        #expect(prompt.components(separatedBy: "Prefers:").count == 2, "only the audience that has them")
+    }
+
     @Test("an empty list is the fixed audience, unchanged")
     func emptyListIsFixed() {
         let prompt = builder.build(request(profile: .students, inferFrom: []))
