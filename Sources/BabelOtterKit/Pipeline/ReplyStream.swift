@@ -9,6 +9,7 @@ enum ReplyStream {
 
     static func collect(
         chat: any ChatStreaming, model: String, prompt: String, key: String,
+        onRaw: (String) -> Void = { _ in },
         onDelta: () -> Void = {},
         onPartial: ([String]) -> Void
     ) async throws -> String {
@@ -20,6 +21,7 @@ enum ReplyStream {
             try Task.checkCancellation()
             guard case .delta(let piece) = event else { continue }
             raw += piece
+            onRaw(raw)
             onDelta()
             let partial = PartialBlocks.extract(from: raw, key: key)
             guard !partial.isEmpty, partial != shown else { continue }

@@ -91,6 +91,19 @@ private func result(_ events: [TranslationEvent]) -> TranslationResult? {
     return result
 }
 
+private func audiences(_ events: [TranslationEvent]) -> [TranslationEvent] {
+    events.filter { event in
+        guard case .audience = event else { return false }
+        return true
+    }
+}
+
+private func index(of wanted: (TranslationEvent) -> Bool, in events: [TranslationEvent]) -> Int? {
+    events.firstIndex(where: wanted)
+}
+
+private let inferring = AudienceRequest.infer(profiles: AudienceProfile.shippedDefaults, fallback: .colleagues)
+
 /// `.timeLimit`: muter has no per-mutant timeout, and a mutant that deletes a
 /// `continuation.finish()` leaves every stream here open forever. Without a
 /// limit one such mutant stalls the whole mutation job until CI cancels it,
@@ -106,6 +119,106 @@ struct TranslatorTests {
         configuration.doNotTranslate = ["Otterbach"]
         configure(&configuration)
         return Translator(configuration: configuration, chat: chat)
+    }
+
+    @Test("an inferred audience is reported once, before the result, and carried by it")
+    func inferredAudience() async throws {
+        let chat = ScriptedChat([["{\"detected_audience\": \"students\", \"blocks\": [\"Hallo\"]}"]])
+        let events = try await collect(translator(chat).translate(
+            UserText("Hello"), direction: Direction(source: english, target: german), audience: inferring))
+
+        #expect(audiences(events) == [.audience(.students, inferred: true)])
+        let reported = try #require(index(of: { $0 == .audience(.students, inferred: true) }, in: events))
+        #expect(reported < events.count - 1)
+        let finished = try #require(result(events))
+        #expect(finished.audience == .students)
+        #expect(finished.audienceInferred)
+        #expect(chat.prompts[0].contains("Decide which of these audiences"))
+    }
+
+    @Test("the audience is reported as soon as it arrives, before the text")
+    func audienceBeforeText() async throws {
+        let chat = ScriptedChat([[
+            "{\"detected_audience\": \"students\", \"blocks\": [\"Hal", "lo\"]}",
+        ]])
+        let events = try await collect(translator(chat).translate(
+            UserText("Hello"), direction: Direction(source: english, target: german), audience: inferring))
+
+        let reported = try #require(index(of: { $0 == .audience(.students, inferred: true) }, in: events))
+        let firstPreview = try #require(index(of: { event in
+            guard case .preview = event else { return false }
+            return true
+        }, in: events))
+        #expect(reported < firstPreview)
+    }
+
+    @Test("unclear means the fallback, not presented as inferred")
+    func unclearFallsBack() async throws {
+        let chat = ScriptedChat([["{\"detected_audience\": \"unclear\", \"blocks\": [\"Hallo\"]}"]])
+        let events = try await collect(translator(chat).translate(
+            UserText("Hello"), direction: Direction(source: english, target: german), audience: inferring))
+
+        #expect(audiences(events) == [.audience(.colleagues, inferred: false)])
+        #expect(result(events)?.audienceInferred == false)
+    }
+
+    @Test("the model naming the fallback is still an inference")
+    func fallbackNamedExplicitly() async throws {
+        let chat = ScriptedChat([["{\"detected_audience\": \"colleagues\", \"blocks\": [\"Hallo\"]}"]])
+        let events = try await collect(translator(chat).translate(
+            UserText("Hello"), direction: Direction(source: english, target: german), audience: inferring))
+
+        #expect(audiences(events) == [.audience(.colleagues, inferred: true)])
+    }
+
+    @Test("a reply without the field falls back, still before the result")
+    func missingFieldFallsBackBeforeFinished() async throws {
+        let chat = ScriptedChat([["{\"blocks\": [\"Hallo\"]}"]])
+        let events = try await collect(translator(chat).translate(
+            UserText("Hello"), direction: Direction(source: english, target: german), audience: inferring))
+
+        #expect(audiences(events) == [.audience(.colleagues, inferred: false)])
+        let reported = try #require(index(of: { $0 == .audience(.colleagues, inferred: false) }, in: events))
+        #expect(reported == events.count - 2)
+    }
+
+    @Test("an unparseable reply falls back, before the result")
+    func unparseableFallsBack() async throws {
+        let chat = ScriptedChat([["Hallo, no JSON"]])
+        let events = try await collect(translator(chat).translate(
+            UserText("Hello"), direction: Direction(source: english, target: german), audience: inferring))
+
+        #expect(audiences(events) == [.audience(.colleagues, inferred: false)])
+        #expect(result(events)?.audience == .colleagues)
+    }
+
+    @Test("the whole-text retry writes for the reported audience, fixed")
+    func retryIsFixed() async throws {
+        let chat = ScriptedChat([
+            ["{\"detected_audience\": \"students\", \"blocks\": [\"only one\"]}"],
+            ["{\"blocks\": [\"Erste Zeile.\\nZweite Zeile.\"]}"],
+        ])
+        let events = try await collect(translator(chat).translate(
+            UserText("First line.\nSecond line."),
+            direction: Direction(source: english, target: german), audience: inferring))
+
+        #expect(chat.prompts.count == 2)
+        #expect(!chat.prompts[1].contains("Decide which"))
+        #expect(chat.prompts[1].contains("Audience: Students."))
+        #expect(audiences(events) == [.audience(.students, inferred: true)])
+        #expect(result(events)?.audience == .students)
+    }
+
+    @Test("a fixed audience is reported at once, as not inferred")
+    func fixedIsReportedAtOnce() async throws {
+        let chat = ScriptedChat([["{\"blocks\": [\"Hallo\"]}"]])
+        let events = try await collect(translator(chat).translate(
+            UserText("Hello"), direction: Direction(source: english, target: german), profile: .administration))
+
+        #expect(events.count > 1)
+        #expect(events[1] == .audience(.administration, inferred: false))
+        #expect(audiences(events).count == 1)
+        #expect(!chat.prompts[0].contains("Decide which"))
     }
 
     @Test("a German list becomes an English list with its terms and markers intact")

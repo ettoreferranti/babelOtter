@@ -393,6 +393,8 @@ final class PopupModel {
         switch event {
         case .started(let direction):
             self.direction = direction
+        case .audience:
+            break
         case .progress:
             break
         case .preview(let partial):

@@ -59,6 +59,16 @@ struct ReplyStreamTests {
         #expect(deltas == 4)
     }
 
+    @Test("onRaw sees the whole reply so far after every piece")
+    func onRawSeesTheReplySoFar() async throws {
+        var seen: [String] = []
+        let raw = try await ReplyStream.collect(
+            chat: Scripted(["{\"a\"", ": 1}"]), model: "m", prompt: "p", key: "blocks",
+            onRaw: { seen.append($0) }, onPartial: { _ in })
+        #expect(seen == ["{\"a\"", "{\"a\": 1}"])
+        #expect(raw == "{\"a\": 1}")
+    }
+
     @Test("an empty reply comes back empty; the caller decides what that means")
     func empty() async throws {
         let raw = try await ReplyStream.collect(
