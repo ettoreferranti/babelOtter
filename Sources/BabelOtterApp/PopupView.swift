@@ -71,7 +71,13 @@ struct PopupView: View {
             .pickerStyle(.menu)
             .fixedSize()
 
-            TextField("Instruction, e.g. shorter", text: $model.instruction)
+            if let note = model.audienceNote {
+                Text(model.audienceInferred ? "\u{2726} \(note)" : note)
+                    .foregroundStyle(.secondary)
+                    .help("Where this audience came from")
+            }
+
+            TextField("Style note, e.g. shorter, more encouraging", text: $model.instruction)
                 .textFieldStyle(.roundedBorder)
                 .focused($instructionFocused)
                 .onSubmit { model.regenerate() }
