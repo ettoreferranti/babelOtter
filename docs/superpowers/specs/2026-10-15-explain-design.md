@@ -72,11 +72,11 @@ public struct Explainer: Sendable {
 
 A run:
 
-1. **Gate.** Empty text, or detection confident it is not German: `.notGerman`, and nothing is sent. Uncertain detection proceeds.
+1. **Gate.** Detection confident it is not German: `.notGerman`, and nothing is sent. Uncertain detection proceeds. (An empty selection never gets here: capture refuses it, `FR-CAP-06`.)
 2. **Mask.** Do-not-translate terms are masked over the whole text with `TokenProtector`.
 3. **Generate.** One streaming request with the text as one block, the model from `configuration.models[.explain]` (default `Configuration.defaultModel`). Each piece emits `.progress`; when the summary read so far has grown, `.summary` with it post-processed and unmasked.
 4. **Parse.** The complete reply decodes strictly into `ExplainResponse`. Invalid JSON, or an empty summary: `.unreadableReply`. An empty reply: `.emptyResponse`.
-5. **Clean.** Terms are restored in the summary, in each phrase and in each explanation. Notes whose phrase or explanation is empty after trimming are dropped. English locale rules (the post-processor for the configured English language) apply to the summary and the explanations; phrases are left as returned.
+5. **Clean.** Terms are restored in the summary, in each phrase and in each explanation. Notes whose phrase or explanation is empty after trimming are dropped. English locale rules (the post-processor for the configured English language) apply to the summary and the explanations; phrases are left as returned. A term missing from the summary or a note is normal (an explanation need not repeat it), so the only warning is a placeholder the model left behind.
 6. **Finish.** `.finished(ExplanationResult)`.
 
 ### 4.2 Reading a value still arriving
@@ -119,7 +119,7 @@ A third menu item, "Explain", with its current hotkey in the title like the othe
 
 ### 6.1 Unit (Swift Testing, fake chat stream as in `CorrectorTests`)
 
-- `ExplainerTests`: confident non-German refused with no request; uncertain detection sent; the request carries one block, the Explain model, masked terms and the style note; a growing summary emits growing `.summary` events and notes only arrive with `.finished`; `.progress` per piece; terms restored in summary, phrases and explanations; English rules on summary and explanations, a phrase with ß left as returned; empty notes dropped; empty summary and invalid JSON are `.unreadableReply`; an empty reply is `.emptyResponse`; `copyText` with and without notes.
+- `ExplainerTests`: confident non-German refused with no request; uncertain detection sent; the request carries one block, the Explain model, masked terms and the style note; a growing summary emits growing `.summary` events and notes only arrive with `.finished`; `.progress` per piece; terms restored in summary, phrases and explanations; English rules on summary and explanations, a phrase with an eszett left as returned; empty notes dropped; empty summary and invalid JSON are `.unreadableReply`; an empty reply is `.emptyResponse`; `copyText` with and without notes.
 - `PartialFieldTests`: `prefix` reads an open value, a closed one, nothing before the opening quote, and leaves out a cut-off escape.
 - `PromptBuilderTests`: the new instruction, and no audience section for Explain.
 - `HotKeyBindings` and `HotKeyPlan` tests: `explain` decodes, encodes, defaults to Control-Option-E, `null` turns it off, and a clash with Translate or Correct is reported.
