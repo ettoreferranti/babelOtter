@@ -45,4 +45,36 @@ struct PartialFieldTests {
     func notAString() {
         #expect(read(#"{"detected_audience": null}"#) == nil)
     }
+
+    private func prefix(_ partial: String) -> String? {
+        PartialField.prefix(named: "summary_en", in: partial)
+    }
+
+    @Test("a value still arriving is read as far as it has come")
+    func prefixOpen() {
+        #expect(prefix(#"{"summary_en": "The meet"#) == "The meet")
+    }
+
+    @Test("a complete value is read whole")
+    func prefixClosed() {
+        #expect(prefix(#"{"summary_en": "Done.", "notes": ["#) == "Done.")
+    }
+
+    @Test("just after the opening quote the value is empty")
+    func prefixEmpty() {
+        #expect(prefix(#"{"summary_en": ""#) == "")
+    }
+
+    @Test("nothing is read before the opening quote")
+    func prefixNotStarted() {
+        #expect(prefix(#"{"summary_en""#) == nil)
+        #expect(prefix(#"{"summary_en": "#) == nil)
+        #expect(prefix(#"{"notes": []"#) == nil)
+    }
+
+    @Test("an escape cut off at the end is left out until it completes")
+    func prefixCutEscape() {
+        #expect(prefix(#"{"summary_en": "say \"#) == "say ")
+        #expect(prefix(#"{"summary_en": "say \"hi"#) == "say \"hi")
+    }
 }
