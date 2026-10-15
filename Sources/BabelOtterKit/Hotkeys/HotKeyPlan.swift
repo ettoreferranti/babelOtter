@@ -33,13 +33,15 @@ public struct HotKeyPlan: Sendable, Equatable {
 
     /// The actions with hotkeys, in the order they are decided: Translate
     /// first, so it wins a duplicate.
-    public static let actions: [Action] = [.translate, .correct]
+    public static let actions: [Action] = [.translate, .correct, .explain]
 
     /// What babelOtter registered before #26, and what is in use before the
-    /// first plan: kVK_ANSI_T and kVK_ANSI_C with controlKey | optionKey.
+    /// first plan: kVK_ANSI_T, kVK_ANSI_C and kVK_ANSI_E (#65) with
+    /// controlKey | optionKey.
     public static let launchCombinations: [Action: HotKeyCombination] = [
         .translate: HotKeyCombination(keyCode: 0x11, modifiers: 0x1800, displayName: "Control-Option-T"),
         .correct: HotKeyCombination(keyCode: 0x08, modifiers: 0x1800, displayName: "Control-Option-C"),
+        .explain: HotKeyCombination(keyCode: 0x0E, modifiers: 0x1800, displayName: "Control-Option-E"),
     ]
 
     public static func make(

@@ -18,23 +18,31 @@ public enum HotKeyBinding: Sendable, Equatable {
 public struct HotKeyBindings: Sendable, Equatable, Codable {
     public var translate: HotKeyBinding
     public var correct: HotKeyBinding
+    public var explain: HotKeyBinding
 
-    public init(translate: HotKeyBinding = .useDefault, correct: HotKeyBinding = .useDefault) {
+    public init(
+        translate: HotKeyBinding = .useDefault, correct: HotKeyBinding = .useDefault,
+        explain: HotKeyBinding = .useDefault
+    ) {
         self.translate = translate
         self.correct = correct
+        self.explain = explain
     }
 
     public static let defaults = HotKeyBindings(
-        translate: .text("control+option+T"), correct: .text("control+option+C"))
+        translate: .text("control+option+T"), correct: .text("control+option+C"),
+        explain: .text("control+option+E"))
 
-    /// Nil for actions that have no hotkey yet (Explain #65, Re-pitch #66).
+    /// Nil for actions that have no hotkey yet (Re-pitch #66).
     public static func defaultText(for action: Action) -> String? {
         switch action {
         case .translate:
             return "control+option+T"
         case .correct:
             return "control+option+C"
-        case .explain, .repitch:
+        case .explain:
+            return "control+option+E"
+        case .repitch:
             return nil
         }
     }
@@ -45,7 +53,9 @@ public struct HotKeyBindings: Sendable, Equatable, Codable {
             return translate
         case .correct:
             return correct
-        case .explain, .repitch:
+        case .explain:
+            return explain
+        case .repitch:
             return .off
         }
     }
@@ -53,18 +63,21 @@ public struct HotKeyBindings: Sendable, Equatable, Codable {
     private enum CodingKeys: String, CodingKey {
         case translate
         case correct
+        case explain
     }
 
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         translate = try Self.decode(.translate, in: container)
         correct = try Self.decode(.correct, in: container)
+        explain = try Self.decode(.explain, in: container)
     }
 
     public func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try Self.encode(translate, as: .translate, in: &container)
         try Self.encode(correct, as: .correct, in: &container)
+        try Self.encode(explain, as: .explain, in: &container)
     }
 
     /// Absent and null are different answers: absent is the default, null
