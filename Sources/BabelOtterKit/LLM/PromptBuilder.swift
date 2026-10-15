@@ -6,6 +6,10 @@ public struct PromptRequest: Sendable {
     public let source: LanguageConfig
     public let target: LanguageConfig
     public let profile: AudienceProfile
+    /// #52: when not empty, the model chooses the audience from these and
+    /// `profile` is the fallback for a text with no clear sign. Correct
+    /// ignores it.
+    public let inferAudienceFrom: [AudienceProfile]
     public let glossary: [GlossaryEntry]
     public let doNotTranslate: [String]
     public let styleNote: String?
@@ -16,6 +20,7 @@ public struct PromptRequest: Sendable {
         source: LanguageConfig,
         target: LanguageConfig,
         profile: AudienceProfile,
+        inferAudienceFrom: [AudienceProfile] = [],
         glossary: [GlossaryEntry] = [],
         doNotTranslate: [String] = [],
         styleNote: String? = nil,
@@ -25,6 +30,7 @@ public struct PromptRequest: Sendable {
         self.source = source
         self.target = target
         self.profile = profile
+        self.inferAudienceFrom = inferAudienceFrom
         self.glossary = glossary
         self.doNotTranslate = doNotTranslate
         self.styleNote = styleNote
@@ -145,6 +151,9 @@ public struct PromptBuilder: Sendable {
     private func audience(_ request: PromptRequest) -> String? {
         let profile = request.profile
         guard request.action == .correct else {
+            if !request.inferAudienceFrom.isEmpty {
+                return inferredAudience(request)
+            }
             var lines = [
                 "Audience: \(profile.name).",
                 #"Address the reader as "\#(profile.register.rawValue)"."#,
@@ -158,6 +167,22 @@ public struct PromptBuilder: Sendable {
         return
             #"The text is addressed to \#(profile.name), who should be addressed as "\#(profile.register.rawValue)". "#
             + "A mismatch is a register error."
+    }
+
+    /// #52: the model picks the audience the text addresses and writes for
+    /// it. `request.profile` is the fallback for a text with no clear sign.
+    private func inferredAudience(_ request: PromptRequest) -> String {
+        var lines = ["Audiences (id: name, form of address, tone):"]
+        for profile in request.inferAudienceFrom {
+            lines.append(
+                #"- \#(profile.id): \#(profile.name), "\#(profile.register.rawValue)". \#(profile.toneGuidance)"#)
+        }
+        lines.append(
+            "Decide which of these audiences the text addresses and write for it. "
+                + #"Put its id in "detected_audience". If the text gives no clear sign, put ""#
+                + AudienceInference.unclear
+                + #"" and write for "\#(request.profile.id)"."#)
+        return lines.joined(separator: "\n")
     }
 
     private func glossarySection(_ request: PromptRequest) -> String? {
