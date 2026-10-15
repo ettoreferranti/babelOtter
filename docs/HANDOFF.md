@@ -2,6 +2,22 @@
 
 Read this first if you are picking babelOtter up in a new session.
 
+## Update 2026-10-14: Copy confirms (#96); the popup opens by the selection (#97)
+
+Copy now shows "Copied" for 0.8 s before the popup closes. The popup is placed against the selection's bounds where the application reports them, else the focused window (near the pointer if it is on the same display, else near the window's top), else the pointer, as before; each Accessibility call is capped at 100 ms. The geometry is `BabelOtterKit/Popup/PopupPlacement.swift`, tested and mutation-gated; the Accessibility reading is `SelectionAnchor.swift` in the app.
+
+**Manual checks (yours):**
+
+| # | Do | Expect |
+|---|---|---|
+| P1 | Translate, then press Copy; again with Shift-Command-C | The button reads "Copied" briefly, then the popup closes; paste gives the translation |
+| P2 | Press Copy, then Escape at once | The popup closes immediately |
+| P3 | Two displays: selection in TextEdit on one, pointer on the other, press the hotkey | The popup opens just below the selection, on the selection's display |
+| P4 | Same in Safari or Mail | As P3 |
+| P5 | Same in Teams or another Electron app | The popup opens near the top of that app's window, on its display |
+| P6 | Select text near the bottom of a display | The popup opens above the selection, fully on screen |
+| P7 | Trigger in TextEdit with one display | The popup still appears at once (C11) |
+
 ## Update 2026-10-13: the app is now lingoSwen, with Swen as its picture
 
 The app the user sees is **lingoSwen**: bundle `build/lingoSwen.app`, executable `lingoSwen`, bundle ID `ch.lingoswen`, data in `~/Library/Application Support/ch.lingoswen` (moved by hand from `ch.babelotter` on the one dev machine; there is no migration code). Swen (`Tools/app/Mascot.png`) replaces the otter emoji in the menu bar and popup header and is the app icon, which `Tools/make-app.sh` generates from the same picture. The repo, the Swift package and module names (`BabelOtterKit`, `BabelOtterApp`, `babelotter-eval`), the signing identity "babelOtter Dev" and the design docs keep the old name.

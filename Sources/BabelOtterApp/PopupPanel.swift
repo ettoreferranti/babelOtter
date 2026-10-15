@@ -1,4 +1,5 @@
 import AppKit
+import BabelOtterKit
 import SwiftUI
 
 /// A floating panel that takes keyboard focus without activating babelOtter,
@@ -23,16 +24,23 @@ final class PopupPanel: NSPanel {
 
     override var canBecomeKey: Bool { true }
 
-    /// Shows `content` near the cursor. `activate` defaults to true for the
+    /// What the last placement used, so a popup reopened after Replace
+    /// returns to the same place.
+    private var anchor: PopupAnchor = .pointer
+
+    /// Shows `content` by `anchor` -- the selection, its window or the
+    /// pointer (#97) -- or, when nil, where the last popup was anchored.
+    /// `activate` defaults to true for the
     /// common case (choosing a direction, a finished translation reopened
     /// after Replace); pass `false` for the moment capture starts, when a
     /// synthetic Command-C must still reach the source application rather
     /// than this panel -- see `makeKeyNow()`.
-    func show<Content: View>(_ content: Content, activate: Bool = true) {
+    func show<Content: View>(_ content: Content, activate: Bool = true, anchor: PopupAnchor? = nil) {
+        if let anchor { self.anchor = anchor }
         let controller = NSHostingController(rootView: content)
         controller.sizingOptions = [.preferredContentSize]
         contentViewController = controller
-        placeNearCursor()
+        place()
         orderFrontRegardless()
         if activate { makeKey() }
     }
@@ -56,14 +64,11 @@ final class PopupPanel: NSPanel {
         contentViewController = nil
     }
 
-    private func placeNearCursor() {
-        let mouse = NSEvent.mouseLocation
-        let screen = NSScreen.screens.first { $0.frame.contains(mouse) } ?? NSScreen.main
-        guard let visible = screen?.visibleFrame else { return }
-        let size = frame.size
-        var origin = NSPoint(x: mouse.x + 12, y: mouse.y - size.height - 12)
-        origin.x = min(max(origin.x, visible.minX + 8), visible.maxX - size.width - 8)
-        origin.y = min(max(origin.y, visible.minY + 8), visible.maxY - size.height - 8)
-        setFrameOrigin(origin)
+    private func place() {
+        let screens = NSScreen.screens.map {
+            PopupScreen(frame: $0.frame, visibleFrame: $0.visibleFrame)
+        }
+        setFrameOrigin(PopupPlacement.origin(
+            size: frame.size, anchor: anchor, pointer: NSEvent.mouseLocation, screens: screens))
     }
 }

@@ -375,7 +375,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         currentModel = model
         // Non-key: the clipboard tier's synthetic Command-C must still reach
         // the source application's own selection, not a key panel of ours.
-        panel.show(PopupView(model: model), activate: false)
+        panel.show(
+            PopupView(model: model), activate: false,
+            anchor: SelectionAnchor(processIdentifier: source.processIdentifier).read())
 
         isCapturing = true
         let capturer = SelectionCapturer(configuration: environment.configuration)
@@ -407,6 +409,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             })
         model.requireAccessibility()
         currentModel = model
-        panel.show(PopupView(model: model))
+        panel.show(PopupView(model: model), anchor: .pointer)
     }
 }
