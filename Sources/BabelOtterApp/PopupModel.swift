@@ -31,6 +31,8 @@ final class PopupModel {
     /// Set only by Correct, once its stream finishes. Never mutated by
     /// Translate.
     private(set) var correction: CorrectionResult?
+    /// Set only by Explain, once its stream finishes (#65).
+    private(set) var explanation: ExplanationResult?
     /// Where the audience came from and what each run is told (#52).
     private(set) var audience: AudienceSession
     /// Free text for this invocation only ("shorter", "use Sie"). Never
@@ -40,6 +42,7 @@ final class PopupModel {
     let configuration: Configuration
     private let translator: Translator
     private let corrector: Corrector
+    private let explainer: Explainer
     private let close: @MainActor () -> Void
     private let reopen: @MainActor (PopupModel) -> Void
     private(set) var snapshot: SelectionSnapshot?
@@ -72,6 +75,7 @@ final class PopupModel {
         self.configuration = environment.configuration
         self.translator = Translator(configuration: environment.configuration, chat: environment.client)
         self.corrector = Corrector(configuration: environment.configuration, chat: environment.client)
+        self.explainer = Explainer(configuration: environment.configuration, chat: environment.client)
         self.close = close
         self.reopen = reopen
         self.audience = AudienceSession(
@@ -89,6 +93,15 @@ final class PopupModel {
     var audienceNote: String? { audience.note }
     var audienceInferred: Bool { audience.origin == .inferred }
 
+    /// Translate (and, until #66, Re-pitch) runs in a language direction;
+    /// Correct and Explain run on the selection as it is.
+    private var usesDirection: Bool {
+        switch action {
+        case .translate, .repitch: return true
+        case .correct, .explain: return false
+        }
+    }
+
     /// Picking another audience re-runs the result already on screen, since
     /// the whole point is to see it in the other register.
     func selectProfile(_ id: String) {
@@ -101,21 +114,21 @@ final class PopupModel {
     /// Translate, a snapshot for Correct.
     func regenerate() {
         guard !isDismissed, !isReplacing else { return }
-        if action == .correct {
-            guard snapshot != nil else { return }
-            runCorrection()
-        } else {
+        if usesDirection {
             guard let direction else { return }
             run(direction)
+        } else {
+            guard snapshot != nil else { return }
+            runOnSelection()
         }
     }
 
     var canRegenerate: Bool {
         guard !isReplacing, !copied else { return false }
-        if action == .correct {
-            guard snapshot != nil else { return false }
-        } else {
+        if usesDirection {
             guard direction != nil else { return false }
+        } else {
+            guard snapshot != nil else { return false }
         }
         switch phase {
         case .translating, .finished, .failed: return true
@@ -136,8 +149,8 @@ final class PopupModel {
             phase = .failed(refusal.detail)
         case .captured(let snapshot):
             self.snapshot = snapshot
-            if action == .correct {
-                runCorrection()
+            if !usesDirection {
+                runOnSelection()
             } else {
                 switch translator.direction(for: snapshot.text) {
                 case .success(let direction):
@@ -160,7 +173,7 @@ final class PopupModel {
     }
 
     func swap() {
-        guard !isDismissed, action != .correct else { return }
+        guard !isDismissed, usesDirection else { return }
         guard let direction else { return }
         run(direction.swapped)
     }
@@ -180,11 +193,9 @@ final class PopupModel {
         dismiss()
     }
 
-    /// Whether there is a result worth keeping. For Translate this is just
-    /// "finished"; for Correct, a text with no errors has nothing to paste or
-    /// copy over the original (Replace stays disabled per the design: "No
-    /// errors found").
-    var canReplace: Bool {
+    /// Whether there is a result worth keeping. For Correct, a text with no
+    /// errors has nothing to copy over the original ("No errors found").
+    var canCopy: Bool {
         guard phase == .finished, !copied else { return false }
         if action == .correct {
             return correction?.hasNoErrors == false
@@ -192,8 +203,14 @@ final class PopupModel {
         return true
     }
 
+    /// An explanation is not a substitute for the text (#65).
+    var canReplace: Bool {
+        guard canCopy else { return false }
+        return action != .explain
+    }
+
     func copy() {
-        guard canReplace else { return }
+        guard canCopy else { return }
         SystemPasteboard().write(text, concealed: false)
         copied = true
         Task { [weak self] in
@@ -400,6 +417,54 @@ final class PopupModel {
             warnings = result.warnings
             phase = .finished
         }
+    }
+
+    private func runOnSelection() {
+        if action == .explain {
+            runExplanation()
+        } else {
+            runCorrection()
+        }
+    }
+
+    private func runExplanation() {
+        guard !isDismissed, let snapshot else { return }
+        stop()
+        explanation = nil
+        text = ""
+        warnings = []
+        message = nil
+        phase = .translating
+        consume(
+            explainer.explain(snapshot.text, styleNote: styleNote),
+            apply: { model, event in model.applyExplanation(event) },
+            fail: Self.describeExplanation)
+    }
+
+    private func applyExplanation(_ event: ExplanationEvent) {
+        switch event {
+        case .started, .progress:
+            break
+        case .summary(let partial):
+            text = partial
+        case .finished(let result):
+            explanation = result
+            text = result.copyText
+            warnings = result.warnings
+            phase = .finished
+        }
+    }
+
+    private static func describeExplanation(_ error: any Error) -> String {
+        if let failure = error as? ExplanationFailure {
+            switch failure {
+            case .notGerman: return "Explain works on German text."
+            case .unreadableReply:
+                return "The model's reply couldn't be read as an explanation. Try Regenerate."
+            case .emptyResponse: return "Nothing came back from the model."
+            }
+        }
+        return describe(error)
     }
 
     private func runCorrection() {

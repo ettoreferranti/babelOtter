@@ -52,41 +52,57 @@ struct PopupView: View {
     }
 
     private var headerTitle: String {
-        if model.action == .correct { return "Correct" }
-        return "lingoSwen"
+        switch model.action {
+        case .correct: return "Correct"
+        case .explain: return "Explain"
+        case .translate, .repitch: return "lingoSwen"
+        }
     }
 
     /// Audience and a one-off instruction. Both re-run the translation.
     private var controls: some View {
         HStack(spacing: 8) {
-            Picker("Audience", selection: Binding(
-                get: { model.profileID },
-                set: { model.selectProfile($0) }
-            )) {
-                ForEach(model.profiles) { profile in
-                    Text("\(profile.name) (\(profile.register.rawValue))").tag(profile.id)
+            // An explanation is written for the user, not a reader (#65).
+            if model.action != .explain {
+                Picker("Audience", selection: Binding(
+                    get: { model.profileID },
+                    set: { model.selectProfile($0) }
+                )) {
+                    ForEach(model.profiles) { profile in
+                        Text("\(profile.name) (\(profile.register.rawValue))").tag(profile.id)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .fixedSize()
+
+                if let note = model.audienceNote {
+                    Text(model.audienceInferred ? "\u{2726} \(note)" : note)
+                        .foregroundStyle(.secondary)
+                        .help("Where this audience came from")
                 }
             }
-            .labelsHidden()
-            .pickerStyle(.menu)
-            .fixedSize()
 
-            if let note = model.audienceNote {
-                Text(model.audienceInferred ? "\u{2726} \(note)" : note)
-                    .foregroundStyle(.secondary)
-                    .help("Where this audience came from")
-            }
-
-            TextField("Style note, e.g. shorter, more encouraging", text: $model.instruction)
+            TextField(stylePlaceholder, text: $model.instruction)
                 .textFieldStyle(.roundedBorder)
                 .focused($instructionFocused)
                 .onSubmit { model.regenerate() }
 
             Button("Regenerate", systemImage: "arrow.clockwise") { model.regenerate() }
                 .labelStyle(.iconOnly).buttonStyle(.borderless)
-                .help("Translate again with this audience and instruction")
+                .help(regenerateHelp)
         }
         .font(.caption)
+    }
+
+    private var stylePlaceholder: String {
+        if model.action == .explain { return "Style note, e.g. focus on grammar" }
+        return "Style note, e.g. shorter, more encouraging"
+    }
+
+    private var regenerateHelp: String {
+        if model.action == .explain { return "Explain again with this instruction" }
+        return "Translate again with this audience and instruction"
     }
 
     @ViewBuilder private var content: some View {
@@ -106,6 +122,8 @@ struct PopupView: View {
         case .finished:
             if let correction = model.correction {
                 correctionContent(correction)
+            } else if let explanation = model.explanation {
+                ExplanationContent(explanation: explanation)
             } else {
                 plainText
             }
@@ -181,15 +199,19 @@ struct PopupView: View {
             // While the instruction field has focus, Return means
             // Regenerate. A default button would otherwise take Return
             // first and paste into the user's document mid-edit.
-            Button("Replace") { model.replace() }
-                .keyboardShortcut(instructionFocused ? nil : .defaultAction)
-                .disabled(!model.canReplace)
+            // Explain has nothing to paste (#65): no button, so Return can
+            // never paste an explanation over the user's text.
+            if model.action != .explain {
+                Button("Replace") { model.replace() }
+                    .keyboardShortcut(instructionFocused ? nil : .defaultAction)
+                    .disabled(!model.canReplace)
+            }
             // Not Command-C: the result text is selectable, and a user
             // copying part of it with Command-C must not have that hijacked
             // into copying (and dismissing over) the whole translation.
             Button(model.copied ? "\u{2713} Copied" : "Copy") { model.copy() }
                 .keyboardShortcut("c", modifiers: [.command, .shift])
-                .disabled(!model.canReplace && !model.copied)
+                .disabled(!model.canCopy && !model.copied)
             Spacer()
             Button("Dismiss") { model.dismiss() }
                 .keyboardShortcut(.cancelAction)
