@@ -333,4 +333,39 @@ struct PromptBuilderTests {
         #expect(!prompt.contains("Address the reader"))
         #expect(!prompt.contains("addressed to"))
     }
+
+    private func repitch(_ profile: AudienceProfile = .administration) -> String {
+        builder.build(PromptRequest(
+            action: .repitch, source: .swissGerman, target: .swissGerman,
+            profile: profile, blocks: ["Hallo"]))
+    }
+
+    @Test("Re-pitch rewrites for the audience in the same language and keeps every fact")
+    func repitchInstruction() {
+        let prompt = repitch()
+        #expect(prompt.contains(
+            "Rewrite the numbered blocks below for the audience described, in the same language."))
+        #expect(prompt.contains("Keep every fact: names, dates, times, numbers, places, links and requests."))
+        #expect(prompt.contains("Do not translate."))
+    }
+
+    @Test("Re-pitch names one language, keeps its orthography, and writes for the fixed audience")
+    func repitchSections() {
+        var profile = AudienceProfile.administration
+        profile.glossaryBias = ["Studiengang"]
+        let prompt = repitch(profile)
+        #expect(prompt.contains("Language: Swiss Standard German."))
+        #expect(!prompt.contains("Target language"))
+        #expect(prompt.contains("Never write"))
+        #expect(prompt.contains("Audience: Administration."))
+        #expect(prompt.contains("Prefer these terms where natural: Studiengang."))
+    }
+
+    @Test("Re-pitch asks for blocks only")
+    func repitchSchema() {
+        let prompt = repitch()
+        #expect(prompt.contains(#"{"blocks": ["..."]}"#))
+        #expect(!prompt.contains("detected_source"))
+        #expect(!prompt.contains("detected_audience"))
+    }
 }

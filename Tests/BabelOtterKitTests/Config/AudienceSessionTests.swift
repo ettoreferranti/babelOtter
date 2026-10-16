@@ -192,4 +192,24 @@ struct AudienceSessionTests {
         current.apply(reported: .informal, inferred: false)
         #expect(current.note == "last used")
     }
+
+    @Test("Re-pitch never detects and is told a fixed audience")
+    func repitchIsFixed() {
+        let start = session(.repitch)
+        #expect(!start.isDetecting)
+        #expect(start.request == .fixed(.colleagues))
+    }
+
+    @Test("confirming the audience shown is a pick: remembered for this app and overall")
+    func confirm() {
+        let memory = Memory()
+        memory.last = "students"
+        var start = session(.repitch, memory: memory)
+        start.confirm()
+        #expect(start.audience == .students)
+        #expect(start.origin == .chosen)
+        #expect(start.note == nil)
+        #expect(memory.perApp["com.apple.mail"] == "students")
+        #expect(memory.last == "students")
+    }
 }

@@ -41,11 +41,11 @@ final class ReadinessMonitor {
         models = Self.models(for: configuration)
     }
 
-    /// Only the actions that exist are checked. One without a configured
-    /// model falls back to the default, as the pipeline does.
+    /// Every action is checked. One without a configured model falls back to
+    /// the default, as the pipeline does.
     private static func models(for configuration: Configuration) -> [Action: String] {
         var models: [Action: String] = [:]
-        for action in [Action.translate, .correct, .explain] {
+        for action in Action.allCases {
             models[action] = configuration.models[action] ?? Configuration.defaultModel
         }
         return models

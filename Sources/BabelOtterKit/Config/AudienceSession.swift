@@ -126,6 +126,14 @@ public struct AudienceSession {
         return true
     }
 
+    /// The audience shown is confirmed as it is (#66: Re-pitch's start): a
+    /// pick like `choose`, remembered for this application and overall.
+    public mutating func confirm() {
+        origin = .chosen
+        settled = true
+        memory.remember(audience.id, forApp: application?.bundleIdentifier)
+    }
+
     private static func starting(
         _ profiles: [AudienceProfile], _ bundleIdentifier: String?, _ memory: any AudienceMemory
     ) -> (profile: AudienceProfile, origin: AudienceOrigin) {

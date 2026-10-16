@@ -9,7 +9,7 @@ struct PopupView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             header
-            if model.canRegenerate {
+            if model.showsControls {
                 controls
             }
             content
@@ -39,23 +39,15 @@ struct PopupView: View {
             } else {
                 Text(Mascot.fallback).font(.headline)
             }
-            Text(headerTitle).font(.headline)
+            Text(model.headerTitle).font(.headline)
             Spacer()
-            if model.action != .correct, let direction = model.direction {
+            if model.action == .translate, let direction = model.direction {
                 Text("\(model.displayName(direction.source)) \u{2192} \(model.displayName(direction.target))")
                     .font(.caption).foregroundStyle(.secondary)
                 Button("Swap", systemImage: "arrow.left.arrow.right") { model.swap() }
                     .labelStyle(.iconOnly).buttonStyle(.borderless)
                     .disabled(model.phase == .capturing)
             }
-        }
-    }
-
-    private var headerTitle: String {
-        switch model.action {
-        case .correct: return "Correct"
-        case .explain: return "Explain"
-        case .translate, .repitch: return "lingoSwen"
         }
     }
 
@@ -96,13 +88,19 @@ struct PopupView: View {
     }
 
     private var stylePlaceholder: String {
-        if model.action == .explain { return "Style note, e.g. focus on grammar" }
-        return "Style note, e.g. shorter, more encouraging"
+        switch model.action {
+        case .explain: return "Style note, e.g. focus on grammar"
+        case .repitch: return "Style note, e.g. shorter, warmer"
+        case .translate, .correct: return "Style note, e.g. shorter, more encouraging"
+        }
     }
 
     private var regenerateHelp: String {
-        if model.action == .explain { return "Explain again with this instruction" }
-        return "Translate again with this audience and instruction"
+        switch model.action {
+        case .explain: return "Explain again with this instruction"
+        case .repitch: return "Re-pitch again with this audience and instruction"
+        case .translate, .correct: return "Translate again with this audience and instruction"
+        }
     }
 
     @ViewBuilder private var content: some View {
@@ -110,12 +108,15 @@ struct PopupView: View {
         case .capturing:
             ProgressView("Reading the selection...").controlSize(.small)
         case .choosingDirection(let candidates):
-            Text("Translate into:")
+            Text(model.action == .repitch ? "Which language is this?" : "Translate into:")
             HStack {
                 ForEach(candidates, id: \.self) { code in
                     Button(model.displayName(code)) { model.choose(target: code) }
                 }
             }
+        case .choosingAudience:
+            Text("Pick the audience to re-pitch for, then press Re-pitch.")
+                .font(.caption).foregroundStyle(.secondary)
         case .translating:
             plainText
             ProgressView().controlSize(.small)
@@ -185,6 +186,14 @@ struct PopupView: View {
             HStack {
                 Button("Open System Settings") { model.openAccessibilitySettings() }
                     .keyboardShortcut(.defaultAction)
+                Spacer()
+                Button("Dismiss") { model.dismiss() }
+                    .keyboardShortcut(.cancelAction)
+            }
+        } else if model.phase == .choosingAudience {
+            HStack {
+                Button("Re-pitch") { model.startRepitch() }
+                    .keyboardShortcut(instructionFocused ? nil : .defaultAction)
                 Spacer()
                 Button("Dismiss") { model.dismiss() }
                     .keyboardShortcut(.cancelAction)

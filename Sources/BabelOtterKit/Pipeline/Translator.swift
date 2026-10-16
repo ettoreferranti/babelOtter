@@ -100,6 +100,20 @@ public struct Translator: Sendable {
         return Direction(source: source.code, target: target)
     }
 
+    /// The enabled language a text is written in (#66): Re-pitch keeps it.
+    /// Not `TargetLanguageResolver`, which calls a text ambiguous whenever
+    /// there is more than one language to translate into.
+    public func language(for text: UserText) -> Result<LanguageCode, TranslationError> {
+        guard case .confident(let detected, _) = detector.detect(text.value) else {
+            return .failure(.directionUnknown(candidates: enabledCodes))
+        }
+        for language in configuration.enabledLanguages {
+            if language.code == detected { return .success(language.code) }
+            if language.code.baseSubtag == detected.baseSubtag { return .success(language.code) }
+        }
+        return .failure(.languageNotConfigured(detected))
+    }
+
     /// Lazy for the same reason `OllamaClient.chat` is: building the value
     /// must not transmit the user's text (NFR-P1).
     ///
@@ -119,14 +133,34 @@ public struct Translator: Sendable {
         _ text: UserText, direction: Direction, audience: AudienceRequest,
         styleNote: String? = nil
     ) -> LazyStream<TranslationEvent> {
+        stream(text, direction: direction, audience: audience, styleNote: styleNote, action: .translate)
+    }
+
+    /// The same text in the same language, for `audience` (#66). Always a
+    /// fixed audience; no glossary, which is for translating between two
+    /// languages; facts of the original that the result lost are warnings.
+    public func repitch(
+        _ text: UserText, language: LanguageCode, audience: AudienceProfile,
+        styleNote: String? = nil
+    ) -> LazyStream<TranslationEvent> {
+        stream(
+            text, direction: Direction(source: language, target: language),
+            audience: .fixed(audience), styleNote: styleNote, action: .repitch)
+    }
+
+    private func stream(
+        _ text: UserText, direction: Direction, audience: AudienceRequest,
+        styleNote: String?, action: Action
+    ) -> LazyStream<TranslationEvent> {
         LazyStream { [self] in
             AsyncThrowingStream { continuation in
                 let task = Task {
                     do {
                         try await run(
-                            text, direction: direction, audience: audience, styleNote: styleNote
+                            text, direction: direction, audience: audience,
+                            styleNote: styleNote, action: action
                         ) {
-                            continuation.yield($0)
+                            continuation.yield(checked($0, action: action, original: text.value))
                         }
                         continuation.finish()
                     } catch {
@@ -138,9 +172,30 @@ public struct Translator: Sendable {
         }
     }
 
+    /// Re-pitch's finished result gains a warning per fact it lost.
+    private func checked(
+        _ event: TranslationEvent, action: Action, original: String
+    ) -> TranslationEvent {
+        guard action == .repitch else { return event }
+        guard case .finished(let result) = event else { return event }
+        let lost = FactCheck.missing(from: original, in: result.text.value).map {
+            "\"" + $0 + "\" from the original is not in the re-pitch."
+        }
+        return .finished(TranslationResult(
+            text: result.text, direction: result.direction, warnings: result.warnings + lost,
+            audience: result.audience, audienceInferred: result.audienceInferred))
+    }
+
     // MARK: - The pipeline
 
     private var enabledCodes: [LanguageCode] { configuration.enabledLanguages.map(\.code) }
+
+    /// The glossary maps terms between two languages; Re-pitch stays in one.
+    private func glossary(for action: Action, _ direction: Direction) -> [GlossaryEntry] {
+        if action == .repitch { return [] }
+        return configuration.glossary.entries(
+            for: LanguagePair(source: direction.source, target: direction.target))
+    }
 
     /// The audience one translation settled on, so it is reported once and
     /// the retry and the result use the same one.
@@ -150,6 +205,7 @@ public struct Translator: Sendable {
     }
 
     private struct Context {
+        let action: Action
         let source: LanguageConfig
         let target: LanguageConfig
         var audience: AudienceRequest
@@ -184,7 +240,7 @@ public struct Translator: Sendable {
 
     private func run(
         _ text: UserText, direction: Direction, audience: AudienceRequest, styleNote: String?,
-        emit: (TranslationEvent) -> Void
+        action: Action, emit: (TranslationEvent) -> Void
     ) async throws {
         guard let source = configuration.language(for: direction.source) else {
             throw TranslationError.languageNotConfigured(direction.source)
@@ -193,13 +249,13 @@ public struct Translator: Sendable {
             throw TranslationError.languageNotConfigured(direction.target)
         }
         let context = Context(
+            action: action,
             source: source, target: target, audience: audience, report: AudienceReport(),
             sourceText: text.value,
             styleNote: styleNote,
-            glossary: configuration.glossary.entries(
-                for: LanguagePair(source: direction.source, target: direction.target)),
+            glossary: glossary(for: action, direction),
             terms: configuration.doNotTranslate,
-            model: configuration.models[.translate] ?? Configuration.defaultModel,
+            model: configuration.models[action] ?? Configuration.defaultModel,
             processor: PostProcessor(target: target))
         emit(.started(direction))
         if case .fixed = audience { settle(nil, nil, context, emit) }
@@ -264,7 +320,7 @@ public struct Translator: Sendable {
         _ blocks: [ProtectedText], _ context: Context, _ emit: (TranslationEvent) -> Void
     ) async throws -> String {
         let prompt = PromptBuilder().build(PromptRequest(
-            action: .translate, source: context.source, target: context.target,
+            action: context.action, source: context.source, target: context.target,
             profile: context.writingFor, inferAudienceFrom: context.choices,
             glossary: context.glossary,
             doNotTranslate: context.terms, styleNote: context.styleNote,
