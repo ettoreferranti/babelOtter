@@ -51,4 +51,11 @@ struct FactCheckTests {
     func trailingStop() {
         #expect(FactCheck.missing(from: "Es sind 42.", in: "") == ["42"])
     }
+
+    @Test("a range written out in words keeps its numbers, so it is kept")
+    func rangeInWords() {
+        #expect(FactCheck.missing(
+            from: "von 14:30-15:00, Seiten 10-12", in: "von 14:30 bis 15:00 Uhr, Seiten 10 bis 12").isEmpty)
+        #expect(FactCheck.missing(from: "14:30-15:00", in: "14:30 bis 16:00") == ["14:30-15:00"])
+    }
 }

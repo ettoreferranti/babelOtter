@@ -14,6 +14,7 @@ Local model check (about two minutes): `BABELOTTER_INTEGRATION=1 swift test --fi
 |---|---|---|
 | R1 | Select a German du-form draft in Mail, press Control-Option-R | The popup shows "Re-pitch · Swiss Standard German", your last re-pitch audience pre-selected and a Re-pitch button; Return starts it and the result streams in |
 | R2 | Pick another audience; then Replace; then open the menu | It re-runs for that audience; Replace pastes the result; the menu lists "Re-pitch Selection (Control-Option-R)" |
+| R3 | Select a short German text (a few words) and press Control-Option-R; pick German; type "kürzer" in the style note and press Return. Then start again and pick, in the picker, the audience already shown | "Which language is this?" appears first; Return in the style note starts the re-pitch and pastes nothing; picking the audience already shown starts it too; before a run there is no Replace, and Escape dismisses |
 
 ## Update 2026-10-15: Explain is built (#65)
 

@@ -11,11 +11,24 @@ public enum FactCheck {
     public static func missing(from original: String, in result: String) -> [String] {
         var missing: [String] = []
         for fact in facts(in: original) {
-            if result.contains(fact) { continue }
+            if isKept(fact, in: result) { continue }
             if missing.contains(fact) { continue }
             missing.append(fact)
         }
         return missing
+    }
+
+    /// As written, or as a range or fraction whose parts all survive: a
+    /// formal rewrite turns "14:30-15:00" into "von 14:30 bis 15:00 Uhr"
+    /// and has lost nothing (final review, 2026-10-16).
+    private static func isKept(_ fact: String, in result: String) -> Bool {
+        if result.contains(fact) { return true }
+        let parts = fact.split(whereSeparator: { $0 == "-" || $0 == "/" })
+        if parts.count < 2 { return false }
+        for part in parts {
+            if !result.contains(part) { return false }
+        }
+        return true
     }
 
     static func facts(in text: String) -> [String] {
