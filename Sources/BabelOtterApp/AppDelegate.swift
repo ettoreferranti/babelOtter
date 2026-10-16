@@ -172,10 +172,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let translateItem = action(Self.menuTitle(.translate, nil), #selector(translateSelectionAction))
         let correctItem = action(Self.menuTitle(.correct, nil), #selector(correctSelectionAction))
         let explainItem = action(Self.menuTitle(.explain, nil), #selector(explainSelectionAction))
-        actionItems = [.translate: translateItem, .correct: correctItem, .explain: explainItem]
+        let repitchItem = action(Self.menuTitle(.repitch, nil), #selector(repitchSelectionAction))
+        actionItems = [
+            .translate: translateItem, .correct: correctItem, .explain: explainItem,
+            .repitch: repitchItem,
+        ]
         menu.addItem(translateItem)
         menu.addItem(correctItem)
         menu.addItem(explainItem)
+        menu.addItem(repitchItem)
         menu.addItem(.separator())
         menu.addItem(action("Check Again", #selector(refreshStatusAction)))
         menu.addItem(action("Open Configuration Folder", #selector(openConfiguration)))
@@ -336,6 +341,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func translateSelectionAction() { startAction(.translate) }
     @objc private func correctSelectionAction() { startAction(.correct) }
     @objc private func explainSelectionAction() { startAction(.explain) }
+    @objc private func repitchSelectionAction() { startAction(.repitch) }
 
     /// Captures the frontmost application's selection and streams the given
     /// action's result into the popup (NFR-P3/P5: never the text itself,
