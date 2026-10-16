@@ -19,21 +19,23 @@ public struct HotKeyBindings: Sendable, Equatable, Codable {
     public var translate: HotKeyBinding
     public var correct: HotKeyBinding
     public var explain: HotKeyBinding
+    public var repitch: HotKeyBinding
 
     public init(
         translate: HotKeyBinding = .useDefault, correct: HotKeyBinding = .useDefault,
-        explain: HotKeyBinding = .useDefault
+        explain: HotKeyBinding = .useDefault, repitch: HotKeyBinding = .useDefault
     ) {
         self.translate = translate
         self.correct = correct
         self.explain = explain
+        self.repitch = repitch
     }
 
     public static let defaults = HotKeyBindings(
         translate: .text("control+option+T"), correct: .text("control+option+C"),
-        explain: .text("control+option+E"))
+        explain: .text("control+option+E"), repitch: .text("control+option+R"))
 
-    /// Nil for actions that have no hotkey yet (Re-pitch #66).
+    /// Every action has a default.
     public static func defaultText(for action: Action) -> String? {
         switch action {
         case .translate:
@@ -43,7 +45,7 @@ public struct HotKeyBindings: Sendable, Equatable, Codable {
         case .explain:
             return "control+option+E"
         case .repitch:
-            return nil
+            return "control+option+R"
         }
     }
 
@@ -56,7 +58,7 @@ public struct HotKeyBindings: Sendable, Equatable, Codable {
         case .explain:
             return explain
         case .repitch:
-            return .off
+            return repitch
         }
     }
 
@@ -64,6 +66,7 @@ public struct HotKeyBindings: Sendable, Equatable, Codable {
         case translate
         case correct
         case explain
+        case repitch
     }
 
     public init(from decoder: any Decoder) throws {
@@ -71,6 +74,7 @@ public struct HotKeyBindings: Sendable, Equatable, Codable {
         translate = try Self.decode(.translate, in: container)
         correct = try Self.decode(.correct, in: container)
         explain = try Self.decode(.explain, in: container)
+        repitch = try Self.decode(.repitch, in: container)
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -78,6 +82,7 @@ public struct HotKeyBindings: Sendable, Equatable, Codable {
         try Self.encode(translate, as: .translate, in: &container)
         try Self.encode(correct, as: .correct, in: &container)
         try Self.encode(explain, as: .explain, in: &container)
+        try Self.encode(repitch, as: .repitch, in: &container)
     }
 
     /// Absent and null are different answers: absent is the default, null
