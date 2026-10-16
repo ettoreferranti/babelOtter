@@ -19,15 +19,15 @@ leaving your machine.
 > all of them plus mutation testing of `BabelOtterKit` at ≥80%.
 >
 > The menu bar app is built on top: **Translate** (**Control-Option-T**),
-> **Correct** (**Control-Option-C**) and **Explain** (**Control-Option-E**) on
-> any selection, a streaming popup with **Replace** / **Copy** /
-> **Regenerate**, an audience picker (du/Sie) inferred from the text, a
-> one-line instruction field, and a one-click swap of the detected direction.
-> The menu bar icon shows readiness (Accessibility, Ollama, models, hotkeys),
-> each problem with the command that fixes it. Hotkeys are set in `config.json`,
-> follow the current keyboard layout, and every save applies without a restart.
-> `swift test` runs 747 tests in 70 suites, all green. **Re-pitch**, a settings
-> window, onboarding and history are not built yet — see
+> **Correct** (**Control-Option-C**), **Explain** (**Control-Option-E**) and
+> **Re-pitch** (**Control-Option-R**) on any selection, a streaming popup with
+> **Replace** / **Copy** / **Regenerate**, an audience picker (du/Sie) inferred
+> from the text, a one-line instruction field, and a one-click swap of the
+> detected direction. The menu bar icon shows readiness (Accessibility, Ollama,
+> models, hotkeys), each problem with the command that fixes it. Hotkeys are set
+> in `config.json`, follow the current keyboard layout, and every save applies
+> without a restart. `swift test` runs 777 tests in 73 suites, all green. A
+> settings window, onboarding and history are not built yet — see
 > [`docs/HANDOFF.md`](docs/HANDOFF.md) for exactly what is done and skipped.
 >
 > **To build and run it:**
