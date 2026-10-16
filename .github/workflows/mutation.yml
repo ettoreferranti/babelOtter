@@ -182,6 +182,7 @@ jobs:
           Sources/BabelOtterKit/Popup/PopupPlacement.swift
           Sources/BabelOtterKit/Privacy/UserText.swift
           Sources/BabelOtterKit/Readiness/ReadinessPolicy.swift
+          Sources/BabelOtterKit/Text/FactCheck.swift
           Sources/BabelOtterKit/Text/LanguageDetector.swift
           Sources/BabelOtterKit/Text/LocaleRuleApplier.swift
           Sources/BabelOtterKit/Text/PostProcessor.swift
