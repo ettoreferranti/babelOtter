@@ -316,4 +316,21 @@ struct PromptBuilderTests {
             explanationEn: "why", severity: .error)
         #expect(item.corrected == "b")
     }
+
+    @Test("Explain asks for the meaning, and for notes on tricky phrases only, quoted exactly")
+    func explainInstruction() {
+        let prompt = builder.build(request(action: .explain))
+        #expect(prompt.contains("Explain the German text below in plain English"))
+        #expect(prompt.contains("quote the phrase exactly as it is written in the text"))
+        #expect(prompt.contains("Do not add notes for plain words."))
+        #expect(prompt.contains("If nothing is tricky, notes is []."))
+    }
+
+    @Test("Explain has no audience section: the explanation is written for the user")
+    func explainHasNoAudience() {
+        let prompt = builder.build(request(action: .explain, profile: .students))
+        #expect(!prompt.contains("Audience:"))
+        #expect(!prompt.contains("Address the reader"))
+        #expect(!prompt.contains("addressed to"))
+    }
 }

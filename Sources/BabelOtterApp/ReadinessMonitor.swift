@@ -45,7 +45,7 @@ final class ReadinessMonitor {
     /// model falls back to the default, as the pipeline does.
     private static func models(for configuration: Configuration) -> [Action: String] {
         var models: [Action: String] = [:]
-        for action in [Action.translate, .correct] {
+        for action in [Action.translate, .correct, .explain] {
             models[action] = configuration.models[action] ?? Configuration.defaultModel
         }
         return models

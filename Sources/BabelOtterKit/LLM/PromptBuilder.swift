@@ -111,7 +111,14 @@ public struct PromptBuilder: Sendable {
                 corrected_blocks.
                 """
         case .explain:
-            return "You are a language teacher. Explain the numbered blocks below in English."
+            return """
+                You are a language teacher. Explain the German text below in plain English \
+                for a reader who does not fully follow it. In summary_en, say what the text \
+                means as a whole. In notes, add one item for each idiom, unusual construction \
+                or tricky phrase: quote the phrase exactly as it is written in the text, and \
+                explain in English what it means and how it works. Do not add notes for plain \
+                words. If nothing is tricky, notes is [].
+                """
         case .repitch:
             return """
                 You are an editor. Re-aim the numbered blocks below at a different \
@@ -149,6 +156,8 @@ public struct PromptBuilder: Sendable {
     /// ternary operator mis-parses a condition ending in an enum member (see
     /// the comment on `languages(_:)` above).
     private func audience(_ request: PromptRequest) -> String? {
+        // #65: an explanation is written for the user, not for a reader.
+        if request.action == .explain { return nil }
         let profile = request.profile
         guard request.action == .correct else {
             if !request.inferAudienceFrom.isEmpty {

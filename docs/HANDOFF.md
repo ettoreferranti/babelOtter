@@ -2,6 +2,19 @@
 
 Read this first if you are picking babelOtter up in a new session.
 
+## Update 2026-10-15: Explain is built (#65)
+
+Select German and press **Control-Option-E** (or choose Explain Selection in the menu): the popup, titled "Explain", streams an English summary of the meaning, then lists each idiom or tricky phrase, quoted as written, with its own note. There is no Replace; Copy takes the summary and the notes. The style note works ("focus on grammar"); there is no audience picker. Text detected as another language is refused before anything is sent. The hotkey is configurable as `"explain"` in `config.json`. The pipeline is `BabelOtterKit/Pipeline/Explainer.swift`. Spec: `docs/superpowers/specs/2026-10-15-explain-design.md`.
+
+Local model check (about a minute): `BABELOTTER_INTEGRATION=1 swift test --filter ExplainIntegrationTests`.
+
+**Manual check (yours):**
+
+| # | Do | Expect |
+|---|---|---|
+| E1 | Select a German paragraph in Mail, press Control-Option-E | The popup is titled "Explain"; the summary streams in; the notes appear when it finishes |
+| E2 | In that popup, press Copy; then open the menu | No Replace button; the clipboard holds the summary and one line per note; the menu lists "Explain Selection (Control-Option-E)" and it behaves as the hotkey does |
+
 ## Update 2026-10-15: the audience is inferred from the text (#52)
 
 Translate asks the model, in the same request, which audience the text addresses, and to quote the words that show it (`audience_evidence`). The guess counts only when that quote really occurs in the text: it is then shown beside the picker as "✦ guessed from the text, change if wrong". Otherwise the audience last picked in this app applies, then the last pick anywhere, then Colleagues, labelled as such. Evidence was added after measuring: asked only for an audience, the default model never answered "unclear" and guessed from the topic, overriding a remembered audience. Picking an audience re-runs and is remembered for that app (`UserDefaults`, ids only). Correct never infers. The rules live in `BabelOtterKit/Config/AudienceSession.swift`. Spec: `docs/superpowers/specs/2026-10-15-audience-inference-design.md`.

@@ -11,20 +11,40 @@ struct HotKeyPlanTests {
 
     private func plan(
         _ translate: HotKeyBinding = .useDefault, _ correct: HotKeyBinding = .useDefault,
+        explain: HotKeyBinding = .useDefault,
         previous: [Action: HotKeyCombination]? = nil, layout: KeyLayout? = nil
     ) -> HotKeyPlan {
         HotKeyPlan.make(
-            bindings: HotKeyBindings(translate: translate, correct: correct),
+            bindings: HotKeyBindings(translate: translate, correct: correct, explain: explain),
             previous: previous ?? launch, layout: layout ?? us)
     }
 
-    @Test("the launch combinations are the ones registered before #26")
+    @Test("the launch combinations are the defaults, Explain included")
     func launchCombinations() {
         #expect(launch[.translate] == HotKeyCombination(
             keyCode: 0x11, modifiers: 0x1800, displayName: "Control-Option-T"))
         #expect(launch[.correct] == HotKeyCombination(
             keyCode: 0x08, modifiers: 0x1800, displayName: "Control-Option-C"))
-        #expect(HotKeyPlan.actions == [.translate, .correct])
+        #expect(launch[.explain] == HotKeyCombination(
+            keyCode: 0x0E, modifiers: 0x1800, displayName: "Control-Option-E"))
+        #expect(HotKeyPlan.actions == [.translate, .correct, .explain])
+    }
+
+    @Test("Explain off leaves it without a hotkey, and is no issue")
+    func explainOff() {
+        let result = plan(explain: .off)
+        #expect(result.combinations[.explain] == nil)
+        #expect(result.combinations[.translate] != nil)
+        #expect(result.issues.isEmpty)
+    }
+
+    @Test("Explain on Translate's keys: Translate keeps them, Explain keeps its previous ones")
+    func explainClash() {
+        let result = plan(explain: .text("control+option+T"))
+        #expect(result.combinations[.translate] == launch[.translate])
+        #expect(result.combinations[.explain] == launch[.explain])
+        #expect(result.issues == [HotKeyIssue(
+            action: .explain, text: "control+option+T", problem: .sharedWith(.translate))])
     }
 
     @Test("no hotkeys field gives both defaults and no issues")
