@@ -121,8 +121,10 @@ public struct PromptBuilder: Sendable {
                 """
         case .repitch:
             return """
-                You are an editor. Re-aim the numbered blocks below at a different \
-                audience without changing their language or their facts.
+                You are an editor. Rewrite the numbered blocks below for the audience described, \
+                in the same language. Change the form of address, the register and the tone to \
+                suit that audience. Keep every fact: names, dates, times, numbers, places, links \
+                and requests. Do not add or remove information. Do not translate.
                 """
         }
     }
@@ -245,8 +247,11 @@ public struct PromptBuilder: Sendable {
     private func schema(for request: PromptRequest) -> String {
         let shape: String
         switch request.action {
-        case .translate, .repitch:
+        case .translate:
             shape = translateShape(request)
+        case .repitch:
+            // #66: the language and the audience are both known.
+            shape = #"{"blocks": ["..."]}"#
         case .correct:
             // Allowed values as prose, never "a|b": the model copied that
             // notation into its answers (measured 2026-09-30).
