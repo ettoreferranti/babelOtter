@@ -10,6 +10,8 @@ final class PopupModel {
     enum Phase: Equatable {
         case capturing
         case choosingDirection([LanguageCode])
+        /// Re-pitch: the language is known; waiting for the audience (#66).
+        case choosingAudience
         case translating
         case finished
         case failed(String)
@@ -25,6 +27,8 @@ final class PopupModel {
         }
     }
     private(set) var direction: Direction?
+    /// Re-pitch's language, once known (#66).
+    private(set) var language: LanguageCode?
     private(set) var text = ""
     private(set) var warnings: [String] = []
     private(set) var message: String?
@@ -78,9 +82,10 @@ final class PopupModel {
         self.explainer = Explainer(configuration: environment.configuration, chat: environment.client)
         self.close = close
         self.reopen = reopen
+        let memory = UserDefaultsAudienceMemory(prefix: action == .repitch ? "repitch." : "")
         self.audience = AudienceSession(
             profiles: environment.configuration.profiles, action: action,
-            application: application, memory: UserDefaultsAudienceMemory())
+            application: application, memory: memory)
     }
 
     // MARK: - Profile and instruction
@@ -93,12 +98,12 @@ final class PopupModel {
     var audienceNote: String? { audience.note }
     var audienceInferred: Bool { audience.origin == .inferred }
 
-    /// Translate (and, until #66, Re-pitch) runs in a language direction;
-    /// Correct and Explain run on the selection as it is.
+    /// Only Translate runs in a language direction; Correct and Explain run
+    /// on the selection as it is, and Re-pitch keeps the text's language.
     private var usesDirection: Bool {
         switch action {
-        case .translate, .repitch: return true
-        case .correct, .explain: return false
+        case .translate: return true
+        case .correct, .explain, .repitch: return false
         }
     }
 
@@ -106,6 +111,13 @@ final class PopupModel {
     /// the whole point is to see it in the other register.
     func selectProfile(_ id: String) {
         guard !isDismissed else { return }
+        // Before a Re-pitch has run, any pick -- the one shown included --
+        // is the confirmation that starts it (#66).
+        if phase == .choosingAudience {
+            audience.choose(id)
+            startRepitch()
+            return
+        }
         if audience.choose(id) { regenerate() }
     }
 
@@ -114,7 +126,12 @@ final class PopupModel {
     /// Translate, a snapshot for Correct.
     func regenerate() {
         guard !isDismissed, !isReplacing else { return }
-        if usesDirection {
+        if action == .repitch {
+            // Return in the style note before the first run starts it.
+            if phase == .choosingAudience { return startRepitch() }
+            guard language != nil else { return }
+            runRepitch()
+        } else if usesDirection {
             guard let direction else { return }
             run(direction)
         } else {
@@ -125,15 +142,41 @@ final class PopupModel {
 
     var canRegenerate: Bool {
         guard !isReplacing, !copied else { return false }
-        if usesDirection {
+        if action == .repitch {
+            guard language != nil else { return false }
+        } else if usesDirection {
             guard direction != nil else { return false }
         } else {
             guard snapshot != nil else { return false }
         }
         switch phase {
         case .translating, .finished, .failed: return true
-        case .capturing, .choosingDirection, .needsAccessibility: return false
+        case .capturing, .choosingDirection, .choosingAudience, .needsAccessibility: return false
         }
+    }
+
+    /// The audience row is shown once there is something to (re-)run, and
+    /// while Re-pitch waits for its audience.
+    var showsControls: Bool {
+        canRegenerate || phase == .choosingAudience
+    }
+
+    var headerTitle: String {
+        switch action {
+        case .correct: return "Correct"
+        case .explain: return "Explain"
+        case .translate: return "lingoSwen"
+        case .repitch:
+            guard let language else { return "Re-pitch" }
+            return "Re-pitch \u{00B7} " + displayName(language)
+        }
+    }
+
+    /// Starts Re-pitch with the audience shown, which counts as a pick.
+    func startRepitch() {
+        guard !isDismissed, phase == .choosingAudience else { return }
+        audience.confirm()
+        runRepitch()
     }
 
     private var styleNote: String? {
@@ -149,7 +192,9 @@ final class PopupModel {
             phase = .failed(refusal.detail)
         case .captured(let snapshot):
             self.snapshot = snapshot
-            if !usesDirection {
+            if action == .repitch {
+                findLanguage(of: snapshot)
+            } else if !usesDirection {
                 runOnSelection()
             } else {
                 switch translator.direction(for: snapshot.text) {
@@ -168,6 +213,11 @@ final class PopupModel {
 
     func choose(target: LanguageCode) {
         guard !isDismissed else { return }
+        if action == .repitch {
+            language = target
+            phase = .choosingAudience
+            return
+        }
         guard let direction = translator.direction(into: target) else { return }
         run(direction)
     }
@@ -417,6 +467,35 @@ final class PopupModel {
             warnings = result.warnings
             phase = .finished
         }
+    }
+
+    private func findLanguage(of snapshot: SelectionSnapshot) {
+        switch translator.language(for: snapshot.text) {
+        case .success(let code):
+            language = code
+            phase = .choosingAudience
+        case .failure(.directionUnknown(let candidates)):
+            phase = .choosingDirection(candidates)
+        case .failure(.languageNotConfigured(let code)):
+            phase = .failed("This looks like \(code), which is not one of your languages.")
+        case .failure(.emptyResponse):
+            phase = .failed("Nothing came back from the model.")
+        }
+    }
+
+    private func runRepitch() {
+        guard !isDismissed, let snapshot, let language else { return }
+        stop()
+        text = ""
+        warnings = []
+        message = nil
+        phase = .translating
+        consume(
+            translator.repitch(
+                snapshot.text, language: language, audience: audience.audience,
+                styleNote: styleNote),
+            apply: { $0.apply($1) },
+            fail: Self.describe)
     }
 
     private func runOnSelection() {

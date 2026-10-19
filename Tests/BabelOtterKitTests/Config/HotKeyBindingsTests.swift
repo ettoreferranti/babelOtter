@@ -50,16 +50,29 @@ struct HotKeyBindingsTests {
         #expect(HotKeyBindings.defaultText(for: .translate) == "control+option+T")
         #expect(HotKeyBindings.defaultText(for: .correct) == "control+option+C")
         #expect(HotKeyBindings.defaultText(for: .explain) == "control+option+E")
-        #expect(HotKeyBindings.defaultText(for: .repitch) == nil)
+        #expect(HotKeyBindings.defaults.repitch == .text("control+option+R"))
+        #expect(HotKeyBindings.defaultText(for: .repitch) == "control+option+R")
     }
 
-    @Test("each action reads its own binding; Re-pitch has none yet")
+    @Test("each action reads its own binding")
     func bindingForAction() {
-        let bindings = HotKeyBindings(translate: .text("a"), correct: .text("b"), explain: .text("e"))
+        let bindings = HotKeyBindings(
+            translate: .text("a"), correct: .text("b"), explain: .text("e"), repitch: .text("r"))
         #expect(bindings.binding(for: .translate) == .text("a"))
         #expect(bindings.binding(for: .correct) == .text("b"))
         #expect(bindings.binding(for: .explain) == .text("e"))
-        #expect(bindings.binding(for: .repitch) == .off)
+        #expect(bindings.binding(for: .repitch) == .text("r"))
+    }
+
+    @Test("repitch is read from the file and written back")
+    func repitchCodable() throws {
+        #expect(try decode(#"{"repitch": "control+option+X"}"#).repitch == .text("control+option+X"))
+        #expect(try decode(#"{"repitch": null}"#).repitch == .off)
+        #expect(try decode("{}").repitch == .useDefault)
+        let bindings = HotKeyBindings(repitch: .off)
+        let data = try JSONEncoder().encode(bindings)
+        #expect(String(decoding: data, as: UTF8.self).contains(#""repitch":null"#))
+        #expect(try JSONDecoder().decode(HotKeyBindings.self, from: data) == bindings)
     }
 
     @Test("explain is read from the file: text, null, or absent")

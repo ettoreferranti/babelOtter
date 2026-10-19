@@ -7,9 +7,9 @@ struct KeyLayoutTests {
 
     /// Key codes are positions: on Swiss German, Z sits where US has Y
     /// (kVK_ANSI_Y, 0x10) and Y where US has Z (kVK_ANSI_Z, 0x06).
-    static let us = KeyLayout(characters: [0x06: "z", 0x08: "c", 0x0E: "e", 0x10: "y", 0x11: "t", 0x12: "1"])
+    static let us = KeyLayout(characters: [0x06: "z", 0x08: "c", 0x0E: "e", 0x0F: "r", 0x10: "y", 0x11: "t", 0x12: "1"])
     static let swissGerman = KeyLayout(characters: [
-        0x06: "y", 0x08: "c", 0x0E: "e", 0x10: "z", 0x11: "t", 0x12: "1", 0x21: "\u{FC}",
+        0x06: "y", 0x08: "c", 0x0E: "e", 0x0F: "r", 0x10: "z", 0x11: "t", 0x12: "1", 0x21: "\u{FC}",
     ])
 
     private func spec(_ text: String) -> HotKeySpec {

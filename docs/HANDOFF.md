@@ -2,6 +2,20 @@
 
 Read this first if you are picking babelOtter up in a new session.
 
+## Update 2026-10-16: Re-pitch is built (#66); all four actions exist
+
+Select a text and press **Control-Option-R** (or choose Re-pitch Selection in the menu). The popup shows "Re-pitch · <language>" with the audience you last re-pitched to in this app pre-selected; Return (or the Re-pitch button, or picking an audience) starts it. The result is the same text in the same language, re-aimed at that audience: form of address, register and tone change, the layout and every fact stay. Any number, date, time, link or email address from the original that is missing from the result is listed as a warning. Replace, Copy and Regenerate work as for Translate. Re-pitch remembers its own last audience per app (`repitch.` keys in `UserDefaults`), apart from Translate's. It runs through `Translator.repitch` (same pipeline, source = target, fixed audience, no glossary); the check is `BabelOtterKit/Text/FactCheck.swift`. Spec: `docs/superpowers/specs/2026-10-16-repitch-design.md`.
+
+Local model check (about two minutes): `BABELOTTER_INTEGRATION=1 swift test --filter RepitchIntegrationTests`.
+
+**Manual check (yours):**
+
+| # | Do | Expect |
+|---|---|---|
+| R1 | Select a German du-form draft in Mail, press Control-Option-R | The popup shows "Re-pitch · Swiss Standard German", your last re-pitch audience pre-selected and a Re-pitch button; Return starts it and the result streams in |
+| R2 | Pick another audience; then Replace; then open the menu | It re-runs for that audience; Replace pastes the result; the menu lists "Re-pitch Selection (Control-Option-R)" |
+| R3 | Select a short German text (a few words) and press Control-Option-R; pick German; type "kürzer" in the style note and press Return. Then start again and pick, in the picker, the audience already shown | "Which language is this?" appears first; Return in the style note starts the re-pitch and pastes nothing; picking the audience already shown starts it too; before a run there is no Replace, and Escape dismisses |
+
 ## Update 2026-10-15: Explain is built (#65)
 
 Select German and press **Control-Option-E** (or choose Explain Selection in the menu): the popup, titled "Explain", streams an English summary of the meaning, then lists each idiom or tricky phrase, quoted as written, with its own note. There is no Replace; Copy takes the summary and the notes. The style note works ("focus on grammar"); there is no audience picker. Text detected as another language is refused before anything is sent. The hotkey is configurable as `"explain"` in `config.json`. The pipeline is `BabelOtterKit/Pipeline/Explainer.swift`. Spec: `docs/superpowers/specs/2026-10-15-explain-design.md`.
