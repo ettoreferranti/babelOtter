@@ -114,7 +114,9 @@ public final class SQLiteHistoryStore: HistoryStore {
     public func add(_ record: HistoryRecord) throws -> Int64 {
         let statement = try prepare(Self.insert)
         defer { sqlite3_finalize(statement) }
-        try bind(record.date.timeIntervalSince1970, 1, statement)
+        if sqlite3_bind_double(statement, 1, record.date.timeIntervalSince1970) != SQLITE_OK {
+            throw failure()
+        }
         try bind(record.action.rawValue, 2, statement)
         try bind(record.sourceLanguage.rawValue, 3, statement)
         try bind(record.targetLanguage?.rawValue, 4, statement)
@@ -136,7 +138,9 @@ public final class SQLiteHistoryStore: HistoryStore {
         // An unbound parameter is NULL: no cursor leaves ?2 and ?3 unbound.
         try bind(term, 1, statement)
         if let before {
-            try bind(before.date.timeIntervalSince1970, 2, statement)
+            if sqlite3_bind_double(statement, 2, before.date.timeIntervalSince1970) != SQLITE_OK {
+                throw failure()
+            }
             if sqlite3_bind_int64(statement, 3, before.id) != SQLITE_OK { throw failure() }
         }
         if sqlite3_bind_int64(statement, 4, Int64(limit)) != SQLITE_OK { throw failure() }
@@ -253,10 +257,6 @@ public final class SQLiteHistoryStore: HistoryStore {
             status = sqlite3_bind_null(statement, index)
         }
         if status != SQLITE_OK { throw failure() }
-    }
-
-    private func bind(_ value: Double, _ index: Int32, _ statement: OpaquePointer) throws {
-        if sqlite3_bind_double(statement, index, value) != SQLITE_OK { throw failure() }
     }
 
     // MARK: - Reading
