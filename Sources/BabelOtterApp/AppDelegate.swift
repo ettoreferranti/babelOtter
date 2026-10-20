@@ -15,6 +15,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let source = ConfigurationSource()
     /// Opened once; survives configuration reloads (#67).
     private let history = HistoryRecorder()
+    private lazy var historyWindow = HistoryWindowController(
+        recorder: history,
+        configuration: { [unowned self] in self.environment.configuration })
     private(set) lazy var environment = AppEnvironment(configuration: source.configuration)
     private lazy var monitor = ReadinessMonitor(configuration: source.configuration)
     private lazy var watcher: ConfigurationWatcher? = makeWatcher()
@@ -51,6 +54,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         layoutReader.start()
         pushConfigurationProblems()
         history.onChange = { [weak self] in self?.pushHistoryProblem() }
+        history.onRecord = { [weak self] in self?.historyWindow.recorded() }
         pushHistoryProblem()
         promptForAccessibilityIfNeeded()
         monitor.onChange = { [weak self] report in self?.render(report) }
@@ -196,6 +200,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(explainItem)
         menu.addItem(repitchItem)
         menu.addItem(.separator())
+        menu.addItem(action("History\u{2026}", #selector(showHistoryAction)))
         menu.addItem(action("Check Again", #selector(refreshStatusAction)))
         menu.addItem(action("Open Configuration Folder", #selector(openConfiguration)))
         menu.addItem(.separator())
@@ -222,6 +227,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func refreshStatusAction() { monitor.refresh() }
+
+    @objc private func showHistoryAction() { historyWindow.show() }
 
     func menuWillOpen(_ menu: NSMenu) {
         // A backstop for a layout change whose notification was held back
