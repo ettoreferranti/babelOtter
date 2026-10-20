@@ -48,6 +48,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// restore sequences on `NSPasteboard.general` and leave the wrong
     /// content on the clipboard).
     private var isCapturing = false
+    /// While a settings hotkey recorder listens, no hotkey is registered,
+    /// so pressing one records it rather than running its action (#61).
+    private var hotKeysSuspended = false
+    private lazy var settingsWindow = SettingsWindowController(
+        source: source,
+        layout: { [unowned self] in self.lastLayout },
+        client: { [unowned self] in self.environment.client },
+        suspendHotKeys: { [unowned self] in self.suspendHotKeys() },
+        resumeHotKeys: { [unowned self] in self.resumeHotKeys() },
+        modelsChanged: { [unowned self] in self.monitor.refresh() },
+        reloadConfiguration: { [unowned self] in self.configurationChanged() })
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         buildMenu()
@@ -76,6 +87,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// registered, so Translate and Correct can swap combinations in one save.
     private func updateHotKeys() {
         lastLayout = KeyboardLayoutReader.current()
+        if hotKeysSuspended { return }
         let plan = HotKeyPlan.make(
             bindings: source.configuration.hotkeys, previous: combinations, layout: lastLayout)
         let changed = changedActions(to: plan.combinations)
@@ -103,6 +115,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
         }
         monitor.hotKeys = facts
+    }
+
+    private func suspendHotKeys() {
+        hotKeysSuspended = true
+        for action in HotKeyPlan.actions {
+            hotKeys[action]?.unregister()
+            hotKeys[action] = nil
+        }
+    }
+
+    /// Registers the plan again, as the file now has it.
+    private func resumeHotKeys() {
+        hotKeysSuspended = false
+        updateHotKeys()
+        // A reload while suspended left the menu's hotkey lines as they were.
+        pushConfigurationProblems()
+        monitor.refresh()
     }
 
     /// An action whose keys are the same and still registered is left alone;
@@ -169,6 +198,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         updateHotKeys()
         pushConfigurationProblems()
         applyHistoryPolicy()
+        settingsWindow.configurationChanged()
         monitor.refresh()
     }
 
@@ -225,6 +255,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(explainItem)
         menu.addItem(repitchItem)
         menu.addItem(.separator())
+        menu.addItem(action("Settings\u{2026}", #selector(showSettingsAction)))
         let historyItem = action("History\u{2026}", #selector(showHistoryAction))
         self.historyItem = historyItem
         menu.addItem(historyItem)
@@ -256,6 +287,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func refreshStatusAction() { monitor.refresh() }
 
     @objc private func showHistoryAction() { historyWindow.show() }
+
+    @objc private func showSettingsAction() { settingsWindow.show() }
 
     func menuWillOpen(_ menu: NSMenu) {
         // A backstop for a layout change whose notification was held back

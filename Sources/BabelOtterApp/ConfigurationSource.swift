@@ -20,6 +20,11 @@ final class ConfigurationSource {
     /// could not be read, so history pauses (#69). A first launch's defaults
     /// are real; a reload with problems keeps whatever was in use (#26).
     private(set) var isFallback: Bool
+    /// What is wrong with config.json itself as last read, each worded to
+    /// follow "config.json: "; empty when it reads cleanly. While not empty
+    /// the settings window is read-only, so it never overwrites the file
+    /// (#61).
+    private(set) var fileProblems: [String] = []
 
     init() {
         let locator = AppStorage.locator()
@@ -40,11 +45,13 @@ final class ConfigurationSource {
             self.configuration = result.configuration
             self.problems = problems
             self.isFallback = !result.problems.isEmpty
+            self.fileProblems = Self.summaries(result.problems)
         } catch {
             self.store = nil
             self.configuration = .default
             self.problems = ["using defaults - \(Self.describe(error))"]
             self.isFallback = true
+            self.fileProblems = self.problems
         }
     }
 
@@ -60,6 +67,7 @@ final class ConfigurationSource {
             previous: configuration, loaded: loaded, fileExists: loaded.fileFound, isLaunch: false)
         configuration = result.configuration
         problems = Self.summaries(result.problems)
+        fileProblems = problems
         if result.problems.isEmpty { isFallback = false }
     }
 
