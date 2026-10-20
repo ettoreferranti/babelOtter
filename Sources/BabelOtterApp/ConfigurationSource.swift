@@ -16,6 +16,10 @@ final class ConfigurationSource {
     private(set) var problems: [String]
     /// Nil when the folder could not be prepared: nothing to reload then.
     let store: ConfigurationStore?
+    /// True while the configuration is the defaults only because config.json
+    /// could not be read, so history pauses (#69). A first launch's defaults
+    /// are real; a reload with problems keeps whatever was in use (#26).
+    private(set) var isFallback: Bool
 
     init() {
         let locator = AppStorage.locator()
@@ -35,10 +39,12 @@ final class ConfigurationSource {
             self.store = store
             self.configuration = result.configuration
             self.problems = problems
+            self.isFallback = !result.problems.isEmpty
         } catch {
             self.store = nil
             self.configuration = .default
             self.problems = ["using defaults - \(Self.describe(error))"]
+            self.isFallback = true
         }
     }
 
@@ -54,6 +60,7 @@ final class ConfigurationSource {
             previous: configuration, loaded: loaded, fileExists: loaded.fileFound, isLaunch: false)
         configuration = result.configuration
         problems = Self.summaries(result.problems)
+        if result.problems.isEmpty { isFallback = false }
     }
 
     private static func summaries(_ problems: [ConfigurationProblem]) -> [String] {

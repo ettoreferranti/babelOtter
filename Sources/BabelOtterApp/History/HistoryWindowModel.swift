@@ -19,17 +19,42 @@ final class HistoryWindowModel: ObservableObject {
         didSet { scheduleSearch() }
     }
     @Published var selection: Int64?
+    /// "History is off - nothing new is saved.", while nothing is recorded.
+    @Published private(set) var note: String?
     /// Bumped by Command-F; the view focuses the search field.
     @Published private(set) var searchFocusRequests = 0
 
+    /// Asks before Clear All: the count when known, and what to run on Delete.
+    var confirmClearAll: ((Int?, @escaping @MainActor () -> Void) -> Void)?
+
     private let browser: HistoryBrowser
     private let configuration: () -> Configuration
+    private let policyNote: () -> String?
     private var pendingSearch: Task<Void, Never>?
 
-    init(browser: HistoryBrowser, configuration: @escaping () -> Configuration) {
+    init(
+        browser: HistoryBrowser, configuration: @escaping () -> Configuration,
+        policyNote: @escaping () -> String?
+    ) {
         self.browser = browser
         self.configuration = configuration
+        self.policyNote = policyNote
         publish()
+    }
+
+    /// Nothing to delete, or no history to delete it from.
+    var canClearAll: Bool {
+        if case .unavailable = problem { return false }
+        return !(records.isEmpty && term == nil)
+    }
+
+    func requestClearAll() {
+        guard canClearAll else { return }
+        confirmClearAll?(browser.count()) { [weak self] in
+            guard let self else { return }
+            if self.browser.clearAll() { self.selection = nil }
+            self.publish()
+        }
     }
 
     var selectedRecord: HistoryRecord? {
@@ -69,6 +94,7 @@ final class HistoryWindowModel: ObservableObject {
 
     /// The selection stays on its record while that record is listed.
     private func publish() {
+        note = policyNote()
         records = browser.records
         hasMore = browser.hasMore
         problem = browser.problem
