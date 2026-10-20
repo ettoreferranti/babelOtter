@@ -94,8 +94,7 @@ public struct Corrector: Sendable {
     /// The configured German language, so its locale rules (ss for de-CH)
     /// apply. Falls back to Swiss German, the shipped default.
     private var germanLanguage: LanguageConfig {
-        configuration.enabledLanguages.first { $0.code.baseSubtag == Self.german }
-            ?? .swissGerman
+        configuration.germanLanguage
     }
 
     private func run(
@@ -107,7 +106,7 @@ public struct Corrector: Sendable {
         let context = Context(
             language: language, profile: profile, styleNote: styleNote,
             terms: configuration.doNotTranslate,
-            model: configuration.models[.correct] ?? Configuration.defaultModel,
+            model: configuration.model(for: .correct),
             processor: PostProcessor(target: language))
         emit(.started)
 

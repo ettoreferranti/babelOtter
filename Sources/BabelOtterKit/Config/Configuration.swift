@@ -132,3 +132,24 @@ extension Configuration {
         hotkeys: HotKeyBindings.defaults
     )
 }
+
+extension Configuration {
+
+    /// The model `action` runs on: the configured one, else the default.
+    /// The pipelines and history both ask here, so a recorded model is by
+    /// construction the one that produced the result (#67).
+    public func model(for action: Action) -> String {
+        models[action] ?? Configuration.defaultModel
+    }
+
+    /// The enabled German language, whatever its region, so its locale rules
+    /// (ss for de-CH) apply; Swiss Standard German, the shipped default,
+    /// when none is enabled. Correct and Explain read German.
+    public var germanLanguage: LanguageConfig {
+        enabledLanguages.first(where: Self.isGerman) ?? .swissGerman
+    }
+
+    private static func isGerman(_ language: LanguageConfig) -> Bool {
+        language.code.baseSubtag == LanguageCode("de")
+    }
+}

@@ -46,7 +46,7 @@ final class ReadinessMonitor {
     private static func models(for configuration: Configuration) -> [Action: String] {
         var models: [Action: String] = [:]
         for action in Action.allCases {
-            models[action] = configuration.models[action] ?? Configuration.defaultModel
+            models[action] = configuration.model(for: action)
         }
         return models
     }
