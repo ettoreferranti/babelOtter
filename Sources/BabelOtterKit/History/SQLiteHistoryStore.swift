@@ -12,6 +12,8 @@ public final class SQLiteHistoryStore: HistoryStore, @unchecked Sendable {
 
     public static let fileName = "history.sqlite"
     static let schemaVersion = 1
+    /// Bounded: a write runs on the main actor when a popup closes.
+    static let busyTimeoutMilliseconds: Int32 = 500
 
     private static let createSchema = """
         BEGIN;
@@ -80,6 +82,9 @@ public final class SQLiteHistoryStore: HistoryStore, @unchecked Sendable {
             sqlite3_close_v2(connection)
             throw HistoryStoreError.cannotOpen(message)
         }
+        // Another program reading the file (the sqlite3 shell, a browser)
+        // holds a lock; wait briefly for it rather than lose the record.
+        sqlite3_busy_timeout(connection, busyTimeoutMilliseconds)
         // From here `deinit` closes the connection on every failure.
         let store = SQLiteHistoryStore(connection: connection)
         do {
@@ -171,13 +176,14 @@ public final class SQLiteHistoryStore: HistoryStore, @unchecked Sendable {
         }
     }
 
-    /// Settings first, then the schema: 0 is a new file, 1 is current, and
-    /// anything higher is a later version's file, refused untouched.
+    /// The version first: anything above 1 is a later version's file,
+    /// refused before any setting can touch it (`journal_mode` rewrites the
+    /// header). Then the settings, then the schema for a new file (0).
     private func configure() throws {
-        try execute("PRAGMA secure_delete = ON")
-        try execute("PRAGMA journal_mode = DELETE")
         let version = Int(try pragmaValue("user_version")) ?? 0
         if version > Self.schemaVersion { throw HistoryStoreError.newerSchema(version) }
+        try execute("PRAGMA secure_delete = ON")
+        try execute("PRAGMA journal_mode = DELETE")
         if version == 0 { try execute(Self.createSchema) }
     }
 

@@ -98,6 +98,39 @@ struct SQLiteHistoryStoreTests {
         }
     }
 
+    @Test("a newer file in another journal mode is refused without a byte changed")
+    func newerSchemaUntouched() throws {
+        let url = try folder().appending(path: "history.sqlite")
+        raw(url, "PRAGMA journal_mode = WAL; CREATE TABLE later (x); PRAGMA user_version = 2;")
+        let before = try Data(contentsOf: url)
+        #expect(throws: HistoryStoreError.newerSchema(2)) {
+            _ = try SQLiteHistoryStore.open(at: url)
+        }
+        let after = try Data(contentsOf: url)
+        // Bytes 18 and 19 of the header are 2 in WAL mode, 1 in rollback mode.
+        #expect(Array(after[18...19]) == [2, 2])
+        #expect(after == before)
+    }
+
+    @Test("a record is still saved while another program is briefly reading the file")
+    func waitsForReader() throws {
+        let url = try folder().appending(path: "history.sqlite")
+        let store = try SQLiteHistoryStore.open(at: url)
+        _ = try store.add(.sample(source: "first"))
+        // Another program (the sqlite3 shell, a browser) holds a read lock...
+        var reader: OpaquePointer?
+        sqlite3_open(url.path(percentEncoded: false), &reader)
+        sqlite3_exec(reader, "BEGIN; SELECT count(*) FROM records;", nil, nil, nil)
+        // ...and lets go a moment later.
+        let held = UncheckedReader(reader)
+        DispatchQueue.global().asyncAfter(deadline: .now() + .milliseconds(100)) {
+            sqlite3_exec(held.pointer, "COMMIT", nil, nil, nil)
+            sqlite3_close(held.pointer)
+        }
+        _ = try store.add(.sample(source: "second"))
+        #expect(try store.recent(limit: 5).count == 2)
+    }
+
     @Test("a file that is not a database cannot be opened")
     func notADatabase() throws {
         let url = try folder().appending(path: "history.sqlite")
@@ -141,4 +174,10 @@ struct SQLiteHistoryStoreTests {
         let file = locator.applicationSupportDirectory().appending(path: SQLiteHistoryStore.fileName)
         #expect(FileManager.default.fileExists(atPath: file.path(percentEncoded: false)))
     }
+}
+
+/// Carries a test-only connection to the thread that releases it.
+private struct UncheckedReader: @unchecked Sendable {
+    let pointer: OpaquePointer?
+    init(_ pointer: OpaquePointer?) { self.pointer = pointer }
 }
