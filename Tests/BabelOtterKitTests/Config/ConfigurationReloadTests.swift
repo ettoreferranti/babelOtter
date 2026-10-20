@@ -10,13 +10,13 @@ struct ConfigurationReloadTests {
 
     private var previous: Configuration {
         var configuration = Configuration.default
-        configuration.retentionDays = 30
+        configuration.retentionDays = .days(30)
         return configuration
     }
 
     private var edited: Configuration {
         var configuration = Configuration.default
-        configuration.retentionDays = 7
+        configuration.retentionDays = .days(7)
         return configuration
     }
 

@@ -7,6 +7,9 @@ public enum HistoryBrowserProblem: Equatable, Sendable {
     /// A page failed and what was loaded stays: "Could not read the
     /// history - <reason>".
     case reading(String)
+    /// Clear All failed and the records stay: "Could not clear the
+    /// history - <reason>" (#69).
+    case clearing(String)
 }
 
 /// What the History window shows, and how it pages (#68, `FR-HIS-02`).
@@ -63,6 +66,33 @@ public final class HistoryBrowser {
     /// every loaded record stays -- a selection on the oldest included.
     public func refresh() {
         _ = reload(term: term, count: max(records.count + 1, pageSize))
+    }
+
+    /// How many records there are, for Clear All's confirmation; nil with no
+    /// store or when counting fails.
+    public func count() -> Int? {
+        guard let store else { return nil }
+        return try? store.count()
+    }
+
+    /// Deletes every record, then reloads whatever happened: a clear that
+    /// failed half-way (the rows deleted, the rebuild not) must not leave
+    /// deleted records listed. False, with the reason in `problem`, when
+    /// the store reported a failure.
+    public func clearAll() -> Bool {
+        guard let store else { return false }
+        var failure: (any Error)?
+        do {
+            try store.deleteAll()
+        } catch {
+            failure = error
+        }
+        _ = reload(term: term, count: pageSize)
+        if let failure {
+            problem = .clearing(HistoryProblem.clearing(failure))
+            return false
+        }
+        return true
     }
 
     /// True when the read succeeded and the list now holds it.

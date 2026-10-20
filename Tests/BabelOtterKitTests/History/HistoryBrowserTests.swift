@@ -16,6 +16,25 @@ final class ScriptedHistoryStore: HistoryStore {
         if failing { throw HistoryStoreError.statementFailed("disk I/O error") }
         return try inner.page(matching: term, before: before, limit: limit)
     }
+
+    func deleteOlder(than date: Date) throws -> Int {
+        if failing { throw HistoryStoreError.statementFailed("disk I/O error") }
+        return try inner.deleteOlder(than: date)
+    }
+
+    /// Deletes, then fails, as a VACUUM that runs out of disk would.
+    var failAfterDeleting = false
+
+    func deleteAll() throws {
+        if failing { throw HistoryStoreError.statementFailed("database is locked") }
+        try inner.deleteAll()
+        if failAfterDeleting { throw HistoryStoreError.statementFailed("database or disk is full") }
+    }
+
+    func count() throws -> Int {
+        if failing { throw HistoryStoreError.statementFailed("disk I/O error") }
+        return try inner.count()
+    }
 }
 
 /// Gives back records no store has kept: no ids.
@@ -26,6 +45,9 @@ final class IdlessHistoryStore: HistoryStore {
         reads += 1
         return Array(repeating: .sample(), count: limit)
     }
+    func deleteOlder(than date: Date) throws -> Int { 0 }
+    func deleteAll() throws {}
+    func count() throws -> Int { 0 }
 }
 
 @Suite("The History window's list pages, searches and reloads")
@@ -219,5 +241,82 @@ struct HistoryBrowserTests {
         let browser = HistoryBrowser(store: try store(2), unavailable: nil, pageSize: 0)
         #expect(sources(browser) == ["r1"])
         #expect(browser.hasMore)
+    }
+}
+
+@Suite("Clear All from the History window")
+struct HistoryBrowserClearTests {
+
+    private func store(_ count: Int) throws -> ScriptedHistoryStore {
+        let store = ScriptedHistoryStore()
+        for index in 0..<count {
+            _ = try store.add(.sample(date: Date(timeIntervalSince1970: Double(index)), source: "r\(index)"))
+        }
+        return store
+    }
+
+    @Test("Clear All empties the list and there is no more")
+    func clears() throws {
+        let backing = try store(5)
+        let browser = HistoryBrowser(store: backing, unavailable: nil, pageSize: 3)
+        #expect(browser.count() == 5)
+        #expect(browser.clearAll())
+        #expect(browser.records.isEmpty)
+        #expect(!browser.hasMore)
+        #expect(browser.problem == nil)
+        #expect(browser.count() == 0)
+        #expect(try backing.count() == 0)
+    }
+
+    @Test("Clear All under a search clears everything, not only the matches")
+    func clearsUnderSearch() throws {
+        let backing = try store(4)
+        let browser = HistoryBrowser(store: backing, unavailable: nil, pageSize: 3)
+        browser.search("r1")
+        #expect(browser.clearAll())
+        #expect(try backing.count() == 0)
+        #expect(browser.term == "r1")
+    }
+
+    @Test("a failed Clear All keeps the records and says why")
+    func failed() throws {
+        let backing = try store(2)
+        let browser = HistoryBrowser(store: backing, unavailable: nil, pageSize: 3)
+        backing.failing = true
+        #expect(!browser.clearAll())
+        #expect(browser.problem == .clearing("database is locked"))
+        #expect(browser.records.count == 2)
+        #expect(browser.count() == nil)
+        backing.failing = false
+        #expect(try backing.count() == 2)
+    }
+
+    @Test("a clear that deletes and then fails lists nothing deleted")
+    func halfDone() throws {
+        let backing = try store(3)
+        let browser = HistoryBrowser(store: backing, unavailable: nil, pageSize: 3)
+        backing.failAfterDeleting = true
+        #expect(!browser.clearAll())
+        #expect(browser.records.isEmpty)
+        #expect(browser.problem == .clearing("database or disk is full"))
+    }
+
+    @Test("a good Clear All clears an earlier clearing problem")
+    func recovers() throws {
+        let backing = try store(2)
+        let browser = HistoryBrowser(store: backing, unavailable: nil, pageSize: 3)
+        backing.failing = true
+        #expect(!browser.clearAll())
+        backing.failing = false
+        #expect(browser.clearAll())
+        #expect(browser.problem == nil)
+    }
+
+    @Test("with no store, nothing is cleared or counted")
+    func noStore() {
+        let browser = HistoryBrowser(store: nil, unavailable: "x")
+        #expect(!browser.clearAll())
+        #expect(browser.count() == nil)
+        #expect(browser.problem == .unavailable("x"))
     }
 }

@@ -15,15 +15,23 @@ struct HistoryView: View {
                     .textFieldStyle(.roundedBorder)
                     .focused($searchFocused)
                     .padding(8)
+                if let note = model.note {
+                    line(note, .secondary)
+                }
                 if case .reading(let reason) = model.problem {
-                    Text("Could not read the history - \(reason)")
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 8)
-                        .padding(.bottom, 4)
+                    line("Could not read the history - \(reason)", .red)
+                }
+                if case .clearing(let reason) = model.problem {
+                    line("Could not clear the history - \(reason)", .red)
                 }
                 list
+                Divider()
+                HStack {
+                    Spacer()
+                    Button("Clear All\u{2026}") { model.requestClearAll() }
+                        .disabled(!model.canClearAll)
+                }
+                .padding(8)
             }
             .frame(minWidth: 260, idealWidth: 320)
             detail
@@ -63,6 +71,15 @@ struct HistoryView: View {
         } else {
             placeholder("Select a record")
         }
+    }
+
+    private func line(_ text: String, _ style: Color) -> some View {
+        Text(text)
+            .font(.caption)
+            .foregroundStyle(style)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 8)
+            .padding(.bottom, 4)
     }
 
     private func placeholder(_ text: String) -> some View {

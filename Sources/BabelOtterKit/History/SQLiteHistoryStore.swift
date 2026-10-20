@@ -40,6 +40,9 @@ public final class SQLiteHistoryStore: HistoryStore {
         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
         """
 
+    private static let deleteBefore = "DELETE FROM records WHERE created_at < ?1"
+    private static let countAll = "SELECT count(*) FROM records"
+
     /// Search calls `HistorySearch.contains` from inside SQLite, so `WHERE`
     /// and `LIMIT` both stay in the query (#68).
     static let containsFunction = "lingoswen_contains"
@@ -158,6 +161,34 @@ public final class SQLiteHistoryStore: HistoryStore {
             }
         }
         return records
+    }
+
+    /// `secure_delete` zeroes what is deleted; no `VACUUM`, as this runs
+    /// after every save.
+    public func deleteOlder(than date: Date) throws -> Int {
+        let statement = try prepare(Self.deleteBefore)
+        defer { sqlite3_finalize(statement) }
+        // Bound directly: through a helper, CI's mutation toolchain stored
+        // NULL (PR #106).
+        if sqlite3_bind_double(statement, 1, date.timeIntervalSince1970) != SQLITE_OK {
+            throw failure()
+        }
+        if sqlite3_step(statement) != SQLITE_DONE { throw failure() }
+        return Int(sqlite3_changes(connection))
+    }
+
+    /// `secure_delete` zeroes the freed pages, then `VACUUM` rebuilds the
+    /// file without them: nothing of the text remains in it (#69).
+    public func deleteAll() throws {
+        try execute("DELETE FROM records")
+        try execute("VACUUM")
+    }
+
+    public func count() throws -> Int {
+        let statement = try prepare(Self.countAll)
+        defer { sqlite3_finalize(statement) }
+        if sqlite3_step(statement) != SQLITE_ROW { throw failure() }
+        return Int(sqlite3_column_int64(statement, 0))
     }
 
     /// One `PRAGMA`'s value as text. Internal: tests read the settings here.

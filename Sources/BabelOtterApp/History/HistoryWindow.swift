@@ -39,6 +39,32 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
         model?.refresh()
     }
 
+    /// Recording was turned on or off: the note above the list follows.
+    func policyChanged() {
+        guard isOpen else { return }
+        model?.refresh()
+    }
+
+    /// Delete is the destructive default; Escape cancels.
+    private func confirmClearAll(_ count: Int?, _ delete: @escaping @MainActor () -> Void) {
+        guard let window else { return }
+        let alert = NSAlert()
+        alert.messageText = Self.clearQuestion(count)
+        alert.informativeText = "This cannot be undone."
+        let deleteButton = alert.addButton(withTitle: "Delete")
+        deleteButton.hasDestructiveAction = true
+        alert.addButton(withTitle: "Cancel").keyEquivalent = "\u{1b}"
+        alert.beginSheetModal(for: window) { response in
+            if response == .alertFirstButtonReturn { delete() }
+        }
+    }
+
+    private static func clearQuestion(_ count: Int?) -> String {
+        guard let count else { return "Delete all records?" }
+        if count == 1 { return "Delete the 1 record?" }
+        return "Delete all \(count.formatted()) records?"
+    }
+
     func windowWillClose(_ notification: Notification) {
         isOpen = false
     }
@@ -46,8 +72,12 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
     /// A fresh list in the same window. The hosting controller is made once,
     /// so reopening keeps the window's size.
     private func open() {
-        let browser = HistoryBrowser(store: recorder.store, unavailable: recorder.problem)
-        let model = HistoryWindowModel(browser: browser, configuration: configuration)
+        let browser = HistoryBrowser(store: recorder.store, unavailable: recorder.unavailableReason)
+        let model = HistoryWindowModel(
+            browser: browser, configuration: configuration,
+            policyNote: { [unowned recorder] in recorder.policy.windowNote })
+        model.confirmClearAll = { [weak self] count, delete in self?.confirmClearAll(count, delete) }
+        model.onCleared = { [unowned recorder] in recorder.cleared() }
         self.model = model
         if let window, let hosting {
             hosting.rootView = HistoryView(model: model)

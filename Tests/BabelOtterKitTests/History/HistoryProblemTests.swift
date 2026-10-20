@@ -43,6 +43,25 @@ struct HistoryProblemTests {
         #expect(HistoryProblem.reading(error) == "could not read (\(error.localizedDescription))")
     }
 
+    @Test("the menu's lines name what failed (#69)")
+    func menuLines() {
+        #expect(HistoryProblem.notSaved("could not save (disk full)")
+            == "History: not saved - could not save (disk full)")
+        #expect(HistoryProblem.pruning(HistoryStoreError.statementFailed("database is locked"))
+            == "History: old records not deleted - database is locked")
+        let error = CocoaError(.fileWriteNoPermission)
+        #expect(HistoryProblem.pruning(error)
+            == "History: old records not deleted - \(error.localizedDescription)")
+    }
+
+    @Test("a failed Clear All names SQLite's reason, or the error's description")
+    func clearing() {
+        #expect(HistoryProblem.clearing(HistoryStoreError.statementFailed("database is locked"))
+            == "database is locked")
+        let error = CocoaError(.fileWriteNoPermission)
+        #expect(HistoryProblem.clearing(error) == error.localizedDescription)
+    }
+
     @Test("any other error falls back to its description")
     func other() {
         let error = CocoaError(.fileWriteNoPermission)

@@ -19,17 +19,48 @@ final class HistoryWindowModel: ObservableObject {
         didSet { scheduleSearch() }
     }
     @Published var selection: Int64?
+    /// "History is off - nothing new is saved.", while nothing is recorded.
+    @Published private(set) var note: String?
     /// Bumped by Command-F; the view focuses the search field.
     @Published private(set) var searchFocusRequests = 0
 
+    /// Asks before Clear All: the count when known, and what to run on Delete.
+    var confirmClearAll: ((Int?, @escaping @MainActor () -> Void) -> Void)?
+    /// Clear All succeeded.
+    var onCleared: (@MainActor () -> Void)?
+
     private let browser: HistoryBrowser
     private let configuration: () -> Configuration
+    private let policyNote: () -> String?
     private var pendingSearch: Task<Void, Never>?
 
-    init(browser: HistoryBrowser, configuration: @escaping () -> Configuration) {
+    init(
+        browser: HistoryBrowser, configuration: @escaping () -> Configuration,
+        policyNote: @escaping () -> String?
+    ) {
         self.browser = browser
         self.configuration = configuration
+        self.policyNote = policyNote
         publish()
+    }
+
+    /// False only with no history, or an empty one read without trouble:
+    /// after a failed read the list may be empty while records exist.
+    var canClearAll: Bool {
+        if case .unavailable = problem { return false }
+        if !records.isEmpty { return true }
+        return term != nil || problem != nil
+    }
+
+    func requestClearAll() {
+        guard canClearAll else { return }
+        confirmClearAll?(browser.count()) { [weak self] in
+            guard let self else { return }
+            let cleared = self.browser.clearAll()
+            self.selection = nil
+            if cleared { self.onCleared?() }
+            self.publish()
+        }
     }
 
     var selectedRecord: HistoryRecord? {
@@ -69,6 +100,7 @@ final class HistoryWindowModel: ObservableObject {
 
     /// The selection stays on its record while that record is listed.
     private func publish() {
+        note = policyNote()
         records = browser.records
         hasMore = browser.hasMore
         problem = browser.problem

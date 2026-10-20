@@ -332,9 +332,9 @@ struct ReadinessPolicyTests {
 
     // MARK: - History (#67)
 
-    @Test("a history problem is degraded, says history is not saved, and offers no command")
+    @Test("a history problem is degraded, shows its line, and offers no command")
     func historyProblemCause() {
-        let cause = ReadinessCause.historyProblem("could not save (disk full)")
+        let cause = ReadinessCause.historyProblem("History: not saved - could not save (disk full)")
         #expect(cause.readiness == .degraded)
         #expect(cause.header == "History: not saved - could not save (disk full)")
         #expect(cause.detail == "History: not saved - could not save (disk full)")

@@ -30,6 +30,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var combinations = HotKeyPlan.launchCombinations
     private var hotKeyIssues: [HotKeyIssue] = []
     private var actionItems: [Action: NSMenuItem] = [:]
+    private var historyItem: NSMenuItem?
+    /// "History: off" above History..., while nothing is recorded (#69).
+    private var historyNote: NSMenuItem?
     private let layoutReader = KeyboardLayoutReader()
     /// The layout the hotkeys were last resolved against.
     private var lastLayout = KeyLayout(characters: [:])
@@ -55,6 +58,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         pushConfigurationProblems()
         history.onChange = { [weak self] in self?.pushHistoryProblem() }
         history.onRecord = { [weak self] in self?.historyWindow.recorded() }
+        applyHistoryPolicy()
         pushHistoryProblem()
         promptForAccessibilityIfNeeded()
         monitor.onChange = { [weak self] report in self?.render(report) }
@@ -164,7 +168,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         monitor.update(configuration: source.configuration)
         updateHotKeys()
         pushConfigurationProblems()
+        applyHistoryPolicy()
         monitor.refresh()
+    }
+
+    /// The configuration's retention, or a pause while it is a fallback.
+    private func applyHistoryPolicy() {
+        history.apply(HistoryPolicy(
+            retention: source.configuration.retentionDays,
+            configurationIsFallback: source.isFallback))
+        renderHistoryNote()
+        historyWindow.policyChanged()
+    }
+
+    /// Information, not a readiness cause: the icon stays as it is.
+    private func renderHistoryNote() {
+        guard let menu = statusItem?.menu, let historyItem else { return }
+        if let historyNote { menu.removeItem(historyNote) }
+        historyNote = nil
+        guard let text = history.policy.menuNote else { return }
+        let note = NSMenuItem.sectionHeader(title: text)
+        menu.insertItem(note, at: menu.index(of: historyItem))
+        historyNote = note
     }
 
     private func pushConfigurationProblems() {
@@ -200,7 +225,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(explainItem)
         menu.addItem(repitchItem)
         menu.addItem(.separator())
-        menu.addItem(action("History\u{2026}", #selector(showHistoryAction)))
+        let historyItem = action("History\u{2026}", #selector(showHistoryAction))
+        self.historyItem = historyItem
+        menu.addItem(historyItem)
         menu.addItem(action("Check Again", #selector(refreshStatusAction)))
         menu.addItem(action("Open Configuration Folder", #selector(openConfiguration)))
         menu.addItem(.separator())

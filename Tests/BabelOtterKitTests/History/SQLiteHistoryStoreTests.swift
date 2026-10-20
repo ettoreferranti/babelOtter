@@ -121,12 +121,16 @@ struct SQLiteHistoryStoreTests {
         var reader: OpaquePointer?
         sqlite3_open(url.path(percentEncoded: false), &reader)
         sqlite3_exec(reader, "BEGIN; SELECT count(*) FROM records;", nil, nil, nil)
-        // ...and lets go a moment later.
+        // ...and lets go a moment later -- on a thread of its own: the
+        // shared queue can be busy with the tests running in parallel, and
+        // a release later than the 500 ms busy timeout failed CI (PR #107).
         let held = UncheckedReader(reader)
-        DispatchQueue.global().asyncAfter(deadline: .now() + .milliseconds(100)) {
+        let release = Thread {
+            Thread.sleep(forTimeInterval: 0.1)
             sqlite3_exec(held.pointer, "COMMIT", nil, nil, nil)
             sqlite3_close(held.pointer)
         }
+        release.start()
         _ = try store.add(.sample(source: "second"))
         #expect(try store.recent(limit: 5).count == 2)
     }
@@ -167,6 +171,43 @@ struct SQLiteHistoryStoreTests {
             """)
         _ = try store.add(.sample(date: Date(timeIntervalSince1970: 3), source: "newer"))
         #expect(try store.recent(limit: 2).map(\.source.value) == ["newer", "older"])
+    }
+
+    @Test("after Clear All, the file holds none of the text and is back to its fresh size")
+    func clearLeavesNoRemnant() throws {
+        let folder = try folder()
+        let fresh = folder.appending(path: "fresh.sqlite")
+        _ = try SQLiteHistoryStore.open(at: fresh)
+        let url = folder.appending(path: "history.sqlite")
+        let store = try SQLiteHistoryStore.open(at: url)
+        let marker = "Geheimnis-\u{00DC}bersetzung-7f3a"
+        for index in 0..<300 {
+            _ = try store.add(.sample(
+                source: "\(marker) \(index) " + String(repeating: "Text ", count: 200),
+                result: "\(marker) result \(index)"))
+        }
+        #expect(try Data(contentsOf: url).range(of: Data(marker.utf8)) != nil)
+        try store.deleteAll()
+        let bytes = try Data(contentsOf: url)
+        #expect(bytes.range(of: Data(marker.utf8)) == nil)
+        #expect(bytes.range(of: Data("Text Text".utf8)) == nil)
+        let freshSize = try Data(contentsOf: fresh).count
+        #expect(bytes.count <= freshSize + 4_096)
+        #expect(!FileManager.default.fileExists(atPath: url.path(percentEncoded: false) + "-journal"))
+    }
+
+    @Test("records deleted for being old leave none of their text in the file")
+    func pruneLeavesNoRemnant() throws {
+        let url = try folder().appending(path: "history.sqlite")
+        let store = try SQLiteHistoryStore.open(at: url)
+        let marker = "Abgelaufen-\u{00E9}t\u{00E9}-91c2"
+        _ = try store.add(.sample(date: Date(timeIntervalSince1970: 1), source: marker, result: marker))
+        _ = try store.add(.sample(date: Date(timeIntervalSince1970: 9), source: "kept", result: "kept"))
+        #expect(try Data(contentsOf: url).range(of: Data(marker.utf8)) != nil)
+        #expect(try store.deleteOlder(than: Date(timeIntervalSince1970: 5)) == 1)
+        let bytes = try Data(contentsOf: url)
+        #expect(bytes.range(of: Data(marker.utf8)) == nil)
+        #expect(bytes.range(of: Data("kept".utf8)) != nil)
     }
 
     @Test("search characters SQL treats specially are matched literally")
