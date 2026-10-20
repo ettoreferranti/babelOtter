@@ -38,7 +38,8 @@ public struct Configuration: Sendable, Equatable, Codable {
     /// A model per action (`FR-CFG-02`).
     public var models: [Action: String]
     public var timeoutSeconds: Double
-    public var retentionDays: Int
+    /// How long history keeps records, or "off" (#69).
+    public var retentionDays: HistoryRetention
     /// Below this, detection is ambiguous and the user is asked rather than
     /// guessed at (`FR-TRN-03`).
     public var detectionConfidenceFloor: Double
@@ -60,7 +61,7 @@ public struct Configuration: Sendable, Equatable, Codable {
         doNotTranslate: [String],
         models: [Action: String],
         timeoutSeconds: Double,
-        retentionDays: Int,
+        retentionDays: HistoryRetention,
         detectionConfidenceFloor: Double,
         minimumLengthForDetection: Int,
         strictCaptureOnly: Bool = false,
@@ -125,7 +126,7 @@ extension Configuration {
         doNotTranslate: [],
         models: Dictionary(uniqueKeysWithValues: Action.allCases.map { ($0, defaultModel) }),
         timeoutSeconds: 60,
-        retentionDays: 90,
+        retentionDays: .default,
         detectionConfidenceFloor: 0.65,
         minimumLengthForDetection: 12,
         strictCaptureOnly: false,

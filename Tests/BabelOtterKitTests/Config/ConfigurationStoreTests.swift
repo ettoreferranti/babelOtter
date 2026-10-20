@@ -24,7 +24,7 @@ struct ConfigurationStoreTests {
     func roundTrip() throws {
         let store = ConfigurationStore(directory: try temporaryDirectory())
         var configuration = Configuration.default
-        configuration.retentionDays = 42
+        configuration.retentionDays = .days(42)
         try store.save(configuration)
         let loaded = store.load()
         #expect(loaded.configuration == configuration)
@@ -63,7 +63,7 @@ struct ConfigurationStoreTests {
             options: .regularExpression
         )
         try text.write(to: store.fileURL, atomically: true, encoding: .utf8)
-        #expect(store.load().configuration.retentionDays == 7)
+        #expect(store.load().configuration.retentionDays == .days(7))
     }
 
     @Test("a malformed file names the file, falls back to defaults, and does not crash")
@@ -93,6 +93,34 @@ struct ConfigurationStoreTests {
         #expect(loaded.configuration == Configuration.default)
         #expect(loaded.problems.count == 1)
         #expect(loaded.problems[0].field == "retentionDays")
+    }
+
+    @Test("retention can be off or unlimited, and the default file keeps 90")
+    func retentionWords() throws {
+        let store = ConfigurationStore(directory: try temporaryDirectory())
+        try store.save(.default)
+        let original = try String(contentsOf: store.fileURL, encoding: .utf8)
+        #expect(original.contains(#""retentionDays" : 90"#))
+        for (written, expected) in [(#""off""#, HistoryRetention.off), (#""Unlimited""#, .unlimited)] {
+            let text = original.replacingOccurrences(
+                of: #""retentionDays" : 90"#, with: #""retentionDays" : "# + written)
+            try text.write(to: store.fileURL, atomically: true, encoding: .utf8)
+            let loaded = store.load()
+            #expect(loaded.problems.isEmpty)
+            #expect(loaded.configuration.retentionDays == expected)
+        }
+    }
+
+    @Test("a retention of zero names the field and the accepted forms")
+    func retentionZero() throws {
+        let store = ConfigurationStore(directory: try temporaryDirectory())
+        let text = try #require(String(
+            data: JSONEncoder.configuration.encode(Configuration.default), encoding: .utf8))
+        try text.replacingOccurrences(of: #""retentionDays" : 90"#, with: #""retentionDays" : 0"#)
+            .write(to: store.fileURL, atomically: true, encoding: .utf8)
+        let loaded = store.load()
+        #expect(loaded.problems.map(\.summary)
+            == [#"retentionDays: expected a number of days (1 or more), "unlimited" or "off""#])
     }
 
     @Test("a missing required field is reported by name too")
