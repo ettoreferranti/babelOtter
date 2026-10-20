@@ -77,6 +77,7 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
             browser: browser, configuration: configuration,
             policyNote: { [unowned recorder] in recorder.policy.windowNote })
         model.confirmClearAll = { [weak self] count, delete in self?.confirmClearAll(count, delete) }
+        model.onCleared = { [unowned recorder] in recorder.cleared() }
         self.model = model
         if let window, let hosting {
             hosting.rootView = HistoryView(model: model)

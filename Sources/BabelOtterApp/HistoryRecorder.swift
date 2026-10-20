@@ -30,6 +30,9 @@ final class HistoryRecorder {
     private var saveProblem: String?
     /// The last prune; a prune that succeeds clears it.
     private var pruneProblem: String?
+    /// When Clear All last succeeded: a popup still open then holds a
+    /// result from before it, which must not reappear after it.
+    private var clearedAt: Date?
 
     init() {
         do {
@@ -47,12 +50,27 @@ final class HistoryRecorder {
     /// so a shortened period applies without waiting for the next save.
     func apply(_ policy: HistoryPolicy) {
         self.policy = policy
-        changing { prune() }
+        changing {
+            // Nothing is written now, so an earlier failed write no longer
+            // matters. A store that never opened keeps saying so.
+            if !policy.records {
+                if store != nil { saveProblem = nil }
+            }
+            prune()
+        }
+    }
+
+    /// Clear All succeeded.
+    func cleared() {
+        clearedAt = Date()
     }
 
     func record(_ record: HistoryRecord) {
         guard let store else { return }
         guard policy.records else { return }
+        if let clearedAt {
+            if record.date < clearedAt { return }
+        }
         changing {
             do {
                 _ = try store.add(record)

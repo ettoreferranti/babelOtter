@@ -78,8 +78,18 @@ public struct ConfigurationStore: Sendable {
         // which is why this note describes the initialiser instead of naming
         // it. That is the conservative direction on purpose: a scanner that
         // parsed context is a scanner a real call site could hide behind.
-        guard let data = FileManager.default.contents(atPath: fileURL.path(percentEncoded: false))
-        else {
+        let path = fileURL.path(percentEncoded: false)
+        guard let data = FileManager.default.contents(atPath: path) else {
+            // Something there that cannot be read -- no permission, a folder,
+            // an I/O error -- is a problem, not a first launch: its settings
+            // are unknown, so history must pause rather than follow the
+            // defaults (#69).
+            if FileManager.default.fileExists(atPath: path) {
+                return LoadedConfiguration(
+                    configuration: .default,
+                    problems: [ConfigurationProblem(
+                        file: Self.fileName, field: nil, detail: "the file could not be read")])
+            }
             // No file is not a problem: it is what a first launch looks like.
             return LoadedConfiguration(configuration: .default, problems: [], fileFound: false)
         }

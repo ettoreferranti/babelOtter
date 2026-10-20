@@ -19,6 +19,8 @@ struct HistoryRetentionTests {
         ("90", HistoryRetention.days(90)), ("1", .days(1)),
         (#""unlimited""#, .unlimited), (#""UNLIMITED""#, .unlimited),
         (#""off""#, .off), (#"" Off ""#, .off), (#""\noff\t""#, .off),
+        // JSONDecoder reads a whole number written as a float as that number.
+        ("90.0", .days(90)), ("1e2", .days(100)),
     ])
     func accepted(written: String, expected: HistoryRetention) throws {
         #expect(try decode(written) == expected)

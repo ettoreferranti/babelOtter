@@ -75,17 +75,23 @@ public final class HistoryBrowser {
         return try? store.count()
     }
 
-    /// Deletes every record, then shows the empty list for the term in
-    /// force. False, with the reason in `problem`, when nothing was deleted.
+    /// Deletes every record, then reloads whatever happened: a clear that
+    /// failed half-way (the rows deleted, the rebuild not) must not leave
+    /// deleted records listed. False, with the reason in `problem`, when
+    /// the store reported a failure.
     public func clearAll() -> Bool {
         guard let store else { return false }
+        var failure: (any Error)?
         do {
             try store.deleteAll()
         } catch {
-            problem = .clearing(HistoryProblem.clearing(error))
-            return false
+            failure = error
         }
         _ = reload(term: term, count: pageSize)
+        if let failure {
+            problem = .clearing(HistoryProblem.clearing(failure))
+            return false
+        }
         return true
     }
 

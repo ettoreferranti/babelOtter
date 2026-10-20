@@ -182,6 +182,7 @@ struct SQLiteHistoryStoreTests {
                 source: "\(marker) \(index) " + String(repeating: "Text ", count: 200),
                 result: "\(marker) result \(index)"))
         }
+        #expect(try Data(contentsOf: url).range(of: Data(marker.utf8)) != nil)
         try store.deleteAll()
         let bytes = try Data(contentsOf: url)
         #expect(bytes.range(of: Data(marker.utf8)) == nil)
@@ -198,6 +199,7 @@ struct SQLiteHistoryStoreTests {
         let marker = "Abgelaufen-\u{00E9}t\u{00E9}-91c2"
         _ = try store.add(.sample(date: Date(timeIntervalSince1970: 1), source: marker, result: marker))
         _ = try store.add(.sample(date: Date(timeIntervalSince1970: 9), source: "kept", result: "kept"))
+        #expect(try Data(contentsOf: url).range(of: Data(marker.utf8)) != nil)
         #expect(try store.deleteOlder(than: Date(timeIntervalSince1970: 5)) == 1)
         let bytes = try Data(contentsOf: url)
         #expect(bytes.range(of: Data(marker.utf8)) == nil)

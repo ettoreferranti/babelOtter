@@ -83,10 +83,11 @@ Everything lives under `~/Library/Application Support/ch.lingoswen/`:
   days (default 90; older records are deleted at launch, when the setting
   changes and after each saved record), `"unlimited"`, or `"off"` (nothing new
   is recorded; existing records stay until Clear All). If `config.json` cannot
-  be read at launch, history records and deletes nothing until it can, so a
-  typo never turns recording back on.
+  be read at launch (malformed, or present but unreadable), history records
+  and deletes nothing until it can, so a typo never turns recording back on.
 - **Clear All…** in the History window deletes every record unconditionally.
-  `secure_delete` zeroes the deleted text and `VACUUM` rebuilds the file, so
+  A popup still open at that moment does not record its earlier result
+  afterwards. `secure_delete` zeroes the deleted text and `VACUUM` rebuilds the file, so
   `history.sqlite` holds no trace of it afterwards (a test reads the raw file
   to check). **One limit:** while a delete runs, SQLite's rollback journal
   (`history.sqlite-journal`) briefly holds a copy of the old pages; it is

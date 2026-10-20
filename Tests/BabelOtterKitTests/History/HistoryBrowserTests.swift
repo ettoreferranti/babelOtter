@@ -22,9 +22,13 @@ final class ScriptedHistoryStore: HistoryStore {
         return try inner.deleteOlder(than: date)
     }
 
+    /// Deletes, then fails, as a VACUUM that runs out of disk would.
+    var failAfterDeleting = false
+
     func deleteAll() throws {
         if failing { throw HistoryStoreError.statementFailed("database is locked") }
         try inner.deleteAll()
+        if failAfterDeleting { throw HistoryStoreError.statementFailed("database or disk is full") }
     }
 
     func count() throws -> Int {
@@ -285,6 +289,27 @@ struct HistoryBrowserClearTests {
         #expect(browser.count() == nil)
         backing.failing = false
         #expect(try backing.count() == 2)
+    }
+
+    @Test("a clear that deletes and then fails lists nothing deleted")
+    func halfDone() throws {
+        let backing = try store(3)
+        let browser = HistoryBrowser(store: backing, unavailable: nil, pageSize: 3)
+        backing.failAfterDeleting = true
+        #expect(!browser.clearAll())
+        #expect(browser.records.isEmpty)
+        #expect(browser.problem == .clearing("database or disk is full"))
+    }
+
+    @Test("a good Clear All clears an earlier clearing problem")
+    func recovers() throws {
+        let backing = try store(2)
+        let browser = HistoryBrowser(store: backing, unavailable: nil, pageSize: 3)
+        backing.failing = true
+        #expect(!browser.clearAll())
+        backing.failing = false
+        #expect(browser.clearAll())
+        #expect(browser.problem == nil)
     }
 
     @Test("with no store, nothing is cleared or counted")

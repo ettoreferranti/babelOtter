@@ -123,6 +123,16 @@ struct ConfigurationStoreTests {
             == [#"retentionDays: expected a number of days (1 or more), "unlimited" or "off""#])
     }
 
+    @Test("a config.json that is there but cannot be read is a problem, not a first launch")
+    func unreadable() throws {
+        let store = ConfigurationStore(directory: try temporaryDirectory())
+        try FileManager.default.createDirectory(at: store.fileURL, withIntermediateDirectories: true)
+        let loaded = store.load()
+        #expect(loaded.fileFound)
+        #expect(loaded.configuration == Configuration.default)
+        #expect(loaded.problems.map(\.summary) == ["the file could not be read"])
+    }
+
     @Test("a missing required field is reported by name too")
     func missingField() throws {
         let directory = try temporaryDirectory()

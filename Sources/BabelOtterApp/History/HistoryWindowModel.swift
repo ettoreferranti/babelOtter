@@ -26,6 +26,8 @@ final class HistoryWindowModel: ObservableObject {
 
     /// Asks before Clear All: the count when known, and what to run on Delete.
     var confirmClearAll: ((Int?, @escaping @MainActor () -> Void) -> Void)?
+    /// Clear All succeeded.
+    var onCleared: (@MainActor () -> Void)?
 
     private let browser: HistoryBrowser
     private let configuration: () -> Configuration
@@ -42,17 +44,21 @@ final class HistoryWindowModel: ObservableObject {
         publish()
     }
 
-    /// Nothing to delete, or no history to delete it from.
+    /// False only with no history, or an empty one read without trouble:
+    /// after a failed read the list may be empty while records exist.
     var canClearAll: Bool {
         if case .unavailable = problem { return false }
-        return !(records.isEmpty && term == nil)
+        if !records.isEmpty { return true }
+        return term != nil || problem != nil
     }
 
     func requestClearAll() {
         guard canClearAll else { return }
         confirmClearAll?(browser.count()) { [weak self] in
             guard let self else { return }
-            if self.browser.clearAll() { self.selection = nil }
+            let cleared = self.browser.clearAll()
+            self.selection = nil
+            if cleared { self.onCleared?() }
             self.publish()
         }
     }
