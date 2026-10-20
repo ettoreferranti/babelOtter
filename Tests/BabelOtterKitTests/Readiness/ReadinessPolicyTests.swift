@@ -42,12 +42,13 @@ struct ReadinessPolicyTests {
         models: [Action: String] = [.translate: "m", .correct: "m"],
         hotKeys: [HotKeyFact] = ReadinessPolicyTests.bothRegistered,
         systemShortcuts: [SystemShortcut] = [],
-        configurationProblems: [String] = []
+        configurationProblems: [String] = [],
+        historyProblem: String? = nil
     ) -> ReadinessFacts {
         ReadinessFacts(
             accessibilityGranted: accessibility, probe: probe, models: models,
             hotKeys: hotKeys, systemShortcuts: systemShortcuts,
-            configurationProblems: configurationProblems)
+            configurationProblems: configurationProblems, historyProblem: historyProblem)
     }
 
     @Test("everything in order is ready, with no causes")
@@ -327,5 +328,33 @@ struct ReadinessPolicyTests {
     func configurationProblemAlone() {
         let report = policy.report(for: facts(configurationProblems: ["x"]))
         #expect(report.readiness == .degraded)
+    }
+
+    // MARK: - History (#67)
+
+    @Test("a history problem is degraded, says history is not saved, and offers no command")
+    func historyProblemCause() {
+        let cause = ReadinessCause.historyProblem("could not save (disk full)")
+        #expect(cause.readiness == .degraded)
+        #expect(cause.header == "History: not saved - could not save (disk full)")
+        #expect(cause.detail == "History: not saved - could not save (disk full)")
+        #expect(cause.remedy == nil)
+    }
+
+    @Test("a history problem comes after configuration problems and before the daemon")
+    func historyProblemOrder() {
+        let report = policy.report(for: facts(
+            probe: .unreachable(detail: "refused"),
+            configurationProblems: ["a"], historyProblem: "x"))
+        #expect(report.causes == [
+            .configurationProblem("a"),
+            .historyProblem("x"),
+            .ollamaUnreachable(detail: "refused"),
+        ])
+    }
+
+    @Test("no history problem adds no cause")
+    func noHistoryProblem() {
+        #expect(policy.report(for: facts(historyProblem: nil)).causes.isEmpty)
     }
 }
