@@ -168,6 +168,10 @@ jobs:
           Sources/BabelOtterKit/History/HistoryStore.swift
           Sources/BabelOtterKit/History/HistoryProblem.swift
           Sources/BabelOtterKit/History/SQLiteHistoryStore.swift
+          Sources/BabelOtterKit/History/HistorySearch.swift
+          Sources/BabelOtterKit/History/HistoryCursor.swift
+          Sources/BabelOtterKit/History/HistoryBrowser.swift
+          Sources/BabelOtterKit/History/HistoryRow.swift
           Sources/BabelOtterKit/Hotkeys/HotKeyPlan.swift
           Sources/BabelOtterKit/Hotkeys/HotKeySpec.swift
           Sources/BabelOtterKit/Hotkeys/KeyLayout.swift
