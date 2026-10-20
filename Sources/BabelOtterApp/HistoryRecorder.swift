@@ -10,9 +10,12 @@ import Foundation
 @MainActor
 final class HistoryRecorder {
 
-    /// Nil when it could not be opened; `problem` then says why.
+    /// Nil when it could not be opened; `unavailableReason` then says why.
     let store: (any HistoryStore)?
-    /// Worded to follow "History: not saved - "; nil while history works.
+    /// Why the store could not be opened, worded to follow "History is not
+    /// saved - " in the window.
+    let unavailableReason: String?
+    /// The menu's whole line; nil while history works.
     private(set) var problem: String?
     /// The problem changed: the menu shows it.
     var onChange: (@MainActor () -> Void)?
@@ -22,10 +25,13 @@ final class HistoryRecorder {
     init() {
         do {
             store = try SQLiteHistoryStore.inApplicationSupport(locator: AppStorage.locator())
+            unavailableReason = nil
             problem = nil
         } catch {
             store = nil
-            problem = HistoryProblem.opening(error)
+            let reason = HistoryProblem.opening(error)
+            unavailableReason = reason
+            problem = HistoryProblem.notSaved(reason)
         }
     }
 
@@ -36,7 +42,7 @@ final class HistoryRecorder {
             _ = try store.add(record)
             problem = nil
         } catch {
-            problem = HistoryProblem.saving(error)
+            problem = HistoryProblem.notSaved(HistoryProblem.saving(error))
         }
         if problem != before { onChange?() }
         if problem == nil { onRecord?() }

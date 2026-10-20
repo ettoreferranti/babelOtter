@@ -46,7 +46,7 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
     /// A fresh list in the same window. The hosting controller is made once,
     /// so reopening keeps the window's size.
     private func open() {
-        let browser = HistoryBrowser(store: recorder.store, unavailable: recorder.problem)
+        let browser = HistoryBrowser(store: recorder.store, unavailable: recorder.unavailableReason)
         let model = HistoryWindowModel(browser: browser, configuration: configuration)
         self.model = model
         if let window, let hosting {

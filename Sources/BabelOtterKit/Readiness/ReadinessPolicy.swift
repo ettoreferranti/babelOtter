@@ -77,8 +77,9 @@ public struct ReadinessFacts: Sendable, Equatable {
     public let systemShortcuts: [SystemShortcut]
     /// What is wrong with config.json, each worded to follow "config.json: ".
     public let configurationProblems: [String]
-    /// Why history is not saved, worded to follow "History: not saved - ";
-    /// nil when it is (#67).
+    /// What is wrong with history, as the whole menu line ("History: not
+    /// saved - ...", "History: old records not deleted - ..."); nil when
+    /// nothing is (#67, #69).
     public let historyProblem: String?
 
     public init(
@@ -126,7 +127,7 @@ public enum ReadinessCause: Sendable, Equatable {
         case .configurationProblem(let text):
             return "config.json: \(text)"
         case .historyProblem(let text):
-            return "History: not saved - \(text)"
+            return text
         case .ollamaUnreachable(let detail):
             // No period of ours: the daemon's text may already end in one.
             return "Ollama is not reachable: \(detail)"
@@ -154,7 +155,7 @@ extension ReadinessCause {
         case .configurationProblem(let text):
             return "config.json: \(text)"
         case .historyProblem(let text):
-            return "History: not saved - \(text)"
+            return text
         case .ollamaUnreachable:
             return "Ollama isn't running"
         case .modelMissing(let action, let model):

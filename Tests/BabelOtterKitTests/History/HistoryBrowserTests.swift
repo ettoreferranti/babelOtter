@@ -239,3 +239,59 @@ struct HistoryBrowserTests {
         #expect(browser.hasMore)
     }
 }
+
+@Suite("Clear All from the History window")
+struct HistoryBrowserClearTests {
+
+    private func store(_ count: Int) throws -> ScriptedHistoryStore {
+        let store = ScriptedHistoryStore()
+        for index in 0..<count {
+            _ = try store.add(.sample(date: Date(timeIntervalSince1970: Double(index)), source: "r\(index)"))
+        }
+        return store
+    }
+
+    @Test("Clear All empties the list and there is no more")
+    func clears() throws {
+        let backing = try store(5)
+        let browser = HistoryBrowser(store: backing, unavailable: nil, pageSize: 3)
+        #expect(browser.count() == 5)
+        #expect(browser.clearAll())
+        #expect(browser.records.isEmpty)
+        #expect(!browser.hasMore)
+        #expect(browser.problem == nil)
+        #expect(browser.count() == 0)
+        #expect(try backing.count() == 0)
+    }
+
+    @Test("Clear All under a search clears everything, not only the matches")
+    func clearsUnderSearch() throws {
+        let backing = try store(4)
+        let browser = HistoryBrowser(store: backing, unavailable: nil, pageSize: 3)
+        browser.search("r1")
+        #expect(browser.clearAll())
+        #expect(try backing.count() == 0)
+        #expect(browser.term == "r1")
+    }
+
+    @Test("a failed Clear All keeps the records and says why")
+    func failed() throws {
+        let backing = try store(2)
+        let browser = HistoryBrowser(store: backing, unavailable: nil, pageSize: 3)
+        backing.failing = true
+        #expect(!browser.clearAll())
+        #expect(browser.problem == .clearing("database is locked"))
+        #expect(browser.records.count == 2)
+        #expect(browser.count() == nil)
+        backing.failing = false
+        #expect(try backing.count() == 2)
+    }
+
+    @Test("with no store, nothing is cleared or counted")
+    func noStore() {
+        let browser = HistoryBrowser(store: nil, unavailable: "x")
+        #expect(!browser.clearAll())
+        #expect(browser.count() == nil)
+        #expect(browser.problem == .unavailable("x"))
+    }
+}
