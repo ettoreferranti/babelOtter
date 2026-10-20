@@ -21,7 +21,7 @@
 | How loose is matching | Case- and diacritic-insensitive, locale-independent (`String.range(of:options:)` with `.caseInsensitive` and `.diacriticInsensitive`) | What Finder and Mail do; SQLite's `LIKE` folds ASCII only, so `über` would miss `Über` |
 | Where matching runs | One Swift function, `HistorySearch.matches`, used by both stores; SQLite calls it as a registered SQL function | The stores cannot disagree; `WHERE` and `LIMIT` stay inside SQLite, so the read loop stays bounded by `limit` (the hang of PR #105) |
 | How the list pages | Keyset paging on (date, id), 200 at a time, one extra row fetched to know whether more exist | A record added at the top does not shift the next page; responsive however large the history grows |
-| How live update works | `HistoryRecorder` notifies after a successful write; the window reloads from the top as many records as it had loaded | One code path, correct for a search too; a reload of a few hundred rows takes milliseconds |
+| How live update works | `HistoryRecorder` notifies after a successful write; the window reloads from the top one more record than it had loaded | One code path, correct for a search too; every loaded record stays, so the selection does; a reload of a few hundred rows takes milliseconds |
 | Where the list logic lives | `HistoryBrowser` in the kit | Paging, searching and reloading are tested and under the mutation gate; the app only displays them |
 | Where row labels come from | `HistoryRow` in the kit, from a record and the current `Configuration` | Pure and tested; a deleted audience or language falls back to its id |
 | The window | A plain `NSWindow` hosting SwiftUI, built once and kept | The app is an accessory (no Dock icon, no main menu); the popup's non-activating panel is the wrong kind of window for something you browse |
@@ -54,6 +54,8 @@ public struct HistoryCursor: Sendable, Equatable {
     public init(date: Date, id: Int64)
     /// Nil for a record no store has kept.
     public init?(_ record: HistoryRecord)
+    /// True when `record` is strictly older; `InMemoryHistoryStore` filters with it.
+    public func precedes(_ record: HistoryRecord) -> Bool
 }
 
 public protocol HistoryStore: AnyObject {
@@ -113,8 +115,8 @@ public final class HistoryBrowser {
     public func search(_ term: String)
     /// Appends the next page after the last record; does nothing when `hasMore` is false.
     public func loadMore()
-    /// Reloads from the top as many records as are loaded (at least one page),
-    /// for the term in force: a new record appears first and loaded pages stay loaded.
+    /// Reloads from the top one more record than are loaded (at least one page),
+    /// for the term in force: a new record appears first and every loaded one stays.
     public func refresh()
 }
 
@@ -159,10 +161,10 @@ public struct HistoryRow: Equatable {
 
 ### 4.2 `HistoryWindowController`
 
-- Owned by `AppDelegate`, created on first use. `show()` builds a `HistoryBrowser` from the recorder's store and problem if the window is not already visible, puts the window on screen, and calls `NSApp.activate()`. When the window is already open, `show()` only brings it forward.
-- `HistoryWindow: NSWindow`: titled, closable, resizable, miniaturizable; 820 x 520, minimum 600 x 360; centred the first time; `isReleasedWhenClosed = false`; frame autosaved as `HistoryWindow`. `performKeyEquivalent` handles Command-W (close), Command-F (focus search), and Command-C/V/X/A/Z/Shift-Z, sending `copy:`, `paste:`, `cut:`, `selectAll:`, `undo:` and `redo:` to the first responder.
+- Owned by `AppDelegate`, created on first use; the window and its hosting controller are made once. The controller is the window's delegate and tracks open from `show()` to `windowWillClose`, so a minimized window counts as open. `show()` on a closed window gives the hosting controller a fresh `HistoryBrowser` and model; on an open one it only deminiaturizes and brings it forward. Either way it calls `NSApp.activate()`.
+- `HistoryWindow: NSWindow`: titled, closable, resizable, miniaturizable; 820 x 520, minimum 600 x 360; centred the first time; `isReleasedWhenClosed = false`; frame autosaved as `HistoryWindow`. `performKeyEquivalent` handles exactly Command-W (close), Command-F (focus search), and Command-C/V/X/A/Z and Command-Shift-Z, sending `copy:`, `paste:`, `cut:`, `selectAll:`, `undo:` and `redo:` to the first responder; any other combination, and a key nobody takes, goes to `super`.
 - `HistoryWindowModel: ObservableObject` wraps the browser and publishes `records`, `hasMore`, `problem` and `selection: Int64?` after each call. It debounces search by 150 ms, cancelling a pending search when typing resumes. It keeps the selection by id across `refresh()` and `loadMore()`, and clears it when a search removes that record.
-- `onRecord` calls `refresh()` when the window is visible.
+- `onRecord` calls `refresh()` while the window is open, minimized included.
 
 ### 4.3 `HistoryView` (SwiftUI)
 
@@ -190,7 +192,7 @@ public struct HistoryRow: Equatable {
 - **`HistorySearchTests`**: case and diacritics are ignored (`uber` / `Über`, `ÉCOLE` / `école`); `strasse` matches `Straße` and the other way round; the result alone matches; the term is not matched against audience, app or model; `normalized` trims and gives nil for empty or white space; a Turkish dotless i behaves the same in any locale (`locale: nil`).
 - **`HistoryStoreContractTests`** (both stores): `page` is newest first; `before` excludes the cursor's record and everything newer, including another record with the same date and a higher id; `matching` finds by source and by result, ignoring case and accents; `matching` and `before` combine; a limit below 1 gives none; `recent` equals `page(nil, nil, limit)`.
 - **`SQLiteHistoryStoreTests`**: search with `%`, `_`, `'` and `\` in the term matches them literally; a NUL in the text is searched; an unknown-action row is left out and does not shorten a page.
-- **`HistoryBrowserTests`** (`InMemoryHistoryStore`, page size 3): the first page loads in `init`; `hasMore` is true with 4 records and false with 3; `loadMore` appends without duplicates and stops; `search` replaces the list and resets paging; the same term twice reads once (a counting store); `refresh` after `add` puts the new record first and keeps the loaded count; a store that throws sets `.reading` and keeps the records, and the next good read clears it; a nil store gives `.unavailable` and every method is inert.
+- **`HistoryBrowserTests`** (`InMemoryHistoryStore`, page size 3): the first page loads in `init`; `hasMore` is true with 4 records and false with 3; `loadMore` appends without duplicates and stops; `search` replaces the list and resets paging; the same term twice reads once (a counting store); `refresh` after `add` puts the new record first and keeps every loaded record; a failed search leaves the old term in force; a last record without an id loads nothing more; a store that throws sets `.reading` and keeps the records, and the next good read clears it; a nil store gives `.unavailable` and every method is inert.
 - **`HistoryRowTests`**: the languages line for each action; deleted audience and language fall back to their ids; Explain has no audience; the excerpt skips leading blank lines and cuts at 80 characters.
 
 ### 6.2 Manual (in HANDOFF)
@@ -208,5 +210,6 @@ sqlite3 ~/Library/Application\ Support/ch.lingoswen/history.sqlite "with recursi
 | W3 | Type `uber` in the search field | Only records containing "Uber" or "Über" are listed; clearing the field lists everything again |
 | W4 | Select a record; press Copy under Result; paste in TextEdit | The detail shows source, result, audience, app, model and date; the result is pasted |
 | W5 | Leave the window open, translate something and press Escape | The new record appears at the top; the selected record stays selected |
-| W6 | Command-F, type, Command-A, Command-C, Command-V; then Command-W | Each works in the search field; Command-W closes the window; History... opens it again |
+| W6 | Command-F, type, Command-A, Command-C, Command-V; select words in the Result text, Command-C, paste in TextEdit; then Command-W | Each works in the search field; the selected words are pasted; Command-W closes the window; History... opens it again at the same size |
+| W8 | Search something, minimize the window; translate something and press Escape; choose History... | The window comes back with the search and selection kept, and the new record listed if it matches |
 | W7 | Quit; in `~/Library/Application Support/ch.lingoswen/`, `mv history.sqlite history.sqlite.keep && echo junk > history.sqlite`; start lingoSwen, choose History...; quit; `mv history.sqlite.keep history.sqlite` | The window shows "History is not saved - could not open the database (file is not a database)" |

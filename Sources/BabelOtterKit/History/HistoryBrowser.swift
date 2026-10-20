@@ -51,16 +51,18 @@ public final class HistoryBrowser {
     public func loadMore() {
         guard hasMore else { return }
         guard let last = records.last else { return }
-        guard let page = read(term: term, before: HistoryCursor(last), count: pageSize) else { return }
+        // A nil cursor would read the first page again.
+        guard let cursor = HistoryCursor(last) else { return }
+        guard let page = read(term: term, before: cursor, count: pageSize) else { return }
         records += page.prefix(pageSize)
         hasMore = page.count > pageSize
     }
 
-    /// Reloads from the top as many records as are loaded, at least a page:
-    /// a new record comes first and the list keeps its length, so the
-    /// oldest loaded one moves to the next page.
+    /// Reloads from the top one more record than are loaded, at least a
+    /// page: called once per saved record, so the new one comes first and
+    /// every loaded record stays -- a selection on the oldest included.
     public func refresh() {
-        _ = reload(term: term, count: max(records.count, pageSize))
+        _ = reload(term: term, count: max(records.count + 1, pageSize))
     }
 
     /// True when the read succeeded and the list now holds it.

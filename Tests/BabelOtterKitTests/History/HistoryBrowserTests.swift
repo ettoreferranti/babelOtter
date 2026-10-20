@@ -18,6 +18,16 @@ final class ScriptedHistoryStore: HistoryStore {
     }
 }
 
+/// Gives back records no store has kept: no ids.
+final class IdlessHistoryStore: HistoryStore {
+    var reads = 0
+    func add(_ record: HistoryRecord) throws -> Int64 { 0 }
+    func page(matching term: String?, before: HistoryCursor?, limit: Int) throws -> [HistoryRecord] {
+        reads += 1
+        return Array(repeating: .sample(), count: limit)
+    }
+}
+
 @Suite("The History window's list pages, searches and reloads")
 struct HistoryBrowserTests {
 
@@ -96,14 +106,14 @@ struct HistoryBrowserTests {
         #expect(backing.reads == reads + 1)
     }
 
-    @Test("a refresh puts a new record first and keeps as many loaded")
+    @Test("a refresh puts a new record first and keeps every loaded one")
     func refresh() throws {
         let backing = try store(8)
         let browser = HistoryBrowser(store: backing, unavailable: nil, pageSize: 3)
         browser.loadMore()
         _ = try backing.add(.sample(date: Date(timeIntervalSince1970: 5_000), source: "new"))
         browser.refresh()
-        #expect(sources(browser) == ["new", "r7", "r6", "r5", "r4", "r3"])
+        #expect(sources(browser) == ["new", "r7", "r6", "r5", "r4", "r3", "r2"])
         #expect(browser.hasMore)
     }
 
@@ -148,6 +158,29 @@ struct HistoryBrowserTests {
         browser.loadMore()
         #expect(browser.problem == nil)
         #expect(sources(browser) == ["r4", "r3", "r2", "r1", "r0"])
+    }
+
+    @Test("after a failed search, the term in force is still the old one")
+    func failedSearchKeepsTerm() throws {
+        let backing = try store(5)
+        let browser = HistoryBrowser(store: backing, unavailable: nil, pageSize: 3)
+        browser.search("odd")
+        backing.failing = true
+        browser.search("even")
+        backing.failing = false
+        browser.refresh()
+        #expect(browser.term == "odd")
+        #expect(sources(browser) == ["r3", "r1"])
+    }
+
+    @Test("a record without an id loads nothing more")
+    func idlessLast() throws {
+        let backing = IdlessHistoryStore()
+        let browser = HistoryBrowser(store: backing, unavailable: nil, pageSize: 1)
+        #expect(browser.hasMore)
+        browser.loadMore()
+        #expect(browser.records.count == 1)
+        #expect(backing.reads == 1)
     }
 
     @Test("a failed first read leaves an empty list with the reason")

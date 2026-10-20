@@ -133,6 +133,7 @@ public final class SQLiteHistoryStore: HistoryStore {
         if limit < 1 { return [] }
         let statement = try prepare(Self.selectPage)
         defer { sqlite3_finalize(statement) }
+        // An unbound parameter is NULL: no cursor leaves ?2 and ?3 unbound.
         try bind(term, 1, statement)
         if let before {
             try bind(before.date.timeIntervalSince1970, 2, statement)
@@ -254,7 +255,6 @@ public final class SQLiteHistoryStore: HistoryStore {
         if status != SQLITE_OK { throw failure() }
     }
 
-    /// Unbound parameters are NULL, so binding nothing is binding NULL.
     private func bind(_ value: Double, _ index: Int32, _ statement: OpaquePointer) throws {
         if sqlite3_bind_double(statement, index, value) != SQLITE_OK { throw failure() }
     }

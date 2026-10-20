@@ -26,7 +26,7 @@ leaving your machine.
 > detected direction. The menu bar icon shows readiness (Accessibility, Ollama,
 > models, hotkeys), each problem with the command that fixes it. Hotkeys are set
 > in `config.json`, follow the current keyboard layout, and every save applies
-> without a restart. `swift test` runs 853 tests in 81 suites, all green. Every
+> without a restart. `swift test` runs 857 tests in 82 suites, all green. Every
 > finished result is kept in a private local history (#67), which History... in
 > the menu lists, searches and copies from (#68); retention and Clear All, a
 > settings window and onboarding are not built yet — see
