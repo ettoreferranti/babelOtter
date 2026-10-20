@@ -121,12 +121,16 @@ struct SQLiteHistoryStoreTests {
         var reader: OpaquePointer?
         sqlite3_open(url.path(percentEncoded: false), &reader)
         sqlite3_exec(reader, "BEGIN; SELECT count(*) FROM records;", nil, nil, nil)
-        // ...and lets go a moment later.
+        // ...and lets go a moment later -- on a thread of its own: the
+        // shared queue can be busy with the tests running in parallel, and
+        // a release later than the 500 ms busy timeout failed CI (PR #107).
         let held = UncheckedReader(reader)
-        DispatchQueue.global().asyncAfter(deadline: .now() + .milliseconds(100)) {
+        let release = Thread {
+            Thread.sleep(forTimeInterval: 0.1)
             sqlite3_exec(held.pointer, "COMMIT", nil, nil, nil)
             sqlite3_close(held.pointer)
         }
+        release.start()
         _ = try store.add(.sample(source: "second"))
         #expect(try store.recent(limit: 5).count == 2)
     }
