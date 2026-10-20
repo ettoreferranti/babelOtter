@@ -169,6 +169,41 @@ struct SQLiteHistoryStoreTests {
         #expect(try store.recent(limit: 2).map(\.source.value) == ["newer", "older"])
     }
 
+    @Test("after Clear All, the file holds none of the text and is back to its fresh size")
+    func clearLeavesNoRemnant() throws {
+        let folder = try folder()
+        let fresh = folder.appending(path: "fresh.sqlite")
+        _ = try SQLiteHistoryStore.open(at: fresh)
+        let url = folder.appending(path: "history.sqlite")
+        let store = try SQLiteHistoryStore.open(at: url)
+        let marker = "Geheimnis-\u{00DC}bersetzung-7f3a"
+        for index in 0..<300 {
+            _ = try store.add(.sample(
+                source: "\(marker) \(index) " + String(repeating: "Text ", count: 200),
+                result: "\(marker) result \(index)"))
+        }
+        try store.deleteAll()
+        let bytes = try Data(contentsOf: url)
+        #expect(bytes.range(of: Data(marker.utf8)) == nil)
+        #expect(bytes.range(of: Data("Text Text".utf8)) == nil)
+        let freshSize = try Data(contentsOf: fresh).count
+        #expect(bytes.count <= freshSize + 4_096)
+        #expect(!FileManager.default.fileExists(atPath: url.path(percentEncoded: false) + "-journal"))
+    }
+
+    @Test("records deleted for being old leave none of their text in the file")
+    func pruneLeavesNoRemnant() throws {
+        let url = try folder().appending(path: "history.sqlite")
+        let store = try SQLiteHistoryStore.open(at: url)
+        let marker = "Abgelaufen-\u{00E9}t\u{00E9}-91c2"
+        _ = try store.add(.sample(date: Date(timeIntervalSince1970: 1), source: marker, result: marker))
+        _ = try store.add(.sample(date: Date(timeIntervalSince1970: 9), source: "kept", result: "kept"))
+        #expect(try store.deleteOlder(than: Date(timeIntervalSince1970: 5)) == 1)
+        let bytes = try Data(contentsOf: url)
+        #expect(bytes.range(of: Data(marker.utf8)) == nil)
+        #expect(bytes.range(of: Data("kept".utf8)) != nil)
+    }
+
     @Test("search characters SQL treats specially are matched literally")
     func literalTerm() throws {
         let store = try SQLiteHistoryStore.open(at: try folder().appending(path: "history.sqlite"))

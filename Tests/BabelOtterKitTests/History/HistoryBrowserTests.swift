@@ -16,6 +16,21 @@ final class ScriptedHistoryStore: HistoryStore {
         if failing { throw HistoryStoreError.statementFailed("disk I/O error") }
         return try inner.page(matching: term, before: before, limit: limit)
     }
+
+    func deleteOlder(than date: Date) throws -> Int {
+        if failing { throw HistoryStoreError.statementFailed("disk I/O error") }
+        return try inner.deleteOlder(than: date)
+    }
+
+    func deleteAll() throws {
+        if failing { throw HistoryStoreError.statementFailed("database is locked") }
+        try inner.deleteAll()
+    }
+
+    func count() throws -> Int {
+        if failing { throw HistoryStoreError.statementFailed("disk I/O error") }
+        return try inner.count()
+    }
 }
 
 /// Gives back records no store has kept: no ids.
@@ -26,6 +41,9 @@ final class IdlessHistoryStore: HistoryStore {
         reads += 1
         return Array(repeating: .sample(), count: limit)
     }
+    func deleteOlder(than date: Date) throws -> Int { 0 }
+    func deleteAll() throws {}
+    func count() throws -> Int { 0 }
 }
 
 @Suite("The History window's list pages, searches and reloads")

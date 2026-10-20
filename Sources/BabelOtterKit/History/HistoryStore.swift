@@ -1,6 +1,7 @@
 import Foundation
 
-/// Where history is kept (#67), paged and searched (#68). #69 adds deletion.
+/// Where history is kept (#67), paged and searched (#68), pruned and
+/// cleared (#69).
 ///
 /// Not `Sendable`, and no store takes a lock: history is written on the main
 /// actor when a popup closes. A lock would also hang mutation testing --
@@ -15,6 +16,12 @@ public protocol HistoryStore: AnyObject {
     /// those `HistorySearch.matches` when `term` is given. `term` is used as
     /// given: callers pass `HistorySearch.normalized`.
     func page(matching term: String?, before: HistoryCursor?, limit: Int) throws -> [HistoryRecord]
+    /// Deletes every record dated before `date`; returns how many.
+    func deleteOlder(than date: Date) throws -> Int
+    /// Deletes every record and leaves no trace of them in storage.
+    func deleteAll() throws
+    /// How many records there are.
+    func count() throws -> Int
 }
 
 extension HistoryStore {
@@ -56,6 +63,20 @@ public final class InMemoryHistoryStore: HistoryStore {
         if let before { found = found.filter { before.precedes($0) } }
         if let term { found = found.filter { HistorySearch.matches($0, term) } }
         return Array(found.prefix(limit))
+    }
+
+    public func deleteOlder(than date: Date) throws -> Int {
+        let before = records.count
+        records.removeAll { $0.date < date }
+        return before - records.count
+    }
+
+    public func deleteAll() throws {
+        records.removeAll()
+    }
+
+    public func count() throws -> Int {
+        records.count
     }
 
     /// Later date first; for the same date, the higher id.

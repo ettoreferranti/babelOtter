@@ -167,4 +167,35 @@ struct HistoryStoreContractTests {
         #expect(try store.recent(limit: 3) == store.page(matching: nil, before: nil, limit: 3))
         #expect(try store.page(matching: "r", before: nil, limit: 0).isEmpty)
     }
+
+    // MARK: - Retention and Clear All (#69)
+
+    @Test("deleting older records keeps one dated exactly at the cutoff", arguments: StoreKind.allCases)
+    func deleteOlder(kind: StoreKind) throws {
+        let store = try kind.make()
+        let cutoff = Date(timeIntervalSince1970: 2_000.5)
+        _ = try store.add(.sample(date: Date(timeIntervalSince1970: 1_000), source: "old"))
+        _ = try store.add(.sample(date: Date(timeIntervalSince1970: 2_000.25), source: "older"))
+        _ = try store.add(.sample(date: cutoff, source: "edge"))
+        _ = try store.add(.sample(date: Date(timeIntervalSince1970: 3_000), source: "new"))
+        #expect(try store.deleteOlder(than: cutoff) == 2)
+        #expect(try store.recent(limit: 9).map(\.source.value) == ["new", "edge"])
+        #expect(try store.count() == 2)
+        #expect(try store.deleteOlder(than: cutoff) == 0)
+    }
+
+    @Test("Clear All leaves nothing, and the store keeps working", arguments: StoreKind.allCases)
+    func deleteAll(kind: StoreKind) throws {
+        let store = try kind.make()
+        for index in 0..<3 { _ = try store.add(.sample(source: "r\(index)")) }
+        #expect(try store.count() == 3)
+        try store.deleteAll()
+        #expect(try store.count() == 0)
+        #expect(try store.recent(limit: 9).isEmpty)
+        _ = try store.add(.sample(source: "after"))
+        #expect(try store.recent(limit: 9).map(\.source.value) == ["after"])
+        try store.deleteAll()
+        try store.deleteAll()
+        #expect(try store.count() == 0)
+    }
 }
