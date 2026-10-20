@@ -21,6 +21,14 @@ public enum HistoryProblem {
         return "could not save (\(error.localizedDescription))"
     }
 
+    /// Worded to follow "Could not read the history - " in the window (#68).
+    public static func reading(_ error: any Error) -> String {
+        if case .statementFailed(let message)? = error as? HistoryStoreError {
+            return "could not read (\(message))"
+        }
+        return "could not read (\(error.localizedDescription))"
+    }
+
     private static func opening(_ failure: HistoryStoreError) -> String {
         switch failure {
         case .cannotOpen(let message), .statementFailed(let message):

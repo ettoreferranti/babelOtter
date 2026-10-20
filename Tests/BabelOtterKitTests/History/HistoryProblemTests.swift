@@ -35,6 +35,14 @@ struct HistoryProblemTests {
             == "could not save (database is locked)")
     }
 
+    @Test("a failed read names SQLite's reason, or the error's description")
+    func reading() {
+        #expect(HistoryProblem.reading(HistoryStoreError.statementFailed("disk I/O error"))
+            == "could not read (disk I/O error)")
+        let error = CocoaError(.fileReadNoPermission)
+        #expect(HistoryProblem.reading(error) == "could not read (\(error.localizedDescription))")
+    }
+
     @Test("any other error falls back to its description")
     func other() {
         let error = CocoaError(.fileWriteNoPermission)

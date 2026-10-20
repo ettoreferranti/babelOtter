@@ -97,4 +97,74 @@ struct HistoryStoreContractTests {
     func empty(kind: StoreKind) throws {
         #expect(try kind.make().recent(limit: 10).isEmpty)
     }
+
+    // MARK: - Paging and search (#68)
+
+    @Test("a page starts strictly after its cursor, same-date records by id", arguments: StoreKind.allCases)
+    func cursor(kind: StoreKind) throws {
+        let store = try kind.make()
+        // Fractional dates, as Date() gives, so equality is tested in earnest.
+        let early = Date(timeIntervalSince1970: 1_790_000_000.123_456)
+        let late = Date(timeIntervalSince1970: 1_790_000_100.654_321)
+        _ = try store.add(.sample(date: early, source: "a"))
+        let b = try store.add(.sample(date: late, source: "b"))
+        _ = try store.add(.sample(date: late, source: "c"))
+        let newest = try store.page(matching: nil, before: nil, limit: 1)
+        #expect(newest.map(\.source.value) == ["c"])
+        let cursor = try #require(newest.first.flatMap { HistoryCursor($0) })
+        let next = try store.page(matching: nil, before: cursor, limit: 10)
+        #expect(next.map(\.source.value) == ["b", "a"])
+        let afterB = try store.page(
+            matching: nil, before: HistoryCursor(date: late, id: b), limit: 10)
+        #expect(afterB.map(\.source.value) == ["a"])
+    }
+
+    @Test("pages read one after another cover every record once", arguments: StoreKind.allCases)
+    func pagesCoverAll(kind: StoreKind) throws {
+        let store = try kind.make()
+        for index in 0..<7 {
+            _ = try store.add(.sample(
+                date: Date(timeIntervalSince1970: Double(1_000 + index / 2)), source: "r\(index)"))
+        }
+        var seen: [String] = []
+        var cursor: HistoryCursor?
+        for _ in 0..<5 {
+            let page = try store.page(matching: nil, before: cursor, limit: 3)
+            seen += page.map(\.source.value)
+            guard let last = page.last else { break }
+            cursor = HistoryCursor(last)
+        }
+        #expect(seen == ["r6", "r5", "r4", "r3", "r2", "r1", "r0"])
+    }
+
+    @Test("a term finds the source or the result, ignoring case and accents", arguments: StoreKind.allCases)
+    func search(kind: StoreKind) throws {
+        let store = try kind.make()
+        _ = try store.add(.sample(source: "Die \u{00DC}ber-Sitzung", result: "The meeting"))
+        _ = try store.add(.sample(source: "Hallo", result: "Hello UBER fans"))
+        _ = try store.add(.sample(source: "Hallo", result: "Hello"))
+        let found = try store.page(matching: "uber", before: nil, limit: 10)
+        #expect(found.map(\.result.value) == ["Hello UBER fans", "The meeting"])
+        #expect(try store.page(matching: "nothing", before: nil, limit: 10).isEmpty)
+    }
+
+    @Test("a term and a cursor combine, and the limit counts matches", arguments: StoreKind.allCases)
+    func searchPaged(kind: StoreKind) throws {
+        let store = try kind.make()
+        for index in 0..<5 {
+            _ = try store.add(.sample(source: index % 2 == 0 ? "match \(index)" : "other \(index)"))
+        }
+        let first = try store.page(matching: "match", before: nil, limit: 2)
+        #expect(first.map(\.source.value) == ["match 4", "match 2"])
+        let rest = try store.page(matching: "match", before: first.last.flatMap { HistoryCursor($0) }, limit: 2)
+        #expect(rest.map(\.source.value) == ["match 0"])
+    }
+
+    @Test("recent is the first page of everything", arguments: StoreKind.allCases)
+    func recentIsFirstPage(kind: StoreKind) throws {
+        let store = try kind.make()
+        for index in 0..<4 { _ = try store.add(.sample(source: "r\(index)")) }
+        #expect(try store.recent(limit: 3) == store.page(matching: nil, before: nil, limit: 3))
+        #expect(try store.page(matching: "r", before: nil, limit: 0).isEmpty)
+    }
 }

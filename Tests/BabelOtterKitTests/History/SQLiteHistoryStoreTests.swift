@@ -156,6 +156,38 @@ struct SQLiteHistoryStoreTests {
         #expect(try store.recent(limit: 5).map(\.source.value) == ["known"])
     }
 
+    @Test("a row with an unknown action does not shorten a page")
+    func unknownActionKeepsPageFull() throws {
+        let url = try folder().appending(path: "history.sqlite")
+        let store = try SQLiteHistoryStore.open(at: url)
+        _ = try store.add(.sample(date: Date(timeIntervalSince1970: 1), source: "older"))
+        raw(url, """
+            INSERT INTO records (created_at, action, source_language, model, source_text, result_text)
+            VALUES (2, 'summarize', 'en', 'm', 's', 'r')
+            """)
+        _ = try store.add(.sample(date: Date(timeIntervalSince1970: 3), source: "newer"))
+        #expect(try store.recent(limit: 2).map(\.source.value) == ["newer", "older"])
+    }
+
+    @Test("search characters SQL treats specially are matched literally")
+    func literalTerm() throws {
+        let store = try SQLiteHistoryStore.open(at: try folder().appending(path: "history.sqlite"))
+        for text in ["100%", "a_b", "it's", "back\\slash", "plain"] {
+            _ = try store.add(.sample(source: text))
+        }
+        #expect(try store.page(matching: "%", before: nil, limit: 9).map(\.source.value) == ["100%"])
+        #expect(try store.page(matching: "_", before: nil, limit: 9).map(\.source.value) == ["a_b"])
+        #expect(try store.page(matching: "'", before: nil, limit: 9).map(\.source.value) == ["it's"])
+        #expect(try store.page(matching: "\\", before: nil, limit: 9).map(\.source.value) == ["back\\slash"])
+    }
+
+    @Test("search reads past an embedded NUL")
+    func searchAfterNul() throws {
+        let store = try SQLiteHistoryStore.open(at: try folder().appending(path: "history.sqlite"))
+        _ = try store.add(.sample(source: "a\u{0000}needle"))
+        #expect(try store.page(matching: "needle", before: nil, limit: 9).count == 1)
+    }
+
     @Test("the application support folder is refused when it syncs to iCloud")
     func refusesICloud() throws {
         let home = try folder()

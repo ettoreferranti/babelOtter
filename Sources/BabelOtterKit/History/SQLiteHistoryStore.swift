@@ -1,8 +1,8 @@
 import Foundation
 import SQLite3
 
-/// `HistoryStore` over the system SQLite library (#67, `FR-HIS-01`,
-/// `FR-HIS-04`, `NFR-P7`).
+/// `HistoryStore` over the system SQLite library (#67, #68, `FR-HIS-01`,
+/// `FR-HIS-02`, `FR-HIS-04`, `NFR-P7`).
 ///
 /// The file is created `0600` before SQLite touches it and excluded from
 /// backup. `secure_delete` overwrites deleted text and the rollback journal
@@ -40,10 +40,25 @@ public final class SQLiteHistoryStore: HistoryStore {
         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
         """
 
-    private static let selectRecent = """
+    /// Search calls `HistorySearch.contains` from inside SQLite, so `WHERE`
+    /// and `LIMIT` both stay in the query (#68).
+    static let containsFunction = "lingoswen_contains"
+
+    /// The actions this build knows -- constants, not user data. A row with
+    /// any other action is left out here, so it never shortens a page.
+    private static let knownActions = Action.allCases
+        .map { "'" + $0.rawValue + "'" }
+        .joined(separator: ", ")
+
+    private static let selectPage = """
         SELECT id, created_at, action, source_language, target_language, profile_id,
             model, source_bundle_id, source_app_name, source_text, result_text
-        FROM records ORDER BY created_at DESC, id DESC LIMIT ?1
+        FROM records
+        WHERE action IN (\(knownActions))
+            AND (?1 IS NULL OR \(containsFunction)(source_text, ?1)
+                OR \(containsFunction)(result_text, ?1))
+            AND (?2 IS NULL OR created_at < ?2 OR (created_at = ?2 AND id < ?3))
+        ORDER BY created_at DESC, id DESC LIMIT ?4
         """
 
     /// Opened `FULLMUTEX`, so SQLite serialises the connection itself; the
@@ -91,6 +106,7 @@ public final class SQLiteHistoryStore: HistoryStore {
         } catch HistoryStoreError.statementFailed(let message) {
             throw HistoryStoreError.cannotOpen(message)
         }
+        try store.registerSearch()
         try excludeFromBackup(url)
         return store
     }
@@ -114,12 +130,20 @@ public final class SQLiteHistoryStore: HistoryStore {
         return sqlite3_last_insert_rowid(connection)
     }
 
-    public func recent(limit: Int) throws -> [HistoryRecord] {
+    public func page(matching term: String?, before: HistoryCursor?, limit: Int) throws -> [HistoryRecord] {
         // SQLite reads a negative LIMIT as "no limit".
         if limit < 1 { return [] }
-        let statement = try prepare(Self.selectRecent)
+        let statement = try prepare(Self.selectPage)
         defer { sqlite3_finalize(statement) }
-        if sqlite3_bind_int64(statement, 1, Int64(limit)) != SQLITE_OK { throw failure() }
+        // An unbound parameter is NULL: no cursor leaves ?2 and ?3 unbound.
+        try bind(term, 1, statement)
+        if let before {
+            if sqlite3_bind_double(statement, 2, before.date.timeIntervalSince1970) != SQLITE_OK {
+                throw failure()
+            }
+            if sqlite3_bind_int64(statement, 3, before.id) != SQLITE_OK { throw failure() }
+        }
+        if sqlite3_bind_int64(statement, 4, Int64(limit)) != SQLITE_OK { throw failure() }
         var records: [HistoryRecord] = []
         // Bounded by `limit` rather than "while there are rows": SQLite
         // restarts a finished statement on the next step, so a loop on the
@@ -182,6 +206,17 @@ public final class SQLiteHistoryStore: HistoryStore {
         try execute("PRAGMA secure_delete = ON")
         try execute("PRAGMA journal_mode = DELETE")
         if version == 0 { try execute(Self.createSchema) }
+    }
+
+    /// Registers `lingoswen_contains(text, term)`: 1 when `HistorySearch`
+    /// finds the term in the text, 0 otherwise or for a NULL.
+    private func registerSearch() throws {
+        let status = sqlite3_create_function_v2(
+            connection, Self.containsFunction, 2, SQLITE_UTF8 | SQLITE_DETERMINISTIC,
+            nil, searchFunction, nil, nil, nil)
+        if status != SQLITE_OK {
+            throw HistoryStoreError.cannotOpen(String(cString: sqlite3_errmsg(connection)))
+        }
     }
 
     // MARK: - Statements
@@ -251,4 +286,26 @@ public final class SQLiteHistoryStore: HistoryStore {
         let count = Int(sqlite3_column_bytes(statement, column))
         return String(decoding: UnsafeBufferPointer(start: bytes, count: count), as: UTF8.self)
     }
+}
+
+/// `lingoswen_contains`, as SQLite calls it: a C function, so it captures
+/// nothing and reads its two arguments by byte count.
+private func searchFunction(
+    _ context: OpaquePointer?, _ count: Int32, _ arguments: UnsafeMutablePointer<OpaquePointer?>?
+) {
+    var found: Int32 = 0
+    if let arguments {
+        if let text = searchArgument(arguments[0]) {
+            if let term = searchArgument(arguments[1]) {
+                if HistorySearch.contains(text, term) { found = 1 }
+            }
+        }
+    }
+    sqlite3_result_int(context, found)
+}
+
+private func searchArgument(_ value: OpaquePointer?) -> String? {
+    guard let bytes = sqlite3_value_text(value) else { return nil }
+    let count = Int(sqlite3_value_bytes(value))
+    return String(decoding: UnsafeBufferPointer(start: bytes, count: count), as: UTF8.self)
 }

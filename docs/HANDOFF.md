@@ -1,6 +1,27 @@
-# Handoff — state as of 2026-10-19
+# Handoff — state as of 2026-10-20
 
 Read this first if you are picking babelOtter up in a new session.
+
+## Update 2026-10-20: history can be browsed and searched (#68)
+
+**History…** in the menu (above Check Again) opens a normal window: a search field and the records newest first on the left (action, languages, time, the source's first line), the selected record on the right (source and result, each with Copy, then audience, app, model and date). The list loads 200 at a time as you scroll. Search covers source and result, ignoring case and accents ("uber" finds "Über", "strasse" finds "Straße"), 150 ms after typing stops. A record saved while the window is open appears at the top. If the database could not be opened, the window says "History is not saved - <reason>". Command-W, -F, -C, -V, -X, -A and -Z are handled by the window itself, as lingoSwen has no main menu. Kit: `HistorySearch` (one matching rule; SQLite calls it as the registered function `lingoswen_contains`), `HistoryCursor` and `HistoryStore.page(matching:before:limit:)`, `HistoryBrowser` (paging, search, refresh), `HistoryRow` (labels). App: `Sources/BabelOtterApp/History/`. `.gitignore` now names back in any `History/` folder under `Sources` or `Tests`. Spec: `docs/superpowers/specs/2026-10-20-history-window-design.md`. Next: #69, retention, Clear All and "off" (criterion added 2026-10-20); note `Configuration.retentionDays` (default 90) exists but nothing reads it yet.
+
+**Manual check (yours).** Rebuild first (`Tools/make-app.sh --run`). For W2, seed 5,000 made-up records with lingoSwen quit; delete them afterwards with `sqlite3 ~/Library/Application\ Support/ch.lingoswen/history.sqlite "delete from records where model = 'seed'"`:
+
+```sh
+sqlite3 ~/Library/Application\ Support/ch.lingoswen/history.sqlite "with recursive n(i) as (select 1 union all select i + 1 from n where i < 5000) insert into records (created_at, action, source_language, target_language, profile_id, model, source_text, result_text) select strftime('%s','now') - i * 600, 'translate', 'en', 'de-CH', 'colleagues', 'seed', 'Seed record ' || i || ' about the Uber meeting', 'Testeintrag ' || i || ' zur Über-Sitzung' from n;"
+```
+
+| # | Do | Expect |
+|---|---|---|
+| W1 | Open the menu, choose History… | The window comes to the front, newest record first, each row with action, languages, time and first line |
+| W2 | Scroll to the bottom repeatedly | More rows load each time; scrolling stays smooth; seed record 5000 is reached |
+| W3 | Type `uber` in the search field | Only records containing "Uber" or "Über" are listed; clearing the field lists everything again |
+| W4 | Select a record; press Copy under Result; paste in TextEdit | The detail shows source, result, audience, app, model and date; the result is pasted |
+| W5 | Leave the window open, translate something and press Escape | The new record appears at the top; the selected record stays selected |
+| W6 | Command-F, type, Command-A, Command-C, Command-V; select words in the Result text, Command-C, paste in TextEdit; then Command-W | Each works in the search field; the selected words are pasted; Command-W closes the window; History… opens it again at the same size |
+| W7 | Quit; in `~/Library/Application Support/ch.lingoswen/`, `mv history.sqlite history.sqlite.keep && echo junk > history.sqlite`; start lingoSwen, choose History…; quit; `mv history.sqlite.keep history.sqlite` | The window shows "History is not saved - could not open the database (file is not a database)" |
+| W8 | Search something, minimize the window; translate something and press Escape; choose History… | The window comes back with the search and selection kept, and the new record listed if it matches |
 
 ## Update 2026-10-19: history is recorded (#67)
 
