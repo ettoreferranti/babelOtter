@@ -94,10 +94,9 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
     }
 }
 
-/// A plain window that handles the keys a main menu would: lingoSwen has
-/// none, so without this Command-W, Command-C and the rest do nothing.
+/// The History window: Command-F focuses the search field.
 @MainActor
-final class HistoryWindow: NSWindow {
+final class HistoryWindow: AppWindow {
 
     weak var model: HistoryWindowModel?
 
@@ -115,38 +114,8 @@ final class HistoryWindow: NSWindow {
         setFrameAutosaveName("HistoryWindow")
     }
 
-    /// Only Command, or Command-Shift for redo: Command-Option-W and the
-    /// like pass on. A key nothing here handles goes to `super`.
-    override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        if handle(event) { return true }
-        return super.performKeyEquivalent(with: event)
-    }
-
-    private func handle(_ event: NSEvent) -> Bool {
-        let flags = event.modifierFlags.intersection([.command, .shift, .option, .control])
-        let key = event.charactersIgnoringModifiers?.lowercased()
-        if flags == [.command, .shift] {
-            if key == "z" { return perform(Selector(("redo:"))) }
-            return false
-        }
-        guard flags == .command else { return false }
-        switch key {
-        case "w":
-            performClose(nil)
-            return true
-        case "f":
-            model?.focusSearch()
-            return true
-        case "c": return perform(#selector(NSText.copy(_:)))
-        case "v": return perform(#selector(NSText.paste(_:)))
-        case "x": return perform(#selector(NSText.cut(_:)))
-        case "a": return perform(#selector(NSResponder.selectAll(_:)))
-        case "z": return perform(Selector(("undo:")))
-        default: return false
-        }
-    }
-
-    private func perform(_ action: Selector) -> Bool {
-        NSApp.sendAction(action, to: nil, from: self)
+    override func find() -> Bool {
+        model?.focusSearch()
+        return true
     }
 }
