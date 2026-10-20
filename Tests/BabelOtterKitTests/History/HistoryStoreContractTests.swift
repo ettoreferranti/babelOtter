@@ -6,6 +6,7 @@ import Testing
 /// Every store, the same promises.
 enum StoreKind: String, CaseIterable, CustomTestStringConvertible {
     case memory
+    case sqlite
 
     var testDescription: String { rawValue }
 
@@ -13,6 +14,11 @@ enum StoreKind: String, CaseIterable, CustomTestStringConvertible {
         switch self {
         case .memory:
             return InMemoryHistoryStore()
+        case .sqlite:
+            let folder = URL(fileURLWithPath: NSTemporaryDirectory())
+                .appending(path: "babelotter-history-tests-\(UUID().uuidString)")
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            return try SQLiteHistoryStore.open(at: folder.appending(path: "history.sqlite"))
         }
     }
 }

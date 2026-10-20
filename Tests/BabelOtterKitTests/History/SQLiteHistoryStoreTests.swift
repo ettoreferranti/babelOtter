@@ -1,0 +1,144 @@
+import Foundation
+import SQLite3
+import Testing
+
+@testable import BabelOtterKit
+
+@Suite("History is kept in a private SQLite file")
+struct SQLiteHistoryStoreTests {
+
+    private func folder() throws -> URL {
+        let url = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appending(path: "babelotter-history-tests-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
+    }
+
+    private func permissions(_ url: URL) throws -> Int {
+        let attributes = try FileManager.default.attributesOfItem(
+            atPath: url.path(percentEncoded: false))
+        return (attributes[.posixPermissions] as? NSNumber)?.intValue ?? -1
+    }
+
+    /// Runs SQL on the file directly, as another program would.
+    private func raw(_ url: URL, _ sql: String) {
+        var handle: OpaquePointer?
+        sqlite3_open(url.path(percentEncoded: false), &handle)
+        sqlite3_exec(handle, sql, nil, nil, nil)
+        sqlite3_close(handle)
+    }
+
+    private func expectCannotOpen(_ url: URL) {
+        do {
+            _ = try SQLiteHistoryStore.open(at: url)
+            Issue.record("opened a file that is not a history database")
+        } catch let error as HistoryStoreError {
+            guard case .cannotOpen = error else {
+                Issue.record("expected cannotOpen, got \(error)")
+                return
+            }
+        } catch {
+            Issue.record("unexpected \(error)")
+        }
+    }
+
+    @Test("a new file is readable by its owner only")
+    func newFileMode() throws {
+        let url = try folder().appending(path: "history.sqlite")
+        _ = try SQLiteHistoryStore.open(at: url)
+        #expect(try permissions(url) == 0o600)
+    }
+
+    @Test("an existing file readable by others is locked down on open")
+    func existingFileMode() throws {
+        let url = try folder().appending(path: "history.sqlite")
+        FileManager.default.createFile(
+            atPath: url.path(percentEncoded: false), contents: nil,
+            attributes: [.posixPermissions: 0o644])
+        _ = try SQLiteHistoryStore.open(at: url)
+        #expect(try permissions(url) == 0o600)
+    }
+
+    @Test("the file is excluded from backup")
+    func excludedFromBackup() throws {
+        let url = try folder().appending(path: "history.sqlite")
+        _ = try SQLiteHistoryStore.open(at: url)
+        let fresh = URL(filePath: url.path(percentEncoded: false))
+        let values = try fresh.resourceValues(forKeys: [.isExcludedFromBackupKey])
+        #expect(values.isExcludedFromBackup == true)
+    }
+
+    @Test("deleted text is overwritten and no write-ahead log is kept")
+    func pragmas() throws {
+        let store = try SQLiteHistoryStore.open(at: try folder().appending(path: "history.sqlite"))
+        #expect(try store.pragmaValue("secure_delete") == "1")
+        #expect(try store.pragmaValue("journal_mode") == "delete")
+        #expect(try store.pragmaValue("user_version") == "1")
+    }
+
+    @Test("records survive closing and reopening")
+    func reopen() throws {
+        let url = try folder().appending(path: "history.sqlite")
+        do {
+            let store = try SQLiteHistoryStore.open(at: url)
+            _ = try store.add(.sample(source: "kept"))
+        }
+        let again = try SQLiteHistoryStore.open(at: url)
+        #expect(try again.recent(limit: 5).map(\.source.value) == ["kept"])
+        #expect(try again.pragmaValue("user_version") == "1")
+    }
+
+    @Test("a file from a newer version is refused, not altered")
+    func newerSchema() throws {
+        let url = try folder().appending(path: "history.sqlite")
+        do { _ = try SQLiteHistoryStore.open(at: url) }
+        raw(url, "PRAGMA user_version = 2")
+        #expect(throws: HistoryStoreError.newerSchema(2)) {
+            _ = try SQLiteHistoryStore.open(at: url)
+        }
+    }
+
+    @Test("a file that is not a database cannot be opened")
+    func notADatabase() throws {
+        let url = try folder().appending(path: "history.sqlite")
+        let bytes = Data(String(repeating: "not a database ", count: 200).utf8)
+        FileManager.default.createFile(atPath: url.path(percentEncoded: false), contents: bytes)
+        expectCannotOpen(url)
+    }
+
+    @Test("a missing folder cannot be opened")
+    func missingFolder() throws {
+        expectCannotOpen(try folder().appending(path: "absent/history.sqlite"))
+    }
+
+    @Test("a row with an action this build does not know is skipped")
+    func unknownAction() throws {
+        let url = try folder().appending(path: "history.sqlite")
+        let store = try SQLiteHistoryStore.open(at: url)
+        _ = try store.add(.sample(source: "known"))
+        raw(url, """
+            INSERT INTO records (created_at, action, source_language, model, source_text, result_text)
+            VALUES (1, 'summarize', 'en', 'm', 's', 'r')
+            """)
+        #expect(try store.recent(limit: 5).map(\.source.value) == ["known"])
+    }
+
+    @Test("the application support folder is refused when it syncs to iCloud")
+    func refusesICloud() throws {
+        let home = try folder()
+        let locator = StorageLocator(
+            home: home, iCloudRoots: [home.appending(path: "Library")])
+        #expect(throws: StorageLocationError.self) {
+            _ = try SQLiteHistoryStore.inApplicationSupport(locator: locator)
+        }
+    }
+
+    @Test("the application support folder holds history.sqlite")
+    func inApplicationSupport() throws {
+        let home = try folder()
+        let locator = StorageLocator(home: home, iCloudRoots: [])
+        _ = try SQLiteHistoryStore.inApplicationSupport(locator: locator)
+        let file = locator.applicationSupportDirectory().appending(path: SQLiteHistoryStore.fileName)
+        #expect(FileManager.default.fileExists(atPath: file.path(percentEncoded: false)))
+    }
+}
