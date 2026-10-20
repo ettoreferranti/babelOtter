@@ -49,6 +49,13 @@ final class PopupModel {
     private let explainer: Explainer
     private let close: @MainActor () -> Void
     private let reopen: @MainActor (PopupModel) -> Void
+    /// Writes a record to history; the app's `HistoryRecorder` (#67).
+    private let record: @MainActor (HistoryRecord) -> Void
+    /// The last result that finished in this popup. A new run does not clear
+    /// it, so closing during a Regenerate still keeps the earlier result.
+    private var pendingRecord: HistoryRecord?
+    /// Set once the pending record is written, so no way out writes twice.
+    private var recorded = false
     private(set) var snapshot: SelectionSnapshot?
     private var consumer: Task<Void, Never>?
     private var watchdog: Task<Void, Never>?
@@ -72,6 +79,7 @@ final class PopupModel {
 
     init(
         action: Action, application: SourceApplication?, environment: AppEnvironment,
+        record: @escaping @MainActor (HistoryRecord) -> Void,
         close: @escaping @MainActor () -> Void,
         reopen: @escaping @MainActor (PopupModel) -> Void
     ) {
@@ -82,6 +90,7 @@ final class PopupModel {
         self.explainer = Explainer(configuration: environment.configuration, chat: environment.client)
         self.close = close
         self.reopen = reopen
+        self.record = record
         let memory = UserDefaultsAudienceMemory(prefix: action == .repitch ? "repitch." : "")
         self.audience = AudienceSession(
             profiles: environment.configuration.profiles, action: action,
@@ -327,11 +336,32 @@ final class PopupModel {
     private func settle(_ custody: Custody) {
         isReplacing = false
         message = custody.message
-        guard custody.keepsPopupOpen else { return }
+        guard custody.keepsPopupOpen else {
+            recordHistory()
+            return
+        }
         reopen(self)
     }
 
+    /// Writes the pending record, once, on every way out: Dismiss/Escape,
+    /// Copy after its pause, a Replace that lets the popup go, a new hotkey,
+    /// and quitting. Nothing finished, nothing written.
+    func recordHistory() {
+        guard !recorded else { return }
+        guard let pendingRecord else { return }
+        recorded = true
+        self.pendingRecord = nil
+        record(pendingRecord)
+    }
+
+    /// Keeps a finished result for history, with what the snapshot knows.
+    private func keep(_ make: (UserText, SourceApplication) -> HistoryRecord) {
+        guard let snapshot else { return }
+        pendingRecord = make(snapshot.text, snapshot.application)
+    }
+
     func dismiss() {
+        recordHistory()
         isDismissed = true
         stop()
         close()
@@ -466,6 +496,12 @@ final class PopupModel {
             text = result.text.value
             warnings = result.warnings
             phase = .finished
+            let model = configuration.model(for: action)
+            if action == .repitch {
+                keep { HistoryRecord(repitch: result, source: $0, model: model, application: $1, date: Date()) }
+            } else {
+                keep { HistoryRecord(translation: result, source: $0, model: model, application: $1, date: Date()) }
+            }
         }
     }
 
@@ -531,6 +567,13 @@ final class PopupModel {
             text = result.copyText
             warnings = result.warnings
             phase = .finished
+            let model = configuration.model(for: action)
+            let language = configuration.germanLanguage.code
+            keep {
+                HistoryRecord(
+                    explanation: result, source: $0, language: language, model: model,
+                    application: $1, date: Date())
+            }
         }
     }
 
@@ -571,6 +614,14 @@ final class PopupModel {
             text = result.corrected.value
             warnings = result.warnings
             phase = .finished
+            let model = configuration.model(for: action)
+            let language = configuration.germanLanguage.code
+            let profileID = audience.audience.id
+            keep { _, application in
+                HistoryRecord(
+                    correction: result, language: language, profileID: profileID,
+                    model: model, application: application, date: Date())
+            }
         }
     }
 

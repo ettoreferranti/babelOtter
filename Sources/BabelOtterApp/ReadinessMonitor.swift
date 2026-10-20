@@ -17,6 +17,8 @@ final class ReadinessMonitor {
     var hotKeys: [HotKeyFact] = []
     /// Set by `AppDelegate` at launch and on every reload.
     var configurationProblems: [String] = []
+    /// Set by `AppDelegate` whenever history starts or stops saving (#67).
+    var historyProblem: String?
     var onChange: (@MainActor (ReadinessReport) -> Void)?
 
     private let client: OllamaClient
@@ -79,7 +81,7 @@ final class ReadinessMonitor {
         let facts = ReadinessFacts(
             accessibilityGranted: granted, probe: probe, models: models,
             hotKeys: hotKeys, systemShortcuts: Self.systemShortcuts(),
-            configurationProblems: configurationProblems)
+            configurationProblems: configurationProblems, historyProblem: historyProblem)
         let report = ReadinessPolicy().report(for: facts)
         self.report = report
         inFlight = nil

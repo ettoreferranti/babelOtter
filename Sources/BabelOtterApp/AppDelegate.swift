@@ -13,6 +13,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// every report, in place, so an open menu updates too.
     private var statusLines: [NSMenuItem] = []
     private let source = ConfigurationSource()
+    /// Opened once; survives configuration reloads (#67).
+    private let history = HistoryRecorder()
     private(set) lazy var environment = AppEnvironment(configuration: source.configuration)
     private lazy var monitor = ReadinessMonitor(configuration: source.configuration)
     private lazy var watcher: ConfigurationWatcher? = makeWatcher()
@@ -48,10 +50,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         layoutReader.onChange = { [weak self] in self?.layoutChanged() }
         layoutReader.start()
         pushConfigurationProblems()
+        history.onChange = { [weak self] in self?.pushHistoryProblem() }
+        pushHistoryProblem()
         promptForAccessibilityIfNeeded()
         monitor.onChange = { [weak self] report in self?.render(report) }
         render(nil)
         monitor.start()
+    }
+
+    /// A popup still open when the app quits keeps its result (#67).
+    func applicationWillTerminate(_ notification: Notification) {
+        currentModel?.recordHistory()
     }
 
     /// Registration stays non-exclusive; a failure reaches the menu as a
@@ -160,6 +169,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             problems.append(issue.description)
         }
         monitor.configurationProblems = problems
+    }
+
+    private func pushHistoryProblem() {
+        monitor.historyProblem = history.problem
+        monitor.refresh()
     }
 
     private func buildMenu() {
@@ -376,6 +390,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             action: action,
             application: source,
             environment: environment,
+            record: { [weak self] record in self?.history.record(record) },
             close: { [weak self] in self?.panel.dismiss() },
             reopen: { [weak self] model in
                 guard let self else { return }
@@ -412,6 +427,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             action: action,
             application: nil,
             environment: environment,
+            record: { [weak self] record in self?.history.record(record) },
             close: { [weak self] in self?.panel.dismiss() },
             reopen: { [weak self] model in
                 guard let self else { return }
