@@ -18,12 +18,7 @@ final class ConfigurationSource {
     let store: ConfigurationStore?
 
     init() {
-        let home = FileManager.default.homeDirectoryForCurrentUser
-        // NFR-P7: the directories iCloud Drive can sync on this machine.
-        let locator = StorageLocator(
-            home: home,
-            iCloudRoots: ["Library/Mobile Documents", "Documents", "Desktop"]
-                .map { home.appending(path: $0) })
+        let locator = AppStorage.locator()
         do {
             let store = try ConfigurationStore.inApplicationSupport(locator: locator)
             let loaded = store.load()

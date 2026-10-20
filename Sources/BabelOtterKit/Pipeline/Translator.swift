@@ -255,7 +255,7 @@ public struct Translator: Sendable {
             styleNote: styleNote,
             glossary: glossary(for: action, direction),
             terms: configuration.doNotTranslate,
-            model: configuration.models[action] ?? Configuration.defaultModel,
+            model: configuration.model(for: action),
             processor: PostProcessor(target: target))
         emit(.started(direction))
         if case .fixed = audience { settle(nil, nil, context, emit) }

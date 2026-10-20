@@ -1,6 +1,22 @@
-# Handoff — state as of 2026-10-15
+# Handoff — state as of 2026-10-19
 
 Read this first if you are picking babelOtter up in a new session.
+
+## Update 2026-10-19: history is recorded (#67)
+
+Each popup's last finished result is written to `~/Library/Application Support/ch.lingoswen/history.sqlite` when the popup closes: source, result, action, languages, audience, model, time and source app. Regenerate replaces the pending record rather than adding one; a popup closed before anything finished records nothing. The file is `0600`, excluded from backup, `secure_delete` on, rollback journal (no `-wal`). If the database cannot be opened or a write fails, the menu shows "History: not saved - <reason>" and everything else works. Kit: `BabelOtterKit/History/` (`HistoryRecord`, `HistoryStore`, `SQLiteHistoryStore` on the system `libsqlite3`, `HistoryProblem`); app: `HistoryRecorder`, `PopupModel.recordHistory()`. There is no window yet (#68), no retention or Clear All (#69). Spec: `docs/superpowers/specs/2026-10-19-history-record-design.md`.
+
+To look: `sqlite3 ~/Library/Application\ Support/ch.lingoswen/history.sqlite 'select id, action, source_language, target_language, profile_id, model, source_app_name, substr(result_text,1,40) from records order by id desc limit 5'`
+
+**Manual check (yours):**
+
+| # | Do | Expect |
+|---|---|---|
+| H1 | Translate a text, press Regenerate, wait for it, press Escape | Exactly one new row, holding the second result |
+| H2 | Press Escape while the first run is still streaming; then try Translate on a French text (refused) | No new row either time |
+| H3 | Replace a translation; Copy one; Explain one and close it; then make Replace fail (quit the source app first) and Dismiss; then leave a finished popup open and quit from the menu | One new row each time, five in all |
+| H4 | `ls -l ~/Library/Application\ Support/ch.lingoswen/` | `history.sqlite` is `-rw-------`; there is no `history.sqlite-wal` |
+| H5 | Quit; in `~/Library/Application Support/ch.lingoswen/`, `mv history.sqlite history.sqlite.keep && echo junk > history.sqlite`; start the app, open the menu, translate something; quit; `mv history.sqlite.keep history.sqlite` | The menu shows "History: not saved - could not open the database (file is not a database)"; Translate still works; after moving the file back, history is as before |
 
 ## Update 2026-10-16: Re-pitch is built (#66); all four actions exist
 

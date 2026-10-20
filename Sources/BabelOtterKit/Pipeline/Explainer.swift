@@ -94,9 +94,9 @@ public struct Explainer: Sendable {
         try gate(text)
         let english = language(Self.english, or: .english)
         let context = Context(
-            german: language(Self.german, or: .swissGerman), english: english,
+            german: configuration.germanLanguage, english: english,
             styleNote: styleNote,
-            model: configuration.models[.explain] ?? Configuration.defaultModel,
+            model: configuration.model(for: .explain),
             masked: TokenProtector.mask(text.value, terms: configuration.doNotTranslate),
             processor: PostProcessor(target: english))
         emit(.started)

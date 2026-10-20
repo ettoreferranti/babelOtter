@@ -45,6 +45,10 @@ Icon?
 *.db-wal
 *.db-shm
 history/
+# The code that writes history is not history (#67); macOS matches the rule
+# above case-insensitively, so these two folders are named back in.
+!Sources/BabelOtterKit/History/
+!Tests/BabelOtterKitTests/History/
 glossary.local.*
 config.local.*
 profiles.local.*

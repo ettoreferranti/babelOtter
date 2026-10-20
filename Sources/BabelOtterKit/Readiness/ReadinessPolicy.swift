@@ -77,11 +77,15 @@ public struct ReadinessFacts: Sendable, Equatable {
     public let systemShortcuts: [SystemShortcut]
     /// What is wrong with config.json, each worded to follow "config.json: ".
     public let configurationProblems: [String]
+    /// Why history is not saved, worded to follow "History: not saved - ";
+    /// nil when it is (#67).
+    public let historyProblem: String?
 
     public init(
         accessibilityGranted: Bool, probe: DaemonProbe, models: [Action: String],
         hotKeys: [HotKeyFact], systemShortcuts: [SystemShortcut],
-        configurationProblems: [String] = []
+        configurationProblems: [String] = [],
+        historyProblem: String? = nil
     ) {
         self.accessibilityGranted = accessibilityGranted
         self.probe = probe
@@ -89,6 +93,7 @@ public struct ReadinessFacts: Sendable, Equatable {
         self.hotKeys = hotKeys
         self.systemShortcuts = systemShortcuts
         self.configurationProblems = configurationProblems
+        self.historyProblem = historyProblem
     }
 }
 
@@ -96,6 +101,7 @@ public struct ReadinessFacts: Sendable, Equatable {
 public enum ReadinessCause: Sendable, Equatable {
     case accessibilityMissing
     case configurationProblem(String)
+    case historyProblem(String)
     case ollamaUnreachable(detail: String)
     case modelMissing(action: Action, model: String)
     case hotKeyNotRegistered(action: Action, combination: String)
@@ -107,8 +113,8 @@ public enum ReadinessCause: Sendable, Equatable {
         switch self {
         case .accessibilityMissing:
             return .blocked
-        case .configurationProblem, .ollamaUnreachable, .modelMissing, .hotKeyNotRegistered,
-            .hotKeyClashesWithSystem:
+        case .configurationProblem, .historyProblem, .ollamaUnreachable, .modelMissing,
+            .hotKeyNotRegistered, .hotKeyClashesWithSystem:
             return .degraded
         }
     }
@@ -119,6 +125,8 @@ public enum ReadinessCause: Sendable, Equatable {
             return "Accessibility is not granted, so lingoSwen can't read your selection."
         case .configurationProblem(let text):
             return "config.json: \(text)"
+        case .historyProblem(let text):
+            return "History: not saved - \(text)"
         case .ollamaUnreachable(let detail):
             // No period of ours: the daemon's text may already end in one.
             return "Ollama is not reachable: \(detail)"
@@ -145,6 +153,8 @@ extension ReadinessCause {
             return "Accessibility isn't granted"
         case .configurationProblem(let text):
             return "config.json: \(text)"
+        case .historyProblem(let text):
+            return "History: not saved - \(text)"
         case .ollamaUnreachable:
             return "Ollama isn't running"
         case .modelMissing(let action, let model):
@@ -165,6 +175,8 @@ extension ReadinessCause {
             return .openAccessibilitySettings
         case .configurationProblem:
             return .showConfiguration
+        case .historyProblem:
+            return nil
         case .ollamaUnreachable:
             return .startOllama
         case .modelMissing(_, let model):
@@ -228,7 +240,7 @@ public struct ReadinessPolicy: Sendable {
 
     public init() {}
 
-    /// Order: Accessibility, configuration problems, then the daemon, then
+    /// Order: Accessibility, configuration problems, history, then the daemon, then
     /// each action's model, then each action's hotkey. The only blocked
     /// cause comes first.
     public func report(for facts: ReadinessFacts) -> ReadinessReport {
@@ -238,6 +250,9 @@ public struct ReadinessPolicy: Sendable {
         }
         for problem in facts.configurationProblems {
             causes += [.configurationProblem(problem)]
+        }
+        if let problem = facts.historyProblem {
+            causes += [.historyProblem(problem)]
         }
         causes += daemonCauses(facts)
         for action in Action.allCases {
