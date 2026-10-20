@@ -57,7 +57,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         client: { [unowned self] in self.environment.client },
         suspendHotKeys: { [unowned self] in self.suspendHotKeys() },
         resumeHotKeys: { [unowned self] in self.resumeHotKeys() },
-        modelsChanged: { [unowned self] in self.monitor.refresh() })
+        modelsChanged: { [unowned self] in self.monitor.refresh() },
+        reloadConfiguration: { [unowned self] in self.configurationChanged() })
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         buildMenu()
@@ -128,6 +129,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func resumeHotKeys() {
         hotKeysSuspended = false
         updateHotKeys()
+        // A reload while suspended left the menu's hotkey lines as they were.
+        pushConfigurationProblems()
+        monitor.refresh()
     }
 
     /// An action whose keys are the same and still registered is left alone;

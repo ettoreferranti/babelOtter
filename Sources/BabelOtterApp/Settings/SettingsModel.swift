@@ -47,6 +47,10 @@ final class SettingsModel: ObservableObject {
     private let source: ConfigurationSource
     private let client: () -> OllamaClient
     private let modelsChanged: () -> Void
+    /// Re-reads config.json into the app, as the watcher would.
+    private let reloadConfiguration: () -> Void
+    /// Only the latest list of installed models is shown.
+    private var modelsGeneration = 0
     let layout: () -> KeyLayout
     let suspendHotKeys: () -> Void
     let resumeHotKeys: () -> Void
@@ -54,8 +58,10 @@ final class SettingsModel: ObservableObject {
     init(
         source: ConfigurationSource, layout: @escaping () -> KeyLayout,
         client: @escaping () -> OllamaClient, suspendHotKeys: @escaping () -> Void,
-        resumeHotKeys: @escaping () -> Void, modelsChanged: @escaping () -> Void
+        resumeHotKeys: @escaping () -> Void, modelsChanged: @escaping () -> Void,
+        reloadConfiguration: @escaping () -> Void
     ) {
+        self.reloadConfiguration = reloadConfiguration
         self.source = source
         self.layout = layout
         self.client = client
@@ -80,6 +86,16 @@ final class SettingsModel: ObservableObject {
     func edit(_ field: SettingsField, _ change: (inout SettingsEditor) throws -> Void) {
         guard !isReadOnly else { return }
         guard let store = source.store else { return }
+        // The file first: a hand edit saved in the last moment, before the
+        // watcher has settled (or with no watcher at all), must not be
+        // overwritten by what the window last saw -- least of all one that
+        // is half-way and broken.
+        let current = store.load()
+        if !current.fileFound || !current.problems.isEmpty || current.configuration != source.configuration {
+            reloadConfiguration()
+            refusals[field] = "config.json changed on disk - the window now shows it. Try again."
+            return
+        }
         var next = editor
         do {
             try change(&next)
@@ -117,16 +133,28 @@ final class SettingsModel: ObservableObject {
     // MARK: - Models
 
     func loadModels() {
+        modelsGeneration += 1
+        let generation = modelsGeneration
         installed = .loading
         let client = client()
         Task {
+            let result: InstalledModels
             do {
-                let names = try await client.installedModels().map(\.name)
-                installed = .loaded(names)
+                result = .loaded(try await client.installedModels().map(\.name))
             } catch {
-                installed = .unavailable(error.localizedDescription)
+                result = .unavailable(error.localizedDescription)
             }
+            if generation == modelsGeneration { installed = result }
         }
+    }
+
+    /// The window is shown again: fresh models, and a finished download's
+    /// note gone.
+    func windowShown() {
+        if let download {
+            if !download.running { self.download = nil }
+        }
+        loadModels()
     }
 
     func choice(for action: Action) -> ModelChoice? {
@@ -143,11 +171,16 @@ final class SettingsModel: ObservableObject {
         let stream = client().pull(model: model)
         Task {
             do {
+                var finished = false
                 for try await progress in stream {
                     download?.status = progress.status
                     download?.fraction = Self.fraction(progress)
+                    finished = progress.isComplete
                 }
                 download?.running = false
+                // Ollama reports a failure as a line the stream skips; only
+                // its "success" line means the model is there.
+                if !finished { download?.failure = "Ollama stopped before the download finished." }
             } catch {
                 download?.running = false
                 download?.failure = error.localizedDescription

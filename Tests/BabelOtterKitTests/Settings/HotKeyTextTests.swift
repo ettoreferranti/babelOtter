@@ -52,6 +52,23 @@ struct HotKeyTextTests {
             == "option+\u{00DC}")
     }
 
+    @Test("an eszett is written as itself and reads back to its key")
+    func eszett() throws {
+        let layout = KeyLayout(characters: [0x1B: "\u{00DF}", 0x00: "a"])
+        let text = try #require(HotKeyText.text(keyCode: 0x1B, modifiers: HotKeySpec.command, layout: layout))
+        #expect(text == "command+\u{00DF}")
+        let combination = try layout.resolve(HotKeySpec.parse(text).get()).get()
+        #expect(combination.keyCode == 0x1B)
+    }
+
+    @Test("a key that would read back as another key gives none")
+    func readsBackAsAnother() {
+        // Keypad 1 types "1" too, but "1" resolves to the top-row key.
+        let keypad = KeyLayout(characters: [0x12: "1", 0x53: "1"])
+        #expect(HotKeyText.text(keyCode: 0x53, modifiers: HotKeySpec.command, layout: keypad) == nil)
+        #expect(HotKeyText.text(keyCode: 0x12, modifiers: HotKeySpec.command, layout: keypad) == "command+1")
+    }
+
     @Test("a key with no name and no character, or one the syntax cannot hold, gives none")
     func unnamed() {
         let odd = KeyLayout(characters: [0x18: "+", 0x2A: " ", 0x2B: "ab"])
@@ -124,6 +141,16 @@ struct SettingsHotKeyTests {
         expectRefusal(.hotKey(.sharedWith(.explain))) {
             try fromDefaults.setHotKey(.text("control+option+E"), for: .correct, layout: layout)
         }
+        #expect(fromDefaults.configuration == defaults)
+        // Restoring a default another action now holds is refused too.
+        var taken = SettingsEditor(configuration: .default)
+        try? taken.setHotKey(.off, for: .explain, layout: layout)
+        try? taken.setHotKey(.text("control+option+E"), for: .translate, layout: layout)
+        let before = taken.configuration
+        expectRefusal(.hotKey(.sharedWith(.translate))) {
+            try taken.setHotKey(.useDefault, for: .explain, layout: layout)
+        }
+        #expect(taken.configuration == before)
         #expect(editor.configuration == .default)
     }
 

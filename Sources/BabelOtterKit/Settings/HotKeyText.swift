@@ -6,8 +6,9 @@ public enum HotKeyText {
 
     /// "control+option+T" -- macOS's modifier order, then the key: a named
     /// key by its name, else what the layout types, a letter in capitals.
-    /// Nil when the key has neither, or types something the file's syntax
-    /// cannot hold (a space, "+").
+    /// Nil when the key has neither, types something the file's syntax
+    /// cannot hold (a space, "+"), or would read back as another key: a
+    /// keypad digit, or the second of two keys typing the same character.
     public static func text(keyCode: UInt32, modifiers: UInt32, layout: KeyLayout) -> String? {
         guard let key = keyName(keyCode, layout) else { return nil }
         var parts: [String] = []
@@ -41,6 +42,18 @@ public enum HotKeyText {
         if typed.count != 1 { return nil }
         if typed == "+" { return nil }
         if typed.allSatisfy(\.isWhitespace) { return nil }
-        return typed.uppercased()
+        let back = layout.resolve(HotKeySpec(modifiers: 0, key: .character(typed.lowercased())))
+        guard case .success(let combination) = back else { return nil }
+        if combination.keyCode != keyCode { return nil }
+        return capital(typed)
+    }
+
+    /// A letter in capitals, as people write shortcuts -- unless its capital
+    /// is more than one character ("SS" for an eszett), which the file's
+    /// syntax would read as two keys.
+    private static func capital(_ typed: String) -> String {
+        let upper = typed.uppercased()
+        if upper.count != 1 { return typed }
+        return upper
     }
 }

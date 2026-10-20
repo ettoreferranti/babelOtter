@@ -86,6 +86,9 @@ struct GeneralSettingsView: View {
     }
 
     private func commitDays() {
+        // Leaving the field because Unlimited or Off was chosen must not
+        // write the draft back over that choice.
+        guard keeping == .days else { return }
         guard let value = Int(days.trimmingCharacters(in: .whitespaces)) else {
             model.refuse(.retention, "Enter a whole number of days.")
             return
@@ -95,7 +98,8 @@ struct GeneralSettingsView: View {
     }
 
     private func commitTimeout() {
-        guard let value = Double(timeout.trimmingCharacters(in: .whitespaces)) else {
+        let typed = timeout.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ",", with: ".")
+        guard let value = Double(typed) else {
             model.refuse(.timeout, "Enter a number of seconds.")
             return
         }
@@ -103,8 +107,17 @@ struct GeneralSettingsView: View {
         model.edit(.timeout) { try $0.setTimeout(seconds: value) }
     }
 
+    /// A field being typed in keeps what is typed.
     private func resetDrafts() {
-        if case .days(let value) = model.configuration.retentionDays { days = String(value) }
-        timeout = model.configuration.timeoutSeconds.formatted(.number.grouping(.never))
+        if focused != .retention {
+            if case .days(let value) = model.configuration.retentionDays { days = String(value) }
+        }
+        if focused != .timeout { timeout = Self.seconds(model.configuration.timeoutSeconds) }
+    }
+
+    /// "60", or "7.5": written as typed back, whatever the locale.
+    private static func seconds(_ value: Double) -> String {
+        if value == value.rounded() { return String(Int(value)) }
+        return String(value)
     }
 }

@@ -13,17 +13,20 @@ final class SettingsWindowController {
     init(
         source: ConfigurationSource, layout: @escaping () -> KeyLayout,
         client: @escaping () -> OllamaClient, suspendHotKeys: @escaping () -> Void,
-        resumeHotKeys: @escaping () -> Void, modelsChanged: @escaping () -> Void
+        resumeHotKeys: @escaping () -> Void, modelsChanged: @escaping () -> Void,
+        reloadConfiguration: @escaping () -> Void
     ) {
         model = SettingsModel(
             source: source, layout: layout, client: client, suspendHotKeys: suspendHotKeys,
-            resumeHotKeys: resumeHotKeys, modelsChanged: modelsChanged)
+            resumeHotKeys: resumeHotKeys, modelsChanged: modelsChanged,
+            reloadConfiguration: reloadConfiguration)
     }
 
     func show() {
         let window = self.window ?? makeWindow()
         self.window = window
         model.configurationChanged()
+        model.windowShown()
         if window.isMiniaturized { window.deminiaturize(nil) }
         // An accessory app has to bring itself forward for a normal window.
         NSApp.activate()

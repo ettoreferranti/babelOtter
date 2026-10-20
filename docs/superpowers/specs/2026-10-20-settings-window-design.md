@@ -7,7 +7,7 @@
 ## 1. What it does
 
 - **Settings... in the menu** (above History...) opens one window with tabs in its toolbar, as macOS settings windows have: **General**, **Models**, **Hotkeys** in the first PR; **Audiences** in the second; **Glossary** in the third. Choosing it again brings the same window forward.
-- **The file stays the truth.** Every change is written to `config.json` at once, through the existing `ConfigurationStore.save`; the existing watcher then applies it to the running app exactly as a hand edit is applied (#26). There is no Save or Apply button, and no restart. A hand edit made while the window is open shows in the window.
+- **The file stays the truth.** Every change is written to `config.json` at once, through the existing `ConfigurationStore.save`; the existing watcher then applies it to the running app exactly as a hand edit is applied (#26). There is no Save or Apply button, and no restart. A hand edit made while the window is open shows in the window. Before each save the window reads the file again: if it has changed since the app last loaded it (a hand edit the watcher has not applied yet, or no watcher at all) or has a problem, the window reloads instead of saving and says "config.json changed on disk - the window now shows it. Try again." Saving rewrites the whole file, so a key `config.json` does not define (an `_comment`) is not kept.
 - **Invalid values are refused, never coerced.** A value that would not load is not written; the control shows why beneath it ("Between 5 and 600 seconds") and the file keeps its last good value.
 - **Read-only while the file is broken.** While `config.json` has a problem (it cannot be read, or a value in it is wrong), the window shows that problem at the top with Show config.json in Finder, and every control is disabled. Nothing the window writes can overwrite a file you were half-way through editing; it becomes editable again as soon as the file reads cleanly.
 
@@ -25,7 +25,7 @@
 ### 1.2 Models (first PR, #60)
 
 - One row per action: Translate, Correct, Explain, Re-pitch, each with a pop-up listing the models installed in Ollama (`OllamaClient.installedModels()`), refreshed when the tab opens. The model in use is selected.
-- A configured model that is not installed is listed too, marked "not installed", with a **Download** button. Download streams `OllamaClient.pull(model:)` and shows the status line and a progress bar (completed / total); the row becomes normal when it finishes. One download at a time; closing the window does not stop it; a failed download shows Ollama's reason.
+- A configured model that is not installed is listed too, marked "not installed", with a **Download** button. Download asks first (a model can be many gigabytes), then streams `OllamaClient.pull(model:)` and shows the status line and a progress bar (completed / total); the row becomes normal when it finishes. One download at a time; closing the window does not stop it. A download counts as finished only on Ollama's `success` line; otherwise it shows "Ollama stopped before the download finished." (the client skips Ollama's `error` lines today, so its exact reason is not shown: deferred).
 - When Ollama is not reachable, the tab says so ("Ollama isn't running - start it to choose a model") and shows each action's model as text, unchangeable.
 - An action whose model is not set in the file uses `Configuration.defaultModel` (`model(for:)`, as now). Choosing a model writes `models[action]`.
 
@@ -81,8 +81,8 @@ public enum SettingsRefusal: Error, Equatable {
 }
 ```
 
-- Each method validates before changing anything; a refusal leaves `configuration` as it was.
-- `setHotKey(.text(...))` parses with `HotKeySpec.parse`, resolves with the layout, and checks the other actions' bindings through `HotKeyPlan.make`, so the window and the file follow the same rules.
+- Each method validates before changing anything; a refusal leaves `configuration` as it was. Refusals are thrown with plain `throws` rather than typed throws, to stay clear of toolchain differences on CI's Swift 6.1.
+- `setHotKey(.text(...))` parses with `HotKeySpec.parse`, resolves with the layout, and compares the result with each other action's resolved hotkey (a default counts as its keys; an action that is off, or whose text does not resolve, holds none), so the refusal is about the row being edited. `HotKeyPlan.make` would blame the later action instead.
 - After every accepted edit, `configuration` round-trips through `JSONEncoder.configuration` and `JSONDecoder` to itself (a test, for every method), so nothing the window writes can fail to load.
 
 ### 3.2 `HotKeyText`
@@ -95,7 +95,7 @@ public enum HotKeyText {
 }
 ```
 
-The inverse of what `HotKeySpec.parse` and `KeyLayout.resolve` do, so a recorded shortcut reads back to the same combination (a test over every letter, digit and named key on a US and a Swiss German layout table).
+The inverse of what `HotKeySpec.parse` and `KeyLayout.resolve` do, so a recorded shortcut reads back to the same combination (a test over every letter, digit and named key on a US and a Swiss German layout table). A key that would read back as another one (a keypad digit, the second of two keys typing the same character) gives nil and is refused; a character whose capital is longer (the eszett) is written as typed.
 
 ### 3.3 `ModelChoice`
 

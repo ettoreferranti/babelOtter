@@ -30,7 +30,6 @@ struct ModelsSettingsView: View {
             .formStyle(.grouped)
             .disabled(model.isReadOnly)
         }
-        .onAppear { model.loadModels() }
         .alert(
             "Download \(confirming ?? "")?",
             isPresented: Binding(get: { confirming != nil }, set: { if !$0 { confirming = nil } })

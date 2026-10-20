@@ -104,13 +104,25 @@ final class HotKeyRecorderView: NSView, KeyRecording {
 
     var title = "" { didSet { refresh() } }
     /// SwiftUI's disabled state does not reach an AppKit view.
-    var isEnabled = true { didSet { refresh() } }
+    var isEnabled = true {
+        didSet {
+            if !isEnabled { cancel() }
+            refresh()
+        }
+    }
     var onStart: () -> Void = {}
     var onStop: () -> Void = {}
     var onRecord: (UInt32, UInt32) -> Void = { _, _ in }
     private(set) var isRecording = false
 
     private let label = NSTextField(labelWithString: "")
+
+    /// Clicks on the label are clicks on the recorder.
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        guard let hit = super.hitTest(point) else { return nil }
+        if hit === label { return self }
+        return hit
+    }
     private var resignObserver: (any NSObjectProtocol)?
 
     override init(frame: NSRect) {
@@ -152,6 +164,13 @@ final class HotKeyRecorderView: NSView, KeyRecording {
 
     override func keyDown(with event: NSEvent) {
         if isRecording { record(event) } else { super.keyDown(with: event) }
+    }
+
+    /// Leaving the window without losing focus first must not leave the
+    /// hotkeys suspended.
+    override func viewWillMove(toWindow newWindow: NSWindow?) {
+        if newWindow == nil { stop() }
+        super.viewWillMove(toWindow: newWindow)
     }
 
     override func viewDidMoveToWindow() {
