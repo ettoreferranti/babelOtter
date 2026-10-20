@@ -1,7 +1,6 @@
 import Foundation
 
-/// Where history is kept (#67). #68 adds search and #69 deletion when they
-/// need them.
+/// Where history is kept (#67), paged and searched (#68). #69 adds deletion.
 ///
 /// Not `Sendable`, and no store takes a lock: history is written on the main
 /// actor when a popup closes. A lock would also hang mutation testing --
@@ -12,8 +11,18 @@ public protocol HistoryStore: AnyObject {
     /// ignored.
     func add(_ record: HistoryRecord) throws -> Int64
     /// Newest first (by date, then id), at most `limit`; none for a limit
-    /// below 1.
-    func recent(limit: Int) throws -> [HistoryRecord]
+    /// below 1. Only records older than `before` when it is given, and only
+    /// those `HistorySearch.matches` when `term` is given. `term` is used as
+    /// given: callers pass `HistorySearch.normalized`.
+    func page(matching term: String?, before: HistoryCursor?, limit: Int) throws -> [HistoryRecord]
+}
+
+extension HistoryStore {
+
+    /// The newest `limit` records.
+    public func recent(limit: Int) throws -> [HistoryRecord] {
+        try page(matching: nil, before: nil, limit: limit)
+    }
 }
 
 /// Never carries record text: only SQLite's or the file system's message.
@@ -41,9 +50,12 @@ public final class InMemoryHistoryStore: HistoryStore {
         return id
     }
 
-    public func recent(limit: Int) throws -> [HistoryRecord] {
+    public func page(matching term: String?, before: HistoryCursor?, limit: Int) throws -> [HistoryRecord] {
         if limit < 1 { return [] }
-        return Array(records.sorted(by: Self.isNewer).prefix(limit))
+        var found = records.sorted(by: Self.isNewer)
+        if let before { found = found.filter { before.precedes($0) } }
+        if let term { found = found.filter { HistorySearch.matches($0, term) } }
+        return Array(found.prefix(limit))
     }
 
     /// Later date first; for the same date, the higher id.
