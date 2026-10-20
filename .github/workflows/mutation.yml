@@ -165,6 +165,7 @@ jobs:
           Sources/BabelOtterKit/Config/HotKeyBindings.swift
           Sources/BabelOtterKit/Config/LanguageConfig.swift
           Sources/BabelOtterKit/History/HistoryRecord.swift
+          Sources/BabelOtterKit/History/HistoryStore.swift
           Sources/BabelOtterKit/Hotkeys/HotKeyPlan.swift
           Sources/BabelOtterKit/Hotkeys/HotKeySpec.swift
           Sources/BabelOtterKit/Hotkeys/KeyLayout.swift
