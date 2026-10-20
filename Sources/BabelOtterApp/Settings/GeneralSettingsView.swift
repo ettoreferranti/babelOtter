@@ -3,6 +3,11 @@ import SwiftUI
 
 /// Languages, history retention, the request timeout and the clipboard
 /// switch (#61).
+/// The history pop-up's three choices. At file level, and set through a
+/// closure rather than a method reference: Swift 6.1's compiler crashed
+/// generating the reabstraction thunk for the nested enum (PR #108).
+private enum Keeping: Hashable { case days, unlimited, off }
+
 struct GeneralSettingsView: View {
 
     @ObservedObject var model: SettingsModel
@@ -11,8 +16,6 @@ struct GeneralSettingsView: View {
     @State private var days = ""
     @State private var timeout = ""
     @FocusState private var focused: SettingsField?
-
-    private enum Keeping: Hashable { case days, unlimited, off }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -27,7 +30,7 @@ struct GeneralSettingsView: View {
                     RefusalText(text: model.refusals[.languages])
                 }
                 Section("History") {
-                    Picker("Keep records", selection: Binding(get: { keeping }, set: setKeeping)) {
+                    Picker("Keep records", selection: Binding(get: { keeping }, set: { wanted in setKeeping(wanted) })) {
                         Text("For a number of days").tag(Keeping.days)
                         Text("Unlimited").tag(Keeping.unlimited)
                         Text("Off - record nothing").tag(Keeping.off)
@@ -35,14 +38,14 @@ struct GeneralSettingsView: View {
                     if keeping == .days {
                         TextField("Days", text: $days)
                             .focused($focused, equals: .retention)
-                            .onSubmit(commitDays)
+                            .onSubmit { commitDays() }
                     }
                     RefusalText(text: model.refusals[.retention])
                 }
                 Section("Requests") {
                     TextField("Timeout in seconds", text: $timeout)
                         .focused($focused, equals: .timeout)
-                        .onSubmit(commitTimeout)
+                        .onSubmit { commitTimeout() }
                     RefusalText(text: model.refusals[.timeout])
                 }
                 Section("Clipboard") {
@@ -58,7 +61,7 @@ struct GeneralSettingsView: View {
             .formStyle(.grouped)
             .disabled(model.isReadOnly)
         }
-        .onAppear(perform: resetDrafts)
+        .onAppear { resetDrafts() }
         .onChange(of: model.configuration) { resetDrafts() }
         .onChange(of: focused) { old, _ in
             if old == .retention { commitDays() }
