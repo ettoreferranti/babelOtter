@@ -62,6 +62,19 @@ public struct HotKeyBindings: Sendable, Equatable, Codable {
         }
     }
 
+    public mutating func set(_ binding: HotKeyBinding, for action: Action) {
+        switch action {
+        case .translate:
+            translate = binding
+        case .correct:
+            correct = binding
+        case .explain:
+            explain = binding
+        case .repitch:
+            repitch = binding
+        }
+    }
+
     private enum CodingKeys: String, CodingKey {
         case translate
         case correct
