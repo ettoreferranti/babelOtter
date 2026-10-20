@@ -2,7 +2,12 @@ import Foundation
 
 /// Where history is kept (#67). #68 adds search and #69 deletion when they
 /// need them.
-public protocol HistoryStore: Sendable {
+///
+/// Not `Sendable`, and no store takes a lock: history is written on the main
+/// actor when a popup closes. A lock would also hang mutation testing --
+/// muter deletes `unlock()` as a side effect, and the next call then waits
+/// forever, with no per-mutant timeout to end it (PR #105).
+public protocol HistoryStore: AnyObject {
     /// Keeps the record and returns its new id. The record's own `id` is
     /// ignored.
     func add(_ record: HistoryRecord) throws -> Int64
@@ -20,17 +25,14 @@ public enum HistoryStoreError: Error, Equatable {
 }
 
 /// A `HistoryStore` in memory, for tests.
-public final class InMemoryHistoryStore: HistoryStore, @unchecked Sendable {
+public final class InMemoryHistoryStore: HistoryStore {
 
     private var records: [HistoryRecord] = []
     private var nextID: Int64 = 1
-    private let lock = NSLock()
 
     public init() {}
 
     public func add(_ record: HistoryRecord) throws -> Int64 {
-        lock.lock()
-        defer { lock.unlock() }
         let id = nextID
         nextID += 1
         var stored = record
@@ -40,8 +42,6 @@ public final class InMemoryHistoryStore: HistoryStore, @unchecked Sendable {
     }
 
     public func recent(limit: Int) throws -> [HistoryRecord] {
-        lock.lock()
-        defer { lock.unlock() }
         if limit < 1 { return [] }
         return Array(records.sorted(by: Self.isNewer).prefix(limit))
     }

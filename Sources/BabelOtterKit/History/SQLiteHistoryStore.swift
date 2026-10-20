@@ -8,7 +8,7 @@ import SQLite3
 /// backup. `secure_delete` overwrites deleted text and the rollback journal
 /// leaves no `-wal` file holding it, so #69's Clear All needs no format
 /// change. Every value is bound, never written into SQL.
-public final class SQLiteHistoryStore: HistoryStore, @unchecked Sendable {
+public final class SQLiteHistoryStore: HistoryStore {
 
     public static let fileName = "history.sqlite"
     static let schemaVersion = 1
@@ -46,10 +46,9 @@ public final class SQLiteHistoryStore: HistoryStore, @unchecked Sendable {
         FROM records ORDER BY created_at DESC, id DESC LIMIT ?1
         """
 
-    /// The connection is a C pointer shared by every call; the lock is what
-    /// makes the class `Sendable`.
+    /// Opened `FULLMUTEX`, so SQLite serialises the connection itself; the
+    /// store is used from the main actor (see `HistoryStore`).
     private let connection: OpaquePointer
-    private let lock = NSLock()
 
     private init(connection: OpaquePointer) {
         self.connection = connection
@@ -97,8 +96,6 @@ public final class SQLiteHistoryStore: HistoryStore, @unchecked Sendable {
     }
 
     public func add(_ record: HistoryRecord) throws -> Int64 {
-        lock.lock()
-        defer { lock.unlock() }
         let statement = try prepare(Self.insert)
         defer { sqlite3_finalize(statement) }
         if sqlite3_bind_double(statement, 1, record.date.timeIntervalSince1970) != SQLITE_OK {
@@ -120,27 +117,27 @@ public final class SQLiteHistoryStore: HistoryStore, @unchecked Sendable {
     public func recent(limit: Int) throws -> [HistoryRecord] {
         // SQLite reads a negative LIMIT as "no limit".
         if limit < 1 { return [] }
-        lock.lock()
-        defer { lock.unlock() }
         let statement = try prepare(Self.selectRecent)
         defer { sqlite3_finalize(statement) }
         if sqlite3_bind_int64(statement, 1, Int64(limit)) != SQLITE_OK { throw failure() }
         var records: [HistoryRecord] = []
-        var status = sqlite3_step(statement)
-        while status == SQLITE_ROW {
+        // Bounded by `limit` rather than "while there are rows": SQLite
+        // restarts a finished statement on the next step, so a loop on the
+        // step status alone runs forever once its test is inverted -- which
+        // is exactly the mutant muter makes, and it hung CI (PR #105).
+        for _ in 0..<limit {
+            let status = sqlite3_step(statement)
+            if status == SQLITE_DONE { return records }
+            if status != SQLITE_ROW { throw failure() }
             if let record = Self.record(from: statement) {
                 records.append(record)
             }
-            status = sqlite3_step(statement)
         }
-        if status != SQLITE_DONE { throw failure() }
         return records
     }
 
     /// One `PRAGMA`'s value as text. Internal: tests read the settings here.
     func pragmaValue(_ name: String) throws -> String {
-        lock.lock()
-        defer { lock.unlock() }
         let statement = try prepare("PRAGMA " + name)
         defer { sqlite3_finalize(statement) }
         if sqlite3_step(statement) != SQLITE_ROW { throw failure() }
