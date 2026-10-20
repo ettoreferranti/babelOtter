@@ -2,6 +2,24 @@
 
 Read this first if you are picking babelOtter up in a new session.
 
+## Update 2026-10-20: the settings window, first part (#61, #60)
+
+**Settings…** in the menu (above History…) opens a window with toolbar tabs. **General:** a switch per language (at least two stay on), history (keep for N days, unlimited, off), the request timeout (5–600 s), the clipboard switch. **Models (#60):** a pop-up per action of the models Ollama has installed; a configured model that is not installed shows Download…, which asks first and then shows progress. **Hotkeys:** click a shortcut and press the new one; lingoSwen's own hotkeys are suspended while a recorder listens; Clear makes an action menu-only, Default restores it. Every change goes through `SettingsEditor` (kit) and is written to `config.json` at once; the watcher applies it like a hand edit. While `config.json` has a problem, the window shows it and is read-only. Kit: `Settings/SettingsEditor.swift`, `HotKeyText.swift`, `ModelChoice.swift`; `HotKeyBindings.set(_:for:)`. App: `Settings/`, `AppWindow` (shared key handling, now also History's base class). Spec: `docs/superpowers/specs/2026-10-20-settings-window-design.md`. **Next:** the Audiences tab, then the Glossary tab (#59), each with a short design addendum first.
+
+**Manual check (yours).** Rebuild first (`Tools/make-app.sh --run`). The window's layout has not been seen by anyone yet; S1 is the first look.
+
+| # | Do | Expect |
+|---|---|---|
+| S1 | Choose Settings… in the menu; click through the three tabs | The window comes forward; General, Models and Hotkeys each lay out without clipping |
+| S2 | General: switch off English; set Keep records "For a number of days" and type 30, Return; type 3 in the timeout, Return | English is refused ("At least two languages stay on."); `config.json` shows `"retentionDays" : 30`; 3 is refused with "Between 5 and 600 seconds" and the file keeps its value |
+| S3 | Models: choose another installed model for Explain; run Explain | `config.json` has it under `models`; Explain uses it |
+| S4 | Write a model that is not installed into `config.json` by hand (e.g. `"explain" : "qwen3:0.6b"`); open Models; Download…, confirm | It is listed as not installed; the download shows progress and the row becomes a normal choice; the menu's missing-model line goes |
+| S5 | Hotkeys: click Translate's shortcut and press Control-Option-T; then Control-Option-C; then Shift-K; then click it and press Escape | Control-Option-T records without starting Translate; Control-Option-C is refused ("Already the Correct hotkey."); Shift-K is refused ("Use Command, Control or Option with the key."); Escape cancels |
+| S6 | Hotkeys: record Control-Shift-Y for Explain; select German text in Mail and press it; then click Default | Explain runs; Default restores Control-Option-E |
+| S7 | Click a recorder, then switch to another app with Command-Tab; press Control-Option-T there | Recording stopped when the window lost focus; Translate runs |
+| S8 | Break `config.json` by hand (remove a comma); look at the window; fix it | The window shows the problem and nothing can be changed; after the fix it is editable again |
+| S9 | Quit Ollama; open Models | "Ollama isn't running"; each action's model is shown as text |
+
 ## Update 2026-10-20: retention, off and Clear All (#69); epic #12 complete
 
 `retentionDays` in `config.json` takes a number of days (default `90`), `"unlimited"` or `"off"` (words trimmed, any case); anything else is a config problem naming the three forms. With days, older records are deleted at launch, when a saved change applies, and after each saved record. `"off"` records nothing and keeps existing records; the menu shows "History: off" above History... (information, the icon is unchanged) and the window says "History is off - nothing new is saved." If `config.json` could not be read at launch, history is paused: nothing recorded or deleted, menu "History: off until config.json is fixed"; a mid-session problem keeps the previous settings and their retention. **Clear All…** in the History window asks "Delete all <n> records? This cannot be undone." and then deletes under `secure_delete` and `VACUUM`s. Kit: `Config/HistoryRetention.swift`, `History/HistoryPolicy.swift`, `HistoryStore.deleteOlder/deleteAll/count`, `HistoryBrowser.clearAll/count`. History problems are now whole menu lines (`HistoryProblem.notSaved`, `.pruning`); the readiness cause shows the line as given. App: `ConfigurationSource.isFallback`, `HistoryRecorder.apply(_:)`. The journal limit is in `PRIVACY.md`. Spec: `docs/superpowers/specs/2026-10-20-history-retention-design.md`.

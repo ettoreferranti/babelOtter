@@ -26,11 +26,13 @@ leaving your machine.
 > detected direction. The menu bar icon shows readiness (Accessibility, Ollama,
 > models, hotkeys), each problem with the command that fixes it. Hotkeys are set
 > in `config.json`, follow the current keyboard layout, and every save applies
-> without a restart. `swift test` runs 880 tests in 85 suites, all green. Every
+> without a restart. `swift test` runs 900 tests in 89 suites, all green. Every
 > finished result is kept in a private local history (#67), which History... in
 > the menu lists, searches and copies from (#68); `retentionDays` keeps 90 days
 > by default, or `"unlimited"`, or `"off"`, and the window has Clear All (#69).
-> A settings window and onboarding are not built yet — see
+> Settings… in the menu covers languages, history, timeout, clipboard, a
+> model per action and hotkeys (#61, #60); audiences, the glossary and
+> onboarding are not in it yet — see
 > [`docs/HANDOFF.md`](docs/HANDOFF.md) for exactly what is done and skipped.
 >
 > **To build and run it:**
