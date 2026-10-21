@@ -13,6 +13,8 @@ enum SettingsField: Hashable {
     /// The list's own buttons: add, delete, restore.
     case audiences
     case audience(String, AudienceField)
+    case glossary
+    case doNotTranslate
 }
 
 /// An audience's fields, for refusals under each.
