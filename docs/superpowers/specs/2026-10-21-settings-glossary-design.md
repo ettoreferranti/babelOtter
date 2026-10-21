@@ -14,7 +14,7 @@ The rest of the app's two-language assumptions (Explain, Correct, picking a sour
 ## 2. What it does
 
 - A fifth tab, **Glossary**, after Audiences, with two tables.
-- **Terms (the glossary):** one column per configured language, by display name, in configuration order; one row per concept. Cells are edited in place and written when left. **+** adds an empty row, focused on its first cell; **-** deletes the selected rows. A row is written once it has a term in it; clearing its last term deletes it. A footnote: "A row is used when translating between two languages it has terms for."
+- **Terms (the glossary):** one column per configured language, by display name, in configuration order; one row per concept. Cells are edited in place and written when left. **+** adds an empty row, focused on its first cell; **-** at the end of a row deletes it. A row is written once it has a term in it; clearing its last term deletes it. A footnote: "A row is used when translating between two languages it has terms for."
 - **Do not translate:** one term per row, edited in place; + and -. A footnote: "Matched exactly, capitals included: NORDA protects NORDA, not Norda."
 - **Refusals** (under the table): a term longer than 80 characters; a term already in another row for the same language, ignoring case ("Modul is already in another row for Swiss Standard German."); more than 200 rows; a do-not-translate term already listed (exactly), longer than 80 characters, or past 100 terms.
 - **Hidden languages kept:** a concept's term for a language that is not configured (say `fr`, written by hand) is not shown but is kept when the row is edited.
@@ -76,7 +76,7 @@ public mutating func deleteDoNotTranslate(at indexes: IndexSet) throws
 
 ## 5. The app
 
-- `GlossarySettingsView` with two SwiftUI `Table`s (macOS 14): columns built from `configuration.languages`; each cell a `TextField` with a draft, written on leaving or Return; a row being typed in is not reset by a reload.
+- `GlossarySettingsView` as a `Grid` (a header row of language names, then a `TextField` per cell and a - button per row) and a list below it. Not a `Table`: a column per language needs `TableColumnForEach`, which is macOS 14.4, and lingoSwen supports 14.0. Each cell keeps a draft, written on leaving or Return; a row being typed in is not reset by a reload. Rows are identified by position, so a field whose row changed under it while typed in (a row above was deleted) drops its draft rather than writing it into another row.
 - **+** on the terms table adds an empty row in the view only; the first term typed into it is written with `setTerm(..., inConcept: concepts.count)`, so no empty concept is ever saved.
 - Refusals per table, under it, as on the other tabs.
 

@@ -2,6 +2,21 @@
 
 Read this first if you are picking babelOtter up in a new session.
 
+## Update 2026-10-21: the Glossary tab and a concept glossary (#59, #61 third part)
+
+The glossary is now a **concept glossary**: one row per term, one term per configured language (`"glossary": {"concepts": [{"de-ch": "Modul", "en": "module"}]}`). Translating from A to B uses every row with a term in both, so adding French adds a column, not rows. The old `entries` format still loads, one concept each, and then applies in both directions; the next save writes `concepts`. A term for a language that is not configured is kept. Settings has a fifth tab, **Glossary**: a grid with a column per language and a list of do-not-translate terms below; + adds a row saved by its first term, − deletes a row. A term is unique per language ignoring case; at most 80 characters, 200 rows, 100 do-not-translate terms. Do-not-translate matching is exact, capitals included (as before). `PromptBuilder` and `Translator` are unchanged. Spec: `docs/superpowers/specs/2026-10-21-settings-glossary-design.md`. Two-language assumptions elsewhere are now criteria on #81; per-language formality is #110 (next).
+
+**Manual check (yours).** Rebuild first (`Tools/make-app.sh --run`).
+
+| # | Do | Expect |
+|---|---|---|
+| G1 | Open Settings, Glossary | A Terms grid with English and Swiss Standard German columns, your existing entry as a row; a Do not translate list with your existing term |
+| G2 | Press + under Terms; type "module" under English, Tab, "Modul" under Swiss Standard German, Return | `config.json` has `{"de-ch" : "Modul", "en" : "module"}` under `glossary.concepts` |
+| G3 | Translate "Please register for the module." into German; then translate the result back into English | The German uses "Modul"; the English uses "module" |
+| G4 | Press + again and type "modul" under Swiss Standard German | Refused: "modul is already in another row for Swiss Standard German." |
+| G5 | Add "NORDA" to Do not translate; translate "Die NORDA bietet Module an." into English | "NORDA" is unchanged in the result |
+| G6 | Clear both cells of the module row; then press − on another row | Each row disappears from the grid and from `config.json` |
+
 ## Update 2026-10-21: the Audiences tab (#61, second part)
 
 Settings has a fourth tab, **Audiences**: the list on the left, the selected audience's name, register (Sie/du), tone guidance and preferred terms (one per line) on the right, its id shown under the name. **+** asks for the name, then adds the audience (its id is made from that name); **Delete…** asks first and is disabled for the last audience; **Restore shipped audiences** adds back missing shipped ones at the end, skipping one whose name another audience now has. Text is written when the field is left (or on Return; Command-Return in the multi-line boxes). Ids are made once from the first name (`AudienceID`: "Behörden" → `behorden`, `-2` when taken) and never change. Limits: names unique ignoring case and at most 40 characters; guidance at most 2,000 characters; at most 50 terms of 80. Also fixed: a second quick edit in the window was refused as "changed on disk" while the watcher settled; the window now applies its own save at once. Spec: `docs/superpowers/specs/2026-10-21-settings-audiences-design.md`. **Next:** the Glossary tab (#59).
