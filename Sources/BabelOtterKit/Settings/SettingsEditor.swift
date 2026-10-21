@@ -10,6 +10,11 @@ public enum SettingsRefusal: Error, Sendable, Equatable {
     case outOfRange(String)
     case emptyModel
     case hotKey(HotKeyProblem)
+    case noSuchAudience(String)
+    case emptyName
+    case nameTooLong
+    case nameInUse(String)
+    case lastAudience
 
     public var message: String {
         switch self {
@@ -23,6 +28,16 @@ public enum SettingsRefusal: Error, Sendable, Equatable {
             return "Choose a model."
         case .hotKey(let problem):
             return HotKeyText.sentence(problem)
+        case .noSuchAudience(let id):
+            return "There is no audience \(id)."
+        case .emptyName:
+            return "Enter a name."
+        case .nameTooLong:
+            return "At most \(SettingsEditor.maximumNameLength) characters."
+        case .nameInUse(let name):
+            return "Another audience is called \(name)."
+        case .lastAudience:
+            return "At least one audience stays."
         }
     }
 }
@@ -36,6 +51,11 @@ public struct SettingsEditor: Sendable, Equatable {
     public static let minimumLanguages = 2
     public static let timeoutRange: ClosedRange<Double> = 5...600
     public static let retentionDaysRange: ClosedRange<Int> = 1...36_500
+    public static let maximumNameLength = 40
+    public static let maximumGuidanceLength = 2_000
+    public static let maximumTerms = 50
+    public static let maximumTermLength = 80
+    public static let newAudienceName = "New audience"
 
     public private(set) var configuration: Configuration
 
@@ -127,5 +147,115 @@ public struct SettingsEditor: Sendable, Equatable {
         let name = model.trimmingCharacters(in: .whitespacesAndNewlines)
         if name.isEmpty { throw SettingsRefusal.emptyModel }
         configuration.models[action] = name
+    }
+
+    // MARK: - Audiences
+
+    /// "New audience", or "New audience 2", ... when that is taken.
+    public func newAudienceName() -> String {
+        let base = Self.newAudienceName
+        if !nameInUse(base, except: nil) { return base }
+        for number in 2...(configuration.profiles.count + 2) {
+            let candidate = base + " " + String(number)
+            if !nameInUse(candidate, except: nil) { return candidate }
+        }
+        return base + " " + String(configuration.profiles.count + 3)
+    }
+
+    /// Sie, no guidance, no terms; returns the new id.
+    public mutating func addAudience(named name: String) throws -> String {
+        let checked = try checkedName(name, except: nil)
+        let id = AudienceID.make(from: checked, taken: Set(configuration.profiles.map(\.id)))
+        configuration.profiles.append(
+            AudienceProfile(id: id, name: checked, register: .formal, toneGuidance: ""))
+        return id
+    }
+
+    /// The id stays as it is.
+    public mutating func renameAudience(_ id: String, to name: String) throws {
+        let index = try audienceIndex(id)
+        configuration.profiles[index].name = try checkedName(name, except: id)
+    }
+
+    public mutating func setRegister(_ register: Register, forAudience id: String) throws {
+        let index = try audienceIndex(id)
+        configuration.profiles[index].register = register
+    }
+
+    /// Trimmed; at most `maximumGuidanceLength` characters.
+    public mutating func setToneGuidance(_ text: String, forAudience id: String) throws {
+        let index = try audienceIndex(id)
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.count > Self.maximumGuidanceLength {
+            throw SettingsRefusal.outOfRange("At most 2,000 characters")
+        }
+        configuration.profiles[index].toneGuidance = trimmed
+    }
+
+    /// One term per line, each trimmed; blank lines dropped.
+    public mutating func setPreferredTerms(_ lines: String, forAudience id: String) throws {
+        let index = try audienceIndex(id)
+        var terms: [String] = []
+        for line in lines.split(whereSeparator: \.isNewline) {
+            let term = line.trimmingCharacters(in: .whitespaces)
+            if term.isEmpty { continue }
+            if term.count > Self.maximumTermLength {
+                throw SettingsRefusal.outOfRange("A term has at most 80 characters")
+            }
+            terms.append(term)
+        }
+        if terms.count > Self.maximumTerms {
+            throw SettingsRefusal.outOfRange("At most 50 terms")
+        }
+        configuration.profiles[index].glossaryBias = terms
+    }
+
+    /// Never the last one.
+    public mutating func deleteAudience(_ id: String) throws {
+        let index = try audienceIndex(id)
+        if configuration.profiles.count <= 1 { throw SettingsRefusal.lastAudience }
+        configuration.profiles.remove(at: index)
+    }
+
+    /// Adds back, at the end, each shipped audience whose id is missing --
+    /// unless its name is now another audience's.
+    public mutating func restoreShippedAudiences() -> (restored: [String], skipped: [String]) {
+        var restored: [String] = []
+        var skipped: [String] = []
+        for shipped in AudienceProfile.shippedDefaults {
+            if configuration.profile(id: shipped.id) != nil { continue }
+            if nameInUse(shipped.name, except: nil) {
+                skipped.append(shipped.name)
+                continue
+            }
+            configuration.profiles.append(shipped)
+            restored.append(shipped.name)
+        }
+        return (restored, skipped)
+    }
+
+    private func audienceIndex(_ id: String) throws -> Int {
+        for (index, profile) in configuration.profiles.enumerated() {
+            if profile.id == id { return index }
+        }
+        throw SettingsRefusal.noSuchAudience(id)
+    }
+
+    private func checkedName(_ name: String, except id: String?) throws -> String {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { throw SettingsRefusal.emptyName }
+        if trimmed.count > Self.maximumNameLength { throw SettingsRefusal.nameTooLong }
+        if nameInUse(trimmed, except: id) { throw SettingsRefusal.nameInUse(trimmed) }
+        return trimmed
+    }
+
+    /// Ignoring case; `except` is the audience being renamed.
+    private func nameInUse(_ name: String, except id: String?) -> Bool {
+        let wanted = name.lowercased()
+        for profile in configuration.profiles {
+            if profile.id == id { continue }
+            if profile.name.lowercased() == wanted { return true }
+        }
+        return false
     }
 }
