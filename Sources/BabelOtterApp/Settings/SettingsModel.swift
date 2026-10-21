@@ -13,6 +13,8 @@ enum SettingsField: Hashable {
     /// The list's own buttons: add, delete, restore.
     case audiences
     case audience(String, AudienceField)
+    case glossary
+    case doNotTranslate
 }
 
 /// An audience's fields, for refusals under each.
@@ -95,9 +97,11 @@ final class SettingsModel: ObservableObject {
 
     /// Checks `change`, then writes the file. A refusal or a failed write
     /// is shown under `field`, and the file keeps its value.
-    func edit(_ field: SettingsField, _ change: (inout SettingsEditor) throws -> Void) {
-        guard !isReadOnly else { return }
-        guard let store = source.store else { return }
+    /// True when the change was written.
+    @discardableResult
+    func edit(_ field: SettingsField, _ change: (inout SettingsEditor) throws -> Void) -> Bool {
+        guard !isReadOnly else { return false }
+        guard let store = source.store else { return false }
         // The file first: a hand edit saved in the last moment, before the
         // watcher has settled (or with no watcher at all), must not be
         // overwritten by what the window last saw -- least of all one that
@@ -106,23 +110,23 @@ final class SettingsModel: ObservableObject {
         if !current.fileFound || !current.problems.isEmpty || current.configuration != source.configuration {
             reloadConfiguration()
             refusals[field] = "config.json changed on disk - the window now shows it. Try again."
-            return
+            return false
         }
         var next = editor
         do {
             try change(&next)
         } catch let refusal as SettingsRefusal {
             refusals[field] = refusal.message
-            return
+            return false
         } catch {
             refusals[field] = error.localizedDescription
-            return
+            return false
         }
         do {
             try store.save(next.configuration)
         } catch {
             refusals[field] = "Could not save config.json: \(error.localizedDescription)"
-            return
+            return false
         }
         refusals[field] = nil
         editor = next
@@ -130,6 +134,7 @@ final class SettingsModel: ObservableObject {
         // app's configuration would differ from the file, and the next edit
         // would be refused as "changed on disk".
         reloadConfiguration()
+        return true
     }
 
     /// Selects config.json, or opens its folder.

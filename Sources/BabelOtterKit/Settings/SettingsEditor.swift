@@ -15,6 +15,17 @@ public enum SettingsRefusal: Error, Sendable, Equatable {
     case nameTooLong
     case nameInUse(String)
     case lastAudience
+    case noSuchRow
+    case emptyTerm
+    case termTooLong
+    /// The term, and the language whose column already has it.
+    case termInUse(String, String)
+    case tooManyRows
+    case dntInUse(String)
+    case tooManyTerms
+    /// A do-not-translate term of one character, or one holding the
+    /// masking brackets.
+    case unusableTerm
 
     public var message: String {
         switch self {
@@ -38,6 +49,22 @@ public enum SettingsRefusal: Error, Sendable, Equatable {
             return "Another audience is called \(name)."
         case .lastAudience:
             return "At least one audience stays."
+        case .noSuchRow:
+            return "That row is no longer there."
+        case .emptyTerm:
+            return "Enter a term."
+        case .termTooLong:
+            return "At most \(SettingsEditor.maximumTermLength) characters."
+        case .termInUse(let term, let language):
+            return "\(term) is already in another row for \(language)."
+        case .tooManyRows:
+            return "At most \(SettingsEditor.maximumConcepts) rows."
+        case .dntInUse(let term):
+            return "\(term) is already in the list."
+        case .tooManyTerms:
+            return "At most \(SettingsEditor.maximumDoNotTranslate) terms."
+        case .unusableTerm:
+            return "Use at least two characters, and not \u{27E6} or \u{27E7}."
         }
     }
 }
@@ -55,6 +82,8 @@ public struct SettingsEditor: Sendable, Equatable {
     public static let maximumGuidanceLength = 2_000
     public static let maximumTerms = 50
     public static let maximumTermLength = 80
+    public static let maximumConcepts = 200
+    public static let maximumDoNotTranslate = 100
 
     public private(set) var configuration: Configuration
 
@@ -248,5 +277,96 @@ public struct SettingsEditor: Sendable, Equatable {
             if profile.id.lowercased() == wanted { return true }
         }
         return false
+    }
+
+    // MARK: - Glossary (#59)
+
+    /// Trimmed; empty removes the language from the row, and a row left
+    /// with no terms is removed. `index == concepts.count` appends a row,
+    /// so an empty row is never stored.
+    public mutating func setTerm(_ term: String, for language: LanguageCode, inConcept index: Int) throws {
+        var concepts = configuration.glossary.concepts
+        if index < 0 { throw SettingsRefusal.noSuchRow }
+        if index > concepts.count { throw SettingsRefusal.noSuchRow }
+        let trimmed = term.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.count > Self.maximumTermLength { throw SettingsRefusal.termTooLong }
+        if !trimmed.isEmpty {
+            try checkTermFree(trimmed, language, except: index)
+        }
+        if index == concepts.count {
+            if trimmed.isEmpty { return }
+            if concepts.count >= Self.maximumConcepts { throw SettingsRefusal.tooManyRows }
+            concepts.append(GlossaryConcept())
+        }
+        concepts[index].set(trimmed, for: language)
+        if concepts[index].isEmpty { concepts.remove(at: index) }
+        configuration.glossary.concepts = concepts
+    }
+
+    public mutating func deleteConcepts(at indexes: IndexSet) throws {
+        for index in indexes {
+            if index >= configuration.glossary.concepts.count { throw SettingsRefusal.noSuchRow }
+        }
+        // Highest first, so each index still means the row it named.
+        for index in indexes.reversed() { configuration.glossary.concepts.remove(at: index) }
+    }
+
+    /// Ignoring case, per language: two rows giving "Modul" for German would
+    /// make German to English ambiguous. Another language may share it.
+    private func checkTermFree(_ term: String, _ language: LanguageCode, except index: Int) throws {
+        let wanted = term.lowercased()
+        for (other, concept) in configuration.glossary.concepts.enumerated() {
+            if other == index { continue }
+            guard let existing = concept.terms[language] else { continue }
+            if existing.lowercased() == wanted {
+                let name = configuration.language(for: language)?.displayName ?? language.rawValue
+                throw SettingsRefusal.termInUse(term, name)
+            }
+        }
+    }
+
+    // MARK: - Do not translate (#59)
+
+    /// Matched exactly when masking, so only an exact duplicate is refused.
+    public mutating func addDoNotTranslate(_ term: String) throws {
+        let checked = try checkedDoNotTranslate(term, except: nil)
+        if configuration.doNotTranslate.count >= Self.maximumDoNotTranslate {
+            throw SettingsRefusal.tooManyTerms
+        }
+        configuration.doNotTranslate.append(checked)
+    }
+
+    /// Empty deletes it.
+    public mutating func setDoNotTranslate(_ term: String, at index: Int) throws {
+        if index < 0 { throw SettingsRefusal.noSuchRow }
+        if index >= configuration.doNotTranslate.count { throw SettingsRefusal.noSuchRow }
+        if term.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            configuration.doNotTranslate.remove(at: index)
+            return
+        }
+        configuration.doNotTranslate[index] = try checkedDoNotTranslate(term, except: index)
+    }
+
+    public mutating func deleteDoNotTranslate(at indexes: IndexSet) throws {
+        for index in indexes {
+            if index >= configuration.doNotTranslate.count { throw SettingsRefusal.noSuchRow }
+        }
+        for index in indexes.reversed() { configuration.doNotTranslate.remove(at: index) }
+    }
+
+    private func checkedDoNotTranslate(_ term: String, except index: Int?) throws -> String {
+        let trimmed = term.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { throw SettingsRefusal.emptyTerm }
+        if trimmed.count > Self.maximumTermLength { throw SettingsRefusal.termTooLong }
+        // One character masks every occurrence of it ("a"); the brackets
+        // are the sentinels' own (`TokenProtector`).
+        if trimmed.count < 2 { throw SettingsRefusal.unusableTerm }
+        if trimmed.contains("\u{27E6}") { throw SettingsRefusal.unusableTerm }
+        if trimmed.contains("\u{27E7}") { throw SettingsRefusal.unusableTerm }
+        for (other, existing) in configuration.doNotTranslate.enumerated() {
+            if other == index { continue }
+            if existing == trimmed { throw SettingsRefusal.dntInUse(trimmed) }
+        }
+        return trimmed
     }
 }

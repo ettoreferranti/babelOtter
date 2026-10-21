@@ -100,9 +100,8 @@ struct RepitchTests {
         let chat = ScriptedChat([reply(["Guten Tag Herr Meier"])])
         let configured = translator(chat, configure: {
             $0.models[.repitch] = "repitch-model"
-            $0.glossary.entries = [GlossaryEntry(
-                source: "degree programme", target: "Studiengang",
-                pair: LanguagePair(source: german, target: german))]
+            $0.glossary.concepts = [GlossaryConcept(
+                terms: [LanguageCode("en"): "degree programme", german: "Studiengang"])]
         })
         _ = try await collect(configured.repitch(
             draft, language: german, audience: .administration, styleNote: "shorter"))
