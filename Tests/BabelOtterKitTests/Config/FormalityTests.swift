@@ -38,6 +38,7 @@ struct RegisterTests {
         let text = String(decoding: try JSONEncoder().encode(Holder(register: .informal)), as: UTF8.self)
         #expect(text == #"{"register":"informal"}"#)
         #expect(Register.formal.word == "formal")
+        #expect(Register.informal.word == "informal")
         #expect(Register.formal.phrase == "a formal register")
         #expect(Register.informal.phrase == "an informal register")
     }
@@ -59,6 +60,16 @@ struct AddressFormsTests {
         #expect(try language(english).addressForms == nil)
     }
 
+    @Test("another German without the key takes the shipped German forms by base code")
+    func baseSubtag() throws {
+        for code in ["de", "de-DE", "de-at"] {
+            let json = #"{"code": "\#(code)", "displayName": "German", "localeRules": [], "enabled": true}"#
+            #expect(try language(json).addressForms == AddressForms(formal: "Sie", informal: "du"), "\(code)")
+        }
+        let englishVariant = #"{"code": "en-GB", "displayName": "British English", "localeRules": [], "enabled": true}"#
+        #expect(try language(englishVariant).addressForms == nil)
+    }
+
     @Test("null means none; a language not shipped has none; written forms are used")
     func explicit() throws {
         let noForms = #"{"code": "de-ch", "displayName": "D", "localeRules": [], "enabled": true, "addressForms": null}"#
@@ -69,10 +80,21 @@ struct AddressFormsTests {
         #expect(try language(withForms).addressForms == AddressForms(formal: "Lei", informal: "tu"))
     }
 
-    @Test("a blank form is a problem")
-    func blank() {
-        let blank = #"{"code": "it", "displayName": "I", "localeRules": [], "enabled": true, "addressForms": {"formal": " ", "informal": "tu"}}"#
-        #expect(throws: DecodingError.self) { _ = try language(blank) }
+    @Test("a blank form, either one, is a problem; forms are trimmed")
+    func blank() throws {
+        for forms in [#"{"formal": " ", "informal": "tu"}"#, #"{"formal": "Lei", "informal": " "}"#] {
+            let json = #"{"code": "it", "displayName": "I", "localeRules": [], "enabled": true, "addressForms": \#(forms)}"#
+            #expect(throws: DecodingError.self) { _ = try language(json) }
+        }
+        let padded = #"{"code": "it", "displayName": "I", "localeRules": [], "enabled": true, "addressForms": {"formal": "Lei", "informal": " tu "}}"#
+        #expect(try language(padded).addressForms?.informal == "tu")
+    }
+
+    @Test("a German with no forms stays without them through a round trip")
+    func noneStaysNone() throws {
+        let none = LanguageConfig(code: LanguageCode("de-ch"), displayName: "D", localeRules: [], enabled: true)
+        let data = try JSONEncoder.configuration.encode(none)
+        #expect(try JSONDecoder().decode(LanguageConfig.self, from: data).addressForms == nil)
     }
 
     @Test("the key is always written, null for none, and reads back")
@@ -84,5 +106,43 @@ struct AddressFormsTests {
         }
         #expect(AddressForms(formal: "Lei", informal: "tu").form(for: .informal) == "tu")
         #expect(AddressForms(formal: "Lei", informal: "tu").form(for: .formal) == "Lei")
+    }
+}
+
+@Suite("A config.json from before #110 loads and is saved in the new form")
+struct PreFormalityFileTests {
+
+    @Test("pronoun registers and languages without forms load as before, and save as formal and addressForms")
+    func oldFile() throws {
+        // What the build before #110 wrote: no addressForms, Sie/du registers.
+        var text = String(decoding: try JSONEncoder.configuration.encode(Configuration.default), as: UTF8.self)
+        text = text.replacingOccurrences(of: #""register" : "formal""#, with: #""register" : "Sie""#)
+        text = text.replacingOccurrences(of: #""register" : "informal""#, with: #""register" : "du""#)
+        text = text.replacingOccurrences(
+            of: #",\s*"addressForms" : (null|\{[^}]*\})"#, with: "", options: .regularExpression)
+        text = text.replacingOccurrences(
+            of: #""addressForms" : (null|\{[^}]*\}),\s*"#, with: "", options: .regularExpression)
+        #expect(!text.contains("addressForms"))
+        #expect(text.contains(#""register" : "Sie""#))
+
+        let folder = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appending(path: "babelotter-formality-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let store = ConfigurationStore(directory: folder)
+        try text.write(to: store.fileURL, atomically: true, encoding: .utf8)
+
+        let loaded = store.load()
+        #expect(loaded.problems.isEmpty)
+        #expect(loaded.configuration == Configuration.default)
+        #expect(loaded.configuration.language(for: LanguageCode("de-ch"))?.addressForms
+            == AddressForms(formal: "Sie", informal: "du"))
+        #expect(loaded.configuration.profile(id: "students")?.register == .formal)
+        #expect(loaded.configuration.profile(id: "colleagues")?.register == .informal)
+
+        try store.save(loaded.configuration)
+        let saved = try String(contentsOf: store.fileURL, encoding: .utf8)
+        #expect(saved.contains(#""register" : "formal""#))
+        #expect(!saved.contains(#""register" : "Sie""#))
+        #expect(saved.contains(#""addressForms""#))
     }
 }

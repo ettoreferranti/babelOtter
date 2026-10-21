@@ -24,12 +24,13 @@
 | An existing de-CH without `addressForms` | Gets the shipped forms when the key is **absent**; JSON `null` means "this language has none" | Existing files must keep Sie/du without an edit; the forms come from the shipped language data by code, so no language is named in logic (`FR-LNG-01`) |
 | The JSON key | Stays `register` | Hand-edited files and the `UserDefaults`/history ids are unaffected; only the value changes |
 | More than two levels (Japanese) | Out of scope | Two values cover the languages in view |
+| Going back to an older build | Not supported once this build has saved | A pre-#110 build reads `"formal"` as an error and falls back to the defaults for the whole file; noted in HANDOFF |
 
 ## 3. The kit
 
 - `Register` (`Config/AudienceProfile.swift`): raw values `formal` and `informal`; a custom `init(from:)` accepting `formal`, `informal`, `sie`, `du` (trimmed, any case), refusing anything else with `expected "formal" or "informal"`.
 - `AddressForms` (`Config/LanguageConfig.swift`): `public struct AddressForms: Sendable, Equatable, Codable { public let formal: String; public let informal: String; public func form(for register: Register) -> String }`, both non-empty after trimming.
-- `LanguageConfig.addressForms: AddressForms?`, a new `init` parameter defaulting to nil; `swissGerman` ships `Sie`/`du`, `english` none. Custom decoding: key absent gives the shipped language's forms for the same code (`LanguageConfig.shippedDefaults`), `null` gives none, a value is used as written. Encoding writes the key always (`null` for none), so the file shows the choice.
+- `LanguageConfig.addressForms: AddressForms?`, a new `init` parameter defaulting to nil; `swissGerman` ships `Sie`/`du`, `english` none. Custom decoding: key absent gives the shipped language's forms for the same code, else for the same base code (`de`, `de-de`, `de-at` take de-ch's, as `Configuration.germanLanguage` matches German), from `LanguageConfig.shippedDefaults`; `null` gives none; a value is used as written. Encoding writes the key always (`null` for none), so the file shows the choice.
 - `PromptBuilder`: one helper, `formality(_ register: Register, in language: LanguageConfig) -> String`, used by the translate, inference and correct lines as in section 1. The target for Translate and Re-pitch is `request.target`; for Correct, the text's language.
 - `Register.word`: `"formal"` / `"informal"`, for the register-in-words lines and the popup.
 

@@ -126,8 +126,10 @@ public struct LanguageConfig: Sendable, Equatable, Codable {
     }
 
     /// `addressForms` absent -- a file from before #110 -- takes the shipped
-    /// language's forms for the same code, so de-ch keeps Sie/du with no
-    /// edit and no language is named in logic; `null` means none.
+    /// language's forms for the same code, else for the same base code
+    /// ("de" or "de-at" take de-ch's, as `Configuration.germanLanguage`
+    /// matches German), so no German loses Sie/du and no language is named
+    /// in logic; `null` means none.
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let code = try container.decode(LanguageCode.self, forKey: .code)
@@ -135,7 +137,7 @@ public struct LanguageConfig: Sendable, Equatable, Codable {
         if container.contains(.addressForms) {
             forms = try container.decodeIfPresent(AddressForms.self, forKey: .addressForms)
         } else {
-            forms = Self.shippedDefaults.first { $0.code == code }?.addressForms
+            forms = Self.shippedForms(for: code)
         }
         self.init(
             code: code,
@@ -143,6 +145,16 @@ public struct LanguageConfig: Sendable, Equatable, Codable {
             localeRules: try container.decode([LocaleRule].self, forKey: .localeRules),
             enabled: try container.decode(Bool.self, forKey: .enabled),
             addressForms: forms)
+    }
+
+    static func shippedForms(for code: LanguageCode) -> AddressForms? {
+        for shipped in shippedDefaults where shipped.code == code {
+            return shipped.addressForms
+        }
+        for shipped in shippedDefaults where shipped.code.baseSubtag == code.baseSubtag {
+            return shipped.addressForms
+        }
+        return nil
     }
 
     /// Always writes `addressForms`, `null` for none, so the file shows it.
