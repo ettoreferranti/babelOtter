@@ -114,6 +114,10 @@ final class SettingsModel: ObservableObject {
         }
         refusals[field] = nil
         editor = next
+        // Apply it now rather than when the watcher settles: until then the
+        // app's configuration would differ from the file, and the next edit
+        // would be refused as "changed on disk".
+        reloadConfiguration()
     }
 
     /// Selects config.json, or opens its folder.
