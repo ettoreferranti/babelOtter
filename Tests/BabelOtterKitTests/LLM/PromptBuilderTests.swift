@@ -211,6 +211,53 @@ struct PromptBuilderTests {
         #expect(prompt.contains("Quote each original fragment exactly"))
     }
 
+    // MARK: - Formality per target language (#110)
+
+    private let italian = LanguageConfig(
+        code: LanguageCode("it"), displayName: "Italian", localeRules: [], enabled: true,
+        addressForms: AddressForms(formal: "Lei", informal: "tu"))
+
+    @Test("into a language with forms, the reader is addressed with its form")
+    func formsNamed() {
+        #expect(builder.build(request(profile: .administration)).contains(#"Address the reader as "Sie"."#))
+        #expect(builder.build(request(profile: .colleagues)).contains(#"Address the reader as "du"."#))
+        let intoItalian = builder.build(request(target: italian, profile: .administration))
+        #expect(intoItalian.contains(#"Address the reader as "Lei"."#))
+        #expect(!intoItalian.contains("Sie"))
+    }
+
+    @Test("into English, the register in words and no German pronoun")
+    func registerInWords() {
+        let formal = builder.build(request(target: .english, profile: .administration))
+        #expect(formal.contains("Write in a formal register."))
+        #expect(!formal.contains("Address the reader"))
+        #expect(!formal.contains(#""Sie""#))
+        #expect(formal.contains("Tone: \(AudienceProfile.administration.toneGuidance)"))
+        let informal = builder.build(request(target: .english, profile: .colleagues))
+        #expect(informal.contains("Write in an informal register."))
+    }
+
+    @Test("the inference list gives each audience's formality in the target's terms")
+    func inferenceFormality() {
+        let german = builder.build(request(inferFrom: [.students, .colleagues]))
+        #expect(german.contains("Audiences (id: name, formality, tone):"))
+        #expect(german.contains(#"- students: Students, formal ("Sie")."#))
+        #expect(german.contains(#"- colleagues: Colleagues, informal ("du")."#))
+        let english = builder.build(request(target: .english, inferFrom: [.students]))
+        #expect(english.contains("- students: Students, formal. "))
+        #expect(!english.contains(#""Sie""#))
+    }
+
+    @Test("Correct names the form, or the register for a language without forms")
+    func correctFormality() {
+        let noForms = LanguageConfig(code: LanguageCode("xx"), displayName: "X", localeRules: [], enabled: true)
+        let prompt = builder.build(request(action: .correct, target: noForms, profile: .administration))
+        #expect(prompt.contains("The text is addressed to Administration, and should be written in a formal register."))
+        let casual = builder.build(request(action: .correct, target: noForms, profile: .informal))
+        #expect(casual.contains("and should be written in an informal register."))
+        #expect(prompt.contains("A mismatch is a register error."))
+    }
+
     @Test("Correct's audience section is the register only")
     func correctAudienceIsRegisterOnly() {
         let prompt = builder.build(request(action: .correct, profile: .administration))

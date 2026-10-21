@@ -61,7 +61,7 @@ struct PopupView: View {
                     set: { model.selectProfile($0) }
                 )) {
                     ForEach(model.profiles) { profile in
-                        Text("\(profile.name) (\(profile.register.rawValue))").tag(profile.id)
+                        Text(profile.label(in: model.writingLanguage)).tag(profile.id)
                     }
                 }
                 .labelsHidden()

@@ -130,10 +130,16 @@ private struct AudienceDetail: View {
                         }
                     })
                 ) {
-                    Text("Sie").tag(Register.formal)
-                    Text("du").tag(Register.informal)
+                    Text("Formal").tag(Register.formal)
+                    Text("Informal").tag(Register.informal)
                 }
                 .pickerStyle(.segmented)
+                ForEach(model.configuration.enabledLanguages, id: \.code) { language in
+                    if let forms = language.addressForms {
+                        Text("\(forms.formal) / \(forms.informal) in \(language.displayName)")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
             }
             Section("Tone guidance") {
                 TextEditor(text: $guidance)

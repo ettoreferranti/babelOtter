@@ -167,7 +167,7 @@ public struct PromptBuilder: Sendable {
             }
             var lines = [
                 "Audience: \(profile.name).",
-                #"Address the reader as "\#(profile.register.rawValue)"."#,
+                Self.formality(profile.register, in: request.target),
                 "Tone: \(profile.toneGuidance)",
             ]
             if !profile.glossaryBias.isEmpty {
@@ -175,17 +175,40 @@ public struct PromptBuilder: Sendable {
             }
             return lines.joined(separator: "\n")
         }
+        // Correct writes in the text's own language, its target: that
+        // language's forms, or none.
+        guard let forms = request.target.addressForms else {
+            return "The text is addressed to \(profile.name), and should be written in "
+                + "\(profile.register.phrase). A mismatch is a register error."
+        }
         return
-            #"The text is addressed to \#(profile.name), who should be addressed as "\#(profile.register.rawValue)". "#
+            #"The text is addressed to \#(profile.name), who should be addressed as "\#(forms.form(for: profile.register))". "#
             + "A mismatch is a register error."
+    }
+
+    /// The language's own form of address (#110), or, for a language
+    /// without one (English), the register in words: formality still
+    /// matters there, only no pronoun carries it.
+    static func formality(_ register: Register, in language: LanguageConfig) -> String {
+        guard let forms = language.addressForms else {
+            return "Write in \(register.phrase)."
+        }
+        return #"Address the reader as "\#(forms.form(for: register))"."#
+    }
+
+    /// `formal ("Sie")`, or `formal` for a language without forms.
+    private static func formalityLabel(_ register: Register, in language: LanguageConfig) -> String {
+        guard let forms = language.addressForms else { return register.word }
+        return #"\#(register.word) ("\#(forms.form(for: register))")"#
     }
 
     /// #52: the model picks the audience the text addresses and writes for
     /// it. `request.profile` is the fallback for a text with no clear sign.
     private func inferredAudience(_ request: PromptRequest) -> String {
-        var lines = ["Audiences (id: name, form of address, tone):"]
+        var lines = ["Audiences (id: name, formality, tone):"]
         for profile in request.inferAudienceFrom {
-            var line = #"- \#(profile.id): \#(profile.name), "\#(profile.register.rawValue)". \#(profile.toneGuidance)"#
+            let formality = Self.formalityLabel(profile.register, in: request.target)
+            var line = "- \(profile.id): \(profile.name), \(formality). \(profile.toneGuidance)"
             if !profile.glossaryBias.isEmpty {
                 line += " Prefers: " + profile.glossaryBias.joined(separator: ", ") + "."
             }

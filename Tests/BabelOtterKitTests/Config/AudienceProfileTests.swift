@@ -27,10 +27,13 @@ struct AudienceProfileTests {
         #expect(AudienceProfile.informal.register == .informal)
     }
 
-    @Test("register encodes as the German pronoun a reader would expect")
-    func registerRawValues() {
-        #expect(Register.formal.rawValue == "Sie")
-        #expect(Register.informal.rawValue == "du")
+    @Test("the label names the language's form, the register for a language without, or nothing yet")
+    func labels() {
+        #expect(AudienceProfile.students.label(in: .swissGerman) == "Students (Sie)")
+        #expect(AudienceProfile.colleagues.label(in: .swissGerman) == "Colleagues (du)")
+        #expect(AudienceProfile.students.label(in: .english) == "Students (formal)")
+        #expect(AudienceProfile.colleagues.label(in: .english) == "Colleagues (informal)")
+        #expect(AudienceProfile.students.label(in: nil) == "Students")
     }
 
     @Test("profile ids are stable strings, not UUIDs, so the file stays hand-editable")
