@@ -16,7 +16,7 @@ The rest of the app's two-language assumptions (Explain, Correct, picking a sour
 - A fifth tab, **Glossary**, after Audiences, with two tables.
 - **Terms (the glossary):** one column per configured language, by display name, in configuration order; one row per concept. Cells are edited in place and written when left. **+** adds an empty row, focused on its first cell; **-** at the end of a row deletes it. A row is written once it has a term in it; clearing its last term deletes it. A footnote: "A row is used when translating between two languages it has terms for."
 - **Do not translate:** one term per row, edited in place; + and -. A footnote: "Matched exactly, capitals included: NORDA protects NORDA, not Norda."
-- **Refusals** (under the table): a term longer than 80 characters; a term already in another row for the same language, ignoring case ("Modul is already in another row for Swiss Standard German."); more than 200 rows; a do-not-translate term already listed (exactly), longer than 80 characters, or past 100 terms.
+- **Refusals** (under the table): a term longer than 80 characters; a term already in another row for the same language, ignoring case ("Modul is already in another row for Swiss Standard German."); more than 200 rows; a do-not-translate term already listed (exactly), longer than 80 characters, shorter than two characters ("a" would protect every "a"), containing the masking brackets ⟦ or ⟧, or past 100 terms. A refused value goes back to the saved one when the field is left; the reason stays shown.
 - **Hidden languages kept:** a concept's term for a language that is not configured (say `fr`, written by hand) is not shown but is kept when the row is edited.
 
 ## 3. The file
@@ -31,8 +31,10 @@ The rest of the app's two-language assumptions (Explain, Correct, picking a sour
 ```
 
 - Each concept is an object from language code to term; keys sorted, as the encoder already sorts.
-- **The old format still loads.** A file with `"glossary" : { "entries" : [ { "source", "target", "pair" } ] }` is read as one concept per entry, with the source term under the pair's source language and the target term under its target. Such an entry then applies in both directions; this is the one behaviour change, and it affects only an entry written by hand before this PR (the window never wrote any). The next save writes `concepts`.
-- A file with both `concepts` and `entries` reads `concepts` and ignores `entries`.
+- **The old format still loads.** A file with `"glossary" : { "entries" : [ { "source", "target", "pair" } ] }` is read entry by entry: an entry sharing a term (same language, ignoring case) with an earlier one is merged into that concept, filling only languages it lacks; otherwise it becomes a new concept. The old format needed one entry per direction, so `module -> Modul` and `Modul -> module` become one concept, not two identical ones. Where entries disagree (`Modul` into English as `module`, then as `course unit`), the first wins and the later rendering is dropped: direction-specific renderings are what the concept model gives up. An entry within one language (source and target the same) is dropped. Entries then apply in both directions; this affects only entries written by hand before this PR (the window never wrote any). The next save writes `concepts`.
+- A file with both `concepts` and `entries` reads `concepts` and ignores `entries`; `"concepts" : null` is a problem, not a fall back.
+- Two spellings of one language code in a concept (`de-CH`, `de-ch`) keep the first in sorted order, the same on every launch.
+- **Hand edits are not held to the window's limits** (term length, row count, uniqueness). So that two rows giving one source term never put two renderings into a prompt, `entries(for:)` keeps the first row for each source term (ignoring case).
 
 ## 4. The kit
 

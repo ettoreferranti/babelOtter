@@ -26,8 +26,14 @@ struct GlossarySettingsView: View {
             }
             .disabled(model.isReadOnly)
         }
-        .onChange(of: model.configuration.glossary) { addingConcept = false }
-        .onChange(of: model.configuration.doNotTranslate) { addingTerm = false }
+        // The new row goes once it has been saved -- the list grew -- not
+        // on any other change, which would take it away mid-typing.
+        .onChange(of: model.configuration.glossary.concepts.count) { old, new in
+            if new > old { addingConcept = false }
+        }
+        .onChange(of: model.configuration.doNotTranslate.count) { old, new in
+            if new > old { addingTerm = false }
+        }
     }
 
     // MARK: - Terms
@@ -60,6 +66,13 @@ struct GlossarySettingsView: View {
         }
     }
 
+    /// The row as a whole, and where it is: an empty cell in another row
+    /// looks the same as this one, the whole row does not.
+    private static func identity(_ index: Int, _ concept: GlossaryConcept) -> String {
+        let terms = concept.terms.map { $0.key.rawValue + "=" + $0.value }.sorted()
+        return String(index) + "|" + terms.joined(separator: "|")
+    }
+
     private var conceptRows: Int {
         model.configuration.glossary.concepts.count + (addingConcept ? 1 : 0)
     }
@@ -75,6 +88,7 @@ struct GlossarySettingsView: View {
             ForEach(languages, id: \.code) { language in
                 CommittingField(
                     placeholder: language.displayName, value: concept.terms[language.code] ?? "",
+                    identity: Self.identity(index, concept),
                     focusOnAppear: index == model.configuration.glossary.concepts.count
                         && language.code == languages.first?.code,
                     commit: { text in
@@ -104,15 +118,17 @@ struct GlossarySettingsView: View {
         let isNew = index >= terms.count
         return HStack {
             CommittingField(
-                placeholder: "Term", value: isNew ? "" : terms[index], focusOnAppear: isNew,
+                placeholder: "Term", value: isNew ? "" : terms[index],
+                identity: String(index) + "|" + (isNew ? "" : terms[index]), focusOnAppear: isNew,
                 commit: { text in
                     if !isNew {
-                        model.edit(.doNotTranslate) { try $0.setDoNotTranslate(text, at: index) }
-                    } else if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        addingTerm = false
-                    } else {
-                        model.edit(.doNotTranslate) { try $0.addDoNotTranslate(text) }
+                        return model.edit(.doNotTranslate) { try $0.setDoNotTranslate(text, at: index) }
                     }
+                    if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        addingTerm = false
+                        return true
+                    }
+                    return model.edit(.doNotTranslate) { try $0.addDoNotTranslate(text) }
                 })
             Button {
                 if isNew {
@@ -144,16 +160,20 @@ struct GlossarySettingsView: View {
 
 /// A text field that writes when Return is pressed or it is left, and keeps
 /// what is typed while it has focus. Rows are identified by position, so
-/// if what is under the field changes while it is typed in (a row above
-/// was deleted), the draft is dropped rather than written into another row.
+/// if the row under the field changes while it is typed in (a row above was
+/// deleted), the draft is dropped rather than written into another row. A
+/// refused draft goes back to the saved value; the reason stays shown.
 private struct CommittingField: View {
     let placeholder: String
     let value: String
+    /// The row as a whole; it changes when another row moves under the field.
+    let identity: String
     let focusOnAppear: Bool
-    let commit: (String) -> Void
+    /// False when the value was refused.
+    let commit: (String) -> Bool
 
     @State private var draft = ""
-    /// `value` when typing began.
+    /// `identity` when typing began.
     @State private var started = ""
     /// The last text written, trimmed as the file keeps it.
     @State private var sent: String?
@@ -174,23 +194,34 @@ private struct CommittingField: View {
                 } else if value == sent {
                     // Our own Return coming back from the file, not another
                     // row moving under the field.
-                    started = value
+                    started = identity
+                }
+            }
+            // A sibling cell saving (Tab out of the first cell of a new row)
+            // changes the row before anything is typed here: nothing to
+            // protect yet, so start from the row as it now is.
+            .onChange(of: identity) {
+                if focused {
+                    if draft == value { started = identity }
                 }
             }
             .onChange(of: focused) { wasFocused, isFocused in
-                if isFocused { started = value }
+                if isFocused { started = identity }
                 if wasFocused { write() }
             }
     }
 
     private func write() {
-        if value != started {
+        if identity != started {
             draft = value
-            started = value
+            started = identity
             return
         }
         if draft == value { return }
         sent = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        commit(draft)
+        if !commit(draft) {
+            draft = value
+            sent = nil
+        }
     }
 }

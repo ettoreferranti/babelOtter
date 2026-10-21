@@ -59,13 +59,17 @@ public struct GlossaryConcept: Sendable, Equatable, Codable {
     }
 
     /// `{"de-ch": "Modul", "en": "module"}`: an object by language code.
+    /// Two spellings of one code ("de-CH", "de-ch") keep the first in
+    /// sorted order, the same on every launch.
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: LanguageKey.self)
-        var terms: [LanguageCode: String] = [:]
-        for key in container.allKeys {
-            terms[LanguageCode(key.stringValue)] = try container.decode(String.self, forKey: key)
+        self.init()
+        let keys = container.allKeys.sorted { $0.stringValue < $1.stringValue }
+        for key in keys {
+            let term = try container.decode(String.self, forKey: key)
+            let language = LanguageCode(key.stringValue)
+            if terms[language] == nil { set(term, for: language) }
         }
-        self.init(terms: terms)
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -101,12 +105,16 @@ public struct Glossary: Sendable, Equatable, Codable {
     }
 
     /// The directed entries for this pair, in concept order, from every
-    /// concept with a term in both languages.
+    /// concept with a term in both languages. A source term two rows give
+    /// (possible by hand, never from the settings window) keeps the first:
+    /// two renderings for one term would leave the model to choose.
     public func entries(for pair: LanguagePair) -> [GlossaryEntry] {
         var entries: [GlossaryEntry] = []
+        var seen: Set<String> = []
         for concept in concepts {
             guard let source = concept.terms[pair.source] else { continue }
             guard let target = concept.terms[pair.target] else { continue }
+            if !seen.insert(source.lowercased()).inserted { continue }
             entries.append(GlossaryEntry(source: source, target: target, pair: pair))
         }
         return entries
@@ -118,8 +126,11 @@ public struct Glossary: Sendable, Equatable, Codable {
         case entries
     }
 
-    /// `concepts` when present; otherwise the old `entries`, one concept
-    /// each, which from then on applies in both directions.
+    /// `concepts` when present; otherwise the old `entries`, which from then
+    /// on apply in both directions. The old format needed one entry per
+    /// direction, so entries sharing a term are merged into one concept;
+    /// where they disagree ("Modul" into English as "module", then as
+    /// "course unit"), the first wins.
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         if container.contains(.concepts) {
@@ -129,13 +140,35 @@ public struct Glossary: Sendable, Equatable, Codable {
         var converted: [GlossaryConcept] = []
         if container.contains(.entries) {
             for entry in try container.decode([GlossaryEntry].self, forKey: .entries) {
-                var concept = GlossaryConcept()
-                concept.set(entry.source, for: entry.pair.source)
-                concept.set(entry.target, for: entry.pair.target)
-                converted.append(concept)
+                Self.merge(entry, into: &converted)
             }
         }
         self.init(concepts: converted)
+    }
+
+    private static func merge(_ entry: GlossaryEntry, into concepts: inout [GlossaryConcept]) {
+        // Within one language: nothing to translate, nothing to keep.
+        if entry.pair.source == entry.pair.target { return }
+        var incoming = GlossaryConcept()
+        incoming.set(entry.source, for: entry.pair.source)
+        incoming.set(entry.target, for: entry.pair.target)
+        for index in concepts.indices {
+            if shareATerm(concepts[index], incoming) {
+                for (language, term) in incoming.terms {
+                    if concepts[index].terms[language] == nil { concepts[index].set(term, for: language) }
+                }
+                return
+            }
+        }
+        concepts.append(incoming)
+    }
+
+    /// The same term for the same language, ignoring case.
+    private static func shareATerm(_ lhs: GlossaryConcept, _ rhs: GlossaryConcept) -> Bool {
+        for (language, term) in rhs.terms {
+            if lhs.terms[language]?.lowercased() == term.lowercased() { return true }
+        }
+        return false
     }
 
     public func encode(to encoder: any Encoder) throws {

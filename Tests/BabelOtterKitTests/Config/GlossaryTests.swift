@@ -45,6 +45,22 @@ struct GlossaryTests {
         #expect(Glossary().entries(for: enToDe).isEmpty)
     }
 
+    @Test("a source term two rows give, by hand, reaches the prompt once, from the first row")
+    func handEditedDuplicate() {
+        let glossary = Glossary(concepts: [
+            GlossaryConcept(terms: [en: "module", de: "Modul"]),
+            GlossaryConcept(terms: [en: "Module", de: "Baustein"]),
+        ])
+        #expect(glossary.entries(for: enToDe).map(\.target) == ["Modul"])
+        #expect(glossary.entries(for: deToEn).map(\.target) == ["module", "Module"])
+    }
+
+    @Test("a pair within one language maps each term to itself")
+    func sameLanguage() {
+        #expect(glossary.entries(for: LanguagePair(source: de, target: de)).map(\.target)
+            == ["Modul", "Vorlesung", "Studiengang"])
+    }
+
     @Test("codes are normalised, so a hand-edited capital does not hide a row")
     func normalised() {
         let shouty = LanguagePair(source: LanguageCode("EN"), target: LanguageCode("DE-CH"))
@@ -83,18 +99,47 @@ struct GlossaryCodingTests {
         #expect(try decode(text) == glossary)
     }
 
-    @Test("the old entries format loads, one concept each")
-    func oldFormat() throws {
+    @Test("old entries sharing a term merge into one concept; the first rendering wins")
+    func oldFormatMerges() throws {
         let glossary = try decode(#"""
             {"entries": [
               {"source": "module", "target": "Modul", "pair": {"source": "en", "target": "de-CH"}},
-              {"source": "Modul", "target": "course unit", "pair": {"source": "de-CH", "target": "en"}}
+              {"source": "modul", "target": "course unit", "pair": {"source": "de-CH", "target": "en"}},
+              {"source": "Modul", "target": "module", "pair": {"source": "de-ch", "target": "en"}},
+              {"source": "lecture", "target": "Vorlesung", "pair": {"source": "en", "target": "de-ch"}},
+              {"source": "Modul", "target": "module", "pair": {"source": "de-ch", "target": "fr"}}
             ]}
             """#)
         #expect(glossary.concepts == [
-            GlossaryConcept(terms: [en: "module", de: "Modul"]),
-            GlossaryConcept(terms: [de: "Modul", en: "course unit"]),
+            GlossaryConcept(terms: [en: "module", de: "Modul", fr: "module"]),
+            GlossaryConcept(terms: [en: "lecture", de: "Vorlesung"]),
         ])
+        // No term reaches the prompt twice, in either direction.
+        #expect(glossary.entries(for: LanguagePair(source: de, target: en)).map(\.target) == ["module", "lecture"])
+        #expect(glossary.entries(for: LanguagePair(source: en, target: de)).map(\.target) == ["Modul", "Vorlesung"])
+    }
+
+    @Test("an old entry within one language is dropped")
+    func oldSameLanguage() throws {
+        let glossary = try decode(#"""
+            {"entries": [{"source": "Studiengang", "target": "Studienprogramm", "pair": {"source": "de-ch", "target": "de-ch"}}]}
+            """#)
+        #expect(glossary.concepts.isEmpty)
+    }
+
+    @Test("two spellings of one language code keep the first in sorted order")
+    func caseCollision() throws {
+        let glossary = try decode(#"{"concepts": [{"de-ch": "b", "de-CH": "a", "en": "x"}]}"#)
+        #expect(glossary.concepts == [GlossaryConcept(terms: [de: "a", en: "x"])])
+        let blankFirst = try decode(#"{"concepts": [{"DE-CH": " ", "de-ch": "b"}]}"#)
+        #expect(blankFirst.concepts == [GlossaryConcept(terms: [de: "b"])])
+    }
+
+    @Test("concepts that are null are a problem, not a fall back to entries")
+    func nullConcepts() {
+        #expect(throws: DecodingError.self) {
+            _ = try decode(#"{"concepts": null, "entries": []}"#)
+        }
     }
 
     @Test("with both formats, concepts win; with neither, the glossary is empty")

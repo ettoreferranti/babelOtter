@@ -49,7 +49,8 @@ struct SettingsGlossaryTests {
             try editor.setTerm("MODUL", for: de, inConcept: 1)
         }
         #expect(editor == before)
-        // Its own row, and another language, are free.
+        // Its own row, and another language, are free: changing only the
+        // case of a row's own term is allowed.
         try editor.setTerm("modul", for: de, inConcept: 0)
         try editor.setTerm("Modul", for: en, inConcept: 1)
         #expect(concepts(editor) == [[en: "module", de: "modul"], [en: "Modul"]])
@@ -74,6 +75,10 @@ struct SettingsGlossaryTests {
         expectRefusal(.termTooLong) { try editor.setTerm(String(repeating: "a", count: 81), for: de, inConcept: 0) }
         var full = self.editor((0..<200).map { GlossaryConcept(terms: [en: "t\($0)"]) })
         expectRefusal(.tooManyRows) { try full.setTerm("one more", for: en, inConcept: 200) }
+        // An empty term past the end stores nothing, even at the limit.
+        let before = full
+        try full.setTerm(" ", for: en, inConcept: 200)
+        #expect(full == before)
         // A row that exists can still be edited at the limit.
         try full.setTerm("Modul", for: de, inConcept: 199)
         #expect(SettingsRefusal.tooManyRows.message == "At most 200 rows.")
@@ -106,6 +111,7 @@ struct SettingsGlossaryTests {
         try editor.setDoNotTranslate("GitLab", at: 1)
         expectRefusal(.dntInUse("NORDA")) { try editor.setDoNotTranslate("NORDA", at: 2) }
         try editor.setDoNotTranslate(" ", at: 2)
+        // Clearing a term deletes it.
         #expect(editor.configuration.doNotTranslate == ["NORDA", "GitLab"])
         expectRefusal(.noSuchRow) { try editor.setDoNotTranslate("x", at: 2) }
         expectRefusal(.noSuchRow) { try editor.setDoNotTranslate("x", at: -1) }
@@ -115,6 +121,17 @@ struct SettingsGlossaryTests {
         try expectRoundTrip(editor)
         #expect(SettingsRefusal.dntInUse("X").message == "X is already in the list.")
         #expect(SettingsRefusal.emptyTerm.message == "Enter a term.")
+    }
+
+    @Test("a one-character term, or one with the masking brackets, is refused")
+    func unusable() {
+        var editor = editor(dnt: ["NORDA"])
+        expectRefusal(.unusableTerm) { try editor.addDoNotTranslate("a") }
+        expectRefusal(.unusableTerm) { try editor.addDoNotTranslate("x\u{27E6}DNT0") }
+        expectRefusal(.unusableTerm) { try editor.addDoNotTranslate("y\u{27E7}") }
+        expectRefusal(.unusableTerm) { try editor.setDoNotTranslate(" b ", at: 0) }
+        #expect(editor.configuration.doNotTranslate == ["NORDA"])
+        #expect(SettingsRefusal.unusableTerm.message == "Use at least two characters, and not \u{27E6} or \u{27E7}.")
     }
 
     @Test("the list holds at most 100 terms")

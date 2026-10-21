@@ -23,6 +23,9 @@ public enum SettingsRefusal: Error, Sendable, Equatable {
     case tooManyRows
     case dntInUse(String)
     case tooManyTerms
+    /// A do-not-translate term of one character, or one holding the
+    /// masking brackets.
+    case unusableTerm
 
     public var message: String {
         switch self {
@@ -60,6 +63,8 @@ public enum SettingsRefusal: Error, Sendable, Equatable {
             return "\(term) is already in the list."
         case .tooManyTerms:
             return "At most \(SettingsEditor.maximumDoNotTranslate) terms."
+        case .unusableTerm:
+            return "Use at least two characters, and not \u{27E6} or \u{27E7}."
         }
     }
 }
@@ -353,6 +358,11 @@ public struct SettingsEditor: Sendable, Equatable {
         let trimmed = term.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty { throw SettingsRefusal.emptyTerm }
         if trimmed.count > Self.maximumTermLength { throw SettingsRefusal.termTooLong }
+        // One character masks every occurrence of it ("a"); the brackets
+        // are the sentinels' own (`TokenProtector`).
+        if trimmed.count < 2 { throw SettingsRefusal.unusableTerm }
+        if trimmed.contains("\u{27E6}") { throw SettingsRefusal.unusableTerm }
+        if trimmed.contains("\u{27E7}") { throw SettingsRefusal.unusableTerm }
         for (other, existing) in configuration.doNotTranslate.enumerated() {
             if other == index { continue }
             if existing == trimmed { throw SettingsRefusal.dntInUse(trimmed) }
