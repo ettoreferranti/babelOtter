@@ -10,6 +10,14 @@ enum SettingsField: Hashable {
     case clipboard
     case model(Action)
     case hotKey(Action)
+    /// The list's own buttons: add, delete, restore.
+    case audiences
+    case audience(String, AudienceField)
+}
+
+/// An audience's fields, for refusals under each.
+enum AudienceField: Hashable {
+    case name, register, guidance, terms
 }
 
 /// The installed models, as the Models tab last read them.
@@ -43,6 +51,10 @@ final class SettingsModel: ObservableObject {
     @Published private(set) var refusals: [SettingsField: String] = [:]
     @Published private(set) var installed: InstalledModels = .loading
     @Published private(set) var download: ModelDownload?
+    /// The audience just added, whose name field takes focus.
+    @Published var addedAudience: String?
+    /// What Restore did, under the list.
+    @Published private(set) var audienceNote: String?
 
     private let source: ConfigurationSource
     private let client: () -> OllamaClient
@@ -128,6 +140,38 @@ final class SettingsModel: ObservableObject {
         } else {
             NSWorkspace.shared.open(store.directory)
         }
+    }
+
+    // MARK: - Audiences
+
+    func addAudience() {
+        var added: String?
+        edit(.audiences) { editor in
+            added = try editor.addAudience(named: editor.newAudienceName())
+        }
+        if let added { addedAudience = added }
+        audienceNote = nil
+    }
+
+    func restoreShippedAudiences() {
+        var result: (restored: [String], skipped: [String]) = ([], [])
+        edit(.audiences) { editor in
+            result = editor.restoreShippedAudiences()
+        }
+        var parts: [String] = []
+        if !result.restored.isEmpty { parts.append("Restored " + result.restored.joined(separator: ", ") + ".") }
+        if !result.skipped.isEmpty {
+            parts.append("Not restored, the name is in use: " + result.skipped.joined(separator: ", ") + ".")
+        }
+        audienceNote = parts.isEmpty ? nil : parts.joined(separator: " ")
+    }
+
+    /// Shipped audiences whose id is missing.
+    var canRestoreAudiences: Bool {
+        for shipped in AudienceProfile.shippedDefaults {
+            if configuration.profile(id: shipped.id) == nil { return true }
+        }
+        return false
     }
 
     func refuse(_ field: SettingsField, _ message: String) {
