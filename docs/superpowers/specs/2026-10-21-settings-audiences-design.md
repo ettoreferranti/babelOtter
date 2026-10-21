@@ -7,16 +7,17 @@
 
 - A fourth tab, **Audiences**, between Models and Hotkeys: the audiences on the left in file order, the selected one on the right.
 - **Fields:** Name; Register (Sie / du); Tone guidance (several lines); Preferred terms (one per line; blank lines dropped). A text field is written when you leave it or press Return (Command-Return in the multi-line ones), not on every keystroke. The audience's id is shown small and grey under the name.
-- **Add (+):** a new audience named "New audience" (then "New audience 2", ...), Sie, with empty guidance and no terms, selected with its name ready to type over. Its id is made from the name it was created with.
+- **Add (+):** asks for the name first ("Its id is made from this name and stays when it is renamed."), then adds the audience with Sie, empty guidance and no terms, and selects it. Its id is made from that name. (A placeholder name would have given every new audience the id `new-audience`.)
 - **Delete...:** asks "Delete <name>? Its tone guidance is lost." with Delete (destructive) and Cancel. The last audience cannot be deleted (the button is disabled).
-- **Restore shipped audiences:** adds back, at the end, each of the four shipped audiences (Students, Colleagues, Administration, Informal) whose id is missing; your own audiences and edited shipped ones are not touched. Disabled when none is missing. A shipped audience whose name is now used by another audience is not restored, and the window says which.
+- **Restore shipped audiences:** adds back, at the end, each of the four shipped audiences (Students, Colleagues, Administration, Informal) whose id is missing; your own audiences and edited shipped ones are not touched. Disabled when it would restore nothing. A shipped audience whose name or id is now another audience's name is not restored, and the window says which.
+- **A refused edit is never lost silently:** a save refused as you leave an audience (another selected, the tab switched) is shown under the list, naming the audience, with "Not saved."
 
 ## 2. Decisions
 
 | Question | Decision | Why |
 |---|---|---|
 | The id | Made once from the first name: lowercased, accents dropped, `ss` for an eszett, anything else not a-z or 0-9 becomes `-`; `audience` if nothing is left; `-2`, `-3`, ... if taken. Never changes on rename | App memory (`UserDefaults`) and history records refer to it; a readable id keeps `config.json` hand-editable (`FR-CFG-03`) |
-| Names | Trimmed, not empty, at most 40 characters, unique ignoring case | Inference matches a model's answer by id and by name; two "Students" would be ambiguous |
+| Names | Trimmed, not empty, at most 40 characters, unique ignoring case, and not another audience's id | Inference matches a model's answer by id, then by name; two "Students", or a name that is another audience's id, would be ambiguous |
 | Deleting | Confirmation; never the last one; Restore brings back shipped ones | The guidance text is the work; an empty list leaves Translate without an audience to pick |
 | What a deletion leaves behind | Nothing to clean up | An app's remembered audience that no longer exists is already skipped (`AudienceSession`); history shows a deleted audience by its id; with Colleagues gone the fallback is the first audience |
 | Limits | Tone guidance at most 2,000 characters; at most 50 terms of at most 80 characters | Both go into every prompt for that audience; a local model's context is not free |
@@ -38,7 +39,7 @@ public mutating func restoreShippedAudiences() -> (restored: [String], skipped: 
 
 New refusals: `.noSuchAudience(String)`, `.emptyName`, `.nameTooLong` ("At most 40 characters"), `.nameInUse(String)` ("Another audience is called <name>."), `.lastAudience` ("At least one audience stays."), and `.outOfRange` for the guidance and term limits.
 
-`AudienceID.make(from name: String, taken: Set<String>) -> String` holds the id rule. As in the first PR, every accepted edit is checked to round-trip through the file encoding.
+`AudienceID.make(from name: String, taken: Set<String>) -> String` holds the id rule; its numbering loop has a fixed bound (1,000), past which the number is 1,000 plus the count of ids taken, so no mutant can make it endless. As in the first PR, every accepted edit is checked to round-trip through the file encoding.
 
 ## 4. The app
 

@@ -55,7 +55,6 @@ public struct SettingsEditor: Sendable, Equatable {
     public static let maximumGuidanceLength = 2_000
     public static let maximumTerms = 50
     public static let maximumTermLength = 80
-    public static let newAudienceName = "New audience"
 
     public private(set) var configuration: Configuration
 
@@ -151,17 +150,6 @@ public struct SettingsEditor: Sendable, Equatable {
 
     // MARK: - Audiences
 
-    /// "New audience", or "New audience 2", ... when that is taken.
-    public func newAudienceName() -> String {
-        let base = Self.newAudienceName
-        if !nameInUse(base, except: nil) { return base }
-        for number in 2...(configuration.profiles.count + 2) {
-            let candidate = base + " " + String(number)
-            if !nameInUse(candidate, except: nil) { return candidate }
-        }
-        return base + " " + String(configuration.profiles.count + 3)
-    }
-
     /// Sie, no guidance, no terms; returns the new id.
     public mutating func addAudience(named name: String) throws -> String {
         let checked = try checkedName(name, except: nil)
@@ -224,7 +212,7 @@ public struct SettingsEditor: Sendable, Equatable {
         var skipped: [String] = []
         for shipped in AudienceProfile.shippedDefaults {
             if configuration.profile(id: shipped.id) != nil { continue }
-            if nameInUse(shipped.name, except: nil) {
+            if nameInUse(shipped.name, except: nil) || nameInUse(shipped.id, except: nil) {
                 skipped.append(shipped.name)
                 continue
             }
@@ -249,12 +237,15 @@ public struct SettingsEditor: Sendable, Equatable {
         return trimmed
     }
 
-    /// Ignoring case; `except` is the audience being renamed.
+    /// Another audience's name or id, ignoring case; `except` is the
+    /// audience being renamed. An id counts because inference matches a
+    /// model's answer by id before name, and the prompt lists both.
     private func nameInUse(_ name: String, except id: String?) -> Bool {
         let wanted = name.lowercased()
         for profile in configuration.profiles {
             if profile.id == id { continue }
             if profile.name.lowercased() == wanted { return true }
+            if profile.id.lowercased() == wanted { return true }
         }
         return false
     }

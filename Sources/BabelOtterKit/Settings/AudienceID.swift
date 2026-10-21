@@ -8,6 +8,8 @@ import Foundation
 public enum AudienceID {
 
     public static let fallback = "audience"
+    /// More audiences than anyone keeps; past it the number is the count.
+    static let numberLimit = 1_000
 
     /// "Behoerden" style: lowercased, accents dropped, "ss" for an eszett,
     /// anything else not a-z or 0-9 a single "-"; then "-2", "-3", ... when
@@ -15,12 +17,13 @@ public enum AudienceID {
     public static func make(from name: String, taken: Set<String>) -> String {
         let base = slug(name)
         if !taken.contains(base) { return base }
-        // At most taken.count numbers can be in use, so one of these is free.
-        for number in 2...(taken.count + 2) {
+        // A fixed bound, so no change to it can make the loop endless.
+        for number in 2...numberLimit {
             let candidate = base + "-" + String(number)
             if !taken.contains(candidate) { return candidate }
         }
-        return base + "-" + String(taken.count + 3)
+        // Over a thousand ids taken: one more than any of them can be.
+        return base + "-" + String(numberLimit + taken.count)
     }
 
     static func slug(_ name: String) -> String {

@@ -9,7 +9,7 @@ struct AudienceIDTests {
     @Test("names become readable ids", arguments: [
         ("Students", "students"), ("Beh\u{00F6}rden", "behorden"), ("Stra\u{00DF}e", "strasse"),
         ("\u{00DC}-Pr\u{00FC}fung 2", "u-prufung-2"), ("  Die  neuen -- Kollegen! ", "die-neuen-kollegen"),
-        ("STRASSE \u{1E9E}", "strasse-ss"), ("   ", "audience"), ("!!!", "audience"), ("\u{65E5}\u{672C}", "audience"),
+        ("STRASSE \u{1E9E}", "strasse-ss"), ("Zone 09 a", "zone-09-a"), ("az09", "az09"), ("   ", "audience"), ("!!!", "audience"), ("\u{65E5}\u{672C}", "audience"),
     ])
     func slug(name: String, id: String) {
         #expect(AudienceID.make(from: name, taken: []) == id)
@@ -21,6 +21,13 @@ struct AudienceIDTests {
         #expect(AudienceID.make(from: "Students", taken: ["students", "students-2"]) == "students-3")
         #expect(AudienceID.make(from: "Students", taken: ["students-2"]) == "students")
         #expect(AudienceID.make(from: "x", taken: ["x", "x-2", "x-3", "x-4"]) == "x-5")
+    }
+
+    @Test("past a thousand numbers, one more than all of them")
+    func overflow() {
+        var taken: Set<String> = ["x"]
+        for number in 2...1_000 { taken.insert("x-\(number)") }
+        #expect(AudienceID.make(from: "x", taken: taken) == "x-2000")
     }
 }
 
@@ -40,17 +47,6 @@ struct SettingsAudienceTests {
         try expectRoundTrip(editor)
     }
 
-    @Test("a new audience's name is numbered when taken, and its id follows")
-    func newNames() throws {
-        var editor = editor()
-        #expect(editor.newAudienceName() == "New audience")
-        let first = try editor.addAudience(named: editor.newAudienceName())
-        #expect(editor.newAudienceName() == "New audience 2")
-        let second = try editor.addAudience(named: editor.newAudienceName())
-        #expect(editor.newAudienceName() == "New audience 3")
-        #expect(first == "new-audience")
-        #expect(second == "new-audience-2")
-    }
 
     @Test("an id whose name is free but whose slug is taken is numbered")
     func idCollision() throws {
@@ -79,8 +75,14 @@ struct SettingsAudienceTests {
     func rename() throws {
         var editor = editor()
         try editor.renameAudience("students", to: "STUDENTS")
-        try editor.renameAudience("students", to: "Studierende")
+        try editor.renameAudience("students", to: "  Studierende  ")
         #expect(editor.configuration.profile(id: "students")?.name == "Studierende")
+        // Its own id is fine as its name; another audience's id is not.
+        try editor.renameAudience("students", to: "students")
+        expectRefusal(.nameInUse("Colleagues")) { try editor.renameAudience("informal", to: "Colleagues") }
+        try editor.renameAudience("students", to: "Studierende")
+        expectRefusal(.nameInUse("STUDENTS")) { try editor.renameAudience("informal", to: "STUDENTS") }
+        expectRefusal(.nameInUse("colleagues")) { _ = try editor.addAudience(named: "colleagues") }
         let before = editor
         expectRefusal(.nameInUse("Colleagues")) { try editor.renameAudience("students", to: "Colleagues") }
         expectRefusal(.noSuchAudience("gone")) { try editor.renameAudience("gone", to: "X") }
@@ -97,6 +99,8 @@ struct SettingsAudienceTests {
         let students = try #require(editor.configuration.profile(id: "students"))
         #expect(students.register == .informal)
         #expect(students.toneGuidance == "Kurz.\nFreundlich.")
+        try editor.setToneGuidance(" \n\t ", forAudience: "students")
+        #expect(editor.configuration.profile(id: "students")?.toneGuidance == "")
         try editor.setToneGuidance(String(repeating: "a", count: 2_000), forAudience: "students")
         expectRefusal(.outOfRange("At most 2,000 characters")) {
             try editor.setToneGuidance(String(repeating: "a", count: 2_001), forAudience: "students")
@@ -136,6 +140,7 @@ struct SettingsAudienceTests {
         try editor.deleteAudience("administration")
         #expect(editor.configuration.profiles.map(\.id) == ["informal"])
         expectRefusal(.lastAudience) { try editor.deleteAudience("informal") }
+        // An unknown id is that, not "the last one".
         expectRefusal(.noSuchAudience("students")) { try editor.deleteAudience("students") }
         #expect(editor.configuration.profiles.map(\.id) == ["informal"])
         try expectRoundTrip(editor)
@@ -156,5 +161,15 @@ struct SettingsAudienceTests {
         #expect(editor.configuration.profiles.map(\.id) == ["colleagues", "informal", "administration"])
         #expect(editor.configuration.profile(id: "colleagues")?.toneGuidance == "mine")
         try expectRoundTrip(editor)
+    }
+
+    @Test("a shipped audience whose id is now another's name is not restored")
+    func restoreSkipsIdAsName() throws {
+        var editor = editor()
+        try editor.deleteAudience("informal")
+        try editor.renameAudience("colleagues", to: "informal")
+        let result = editor.restoreShippedAudiences()
+        #expect(result.restored == [])
+        #expect(result.skipped == ["Informal"])
     }
 }

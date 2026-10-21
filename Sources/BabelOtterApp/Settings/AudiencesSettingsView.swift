@@ -9,6 +9,8 @@ struct AudiencesSettingsView: View {
     @ObservedObject var model: SettingsModel
     @State private var selection: String?
     @State private var confirmingDelete: AudienceProfile?
+    /// The name being typed for a new audience; nil when not adding.
+    @State private var newName: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -24,6 +26,19 @@ struct AudiencesSettingsView: View {
         .onChange(of: model.configuration.profiles) { selectFirstIfNeeded() }
         .onChange(of: model.addedAudience) {
             if let added = model.addedAudience { selection = added }
+        }
+        .alert(
+            "New audience",
+            isPresented: Binding(get: { newName != nil }, set: { if !$0 { newName = nil } })
+        ) {
+            TextField("Name", text: Binding(get: { newName ?? "" }, set: { newName = $0 }))
+            Button("Add") {
+                if let name = newName { _ = model.addAudience(named: name) }
+                newName = nil
+            }
+            Button("Cancel", role: .cancel) { newName = nil }
+        } message: {
+            Text("Its id is made from this name and stays when it is renamed.")
         }
         .alert(
             "Delete \(confirmingDelete?.name ?? "")?",
@@ -49,7 +64,7 @@ struct AudiencesSettingsView: View {
                 }
             }
             HStack {
-                Button { model.addAudience() } label: { Image(systemName: "plus") }
+                Button { newName = "" } label: { Image(systemName: "plus") }
                     .help("Add an audience")
                 Button("Delete\u{2026}") {
                     confirmingDelete = model.configuration.profiles.first { $0.id == selection }
@@ -168,6 +183,7 @@ private struct AudienceDetail: View {
                 case .register: break
                 }
             }
+            model.noteRefusalsOnLeaving(profile.name, of: profile.id)
         }
     }
 

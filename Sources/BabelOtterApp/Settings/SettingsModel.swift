@@ -144,14 +144,20 @@ final class SettingsModel: ObservableObject {
 
     // MARK: - Audiences
 
-    func addAudience() {
+    /// The id is made from this name, so it is asked for first. True when
+    /// the audience was added.
+    func addAudience(named name: String) -> Bool {
         var added: String?
         edit(.audiences) { editor in
-            added = try editor.addAudience(named: editor.newAudienceName())
+            added = try editor.addAudience(named: name)
         }
-        if let added { addedAudience = added }
         audienceNote = nil
+        guard let added else { return false }
+        addedAudience = added
+        return true
     }
+
+
 
     func restoreShippedAudiences() {
         var result: (restored: [String], skipped: [String]) = ([], [])
@@ -166,12 +172,27 @@ final class SettingsModel: ObservableObject {
         audienceNote = parts.isEmpty ? nil : parts.joined(separator: " ")
     }
 
-    /// Shipped audiences whose id is missing.
-    var canRestoreAudiences: Bool {
-        for shipped in AudienceProfile.shippedDefaults {
-            if configuration.profile(id: shipped.id) == nil { return true }
+    /// An audience's fields leave the screen (another selected, the tab
+    /// switched, deleted): a refusal still under one of them moves under
+    /// the list, naming the audience, or would never be seen.
+    func noteRefusalsOnLeaving(_ name: String, of id: String) {
+        var message: String?
+        for field in [AudienceField.name, .register, .guidance, .terms] {
+            if let refused = refusals[.audience(id, field)] {
+                if message == nil { message = refused }
+                refusals[.audience(id, field)] = nil
+            }
         }
-        return false
+        guard let message else { return }
+        // A deleted audience has nothing left to save.
+        if configuration.profile(id: id) == nil { return }
+        audienceNote = "\(name): \(message) Not saved."
+    }
+
+    /// True when Restore would add at least one audience.
+    var canRestoreAudiences: Bool {
+        var trial = editor
+        return !trial.restoreShippedAudiences().restored.isEmpty
     }
 
     func refuse(_ field: SettingsField, _ message: String) {
