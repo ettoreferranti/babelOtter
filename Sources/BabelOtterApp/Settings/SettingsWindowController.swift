@@ -27,10 +27,7 @@ final class SettingsWindowController {
         self.window = window
         model.configurationChanged()
         model.windowShown()
-        if window.isMiniaturized { window.deminiaturize(nil) }
-        // An accessory app has to bring itself forward for a normal window.
-        NSApp.activate()
-        window.makeKeyAndOrderFront(nil)
+        window.present()
     }
 
     /// config.json was reloaded.
@@ -43,6 +40,7 @@ final class SettingsWindowController {
         tabs.tabStyle = .toolbar
         tabs.addTabViewItem(tab("General", "gearshape", 560, GeneralSettingsView(model: model)))
         tabs.addTabViewItem(tab("Models", "cpu", 400, ModelsSettingsView(model: model)))
+        tabs.addTabViewItem(tab("Audiences", "person.2", 480, AudiencesSettingsView(model: model)))
         tabs.addTabViewItem(tab("Hotkeys", "keyboard", 360, HotKeysSettingsView(model: model)))
         let window = AppWindow(contentViewController: tabs)
         window.styleMask = [.titled, .closable, .miniaturizable]

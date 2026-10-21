@@ -32,6 +32,18 @@ class AppWindow: NSWindow {
         super.sendEvent(event)
     }
 
+    /// In front of every other app's windows, and key. Asking macOS to
+    /// activate lingoSwen is not enough: since macOS 14 activation is a
+    /// request the system may decline for a menu-bar app, and the window
+    /// then opened behind the app in use. Ordered front regardless, as the
+    /// popup is.
+    func present() {
+        if isMiniaturized { deminiaturize(nil) }
+        NSApp.activate()
+        orderFrontRegardless()
+        makeKey()
+    }
+
     /// Command-F; false when the window has nothing to find.
     func find() -> Bool { false }
 

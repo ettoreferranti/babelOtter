@@ -27,10 +27,7 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
     func show() {
         if !isOpen { open() }
         guard let window else { return }
-        if window.isMiniaturized { window.deminiaturize(nil) }
-        // An accessory app has to bring itself forward for a normal window.
-        NSApp.activate()
-        window.makeKeyAndOrderFront(nil)
+        window.present()
     }
 
     /// A record was saved.
