@@ -17,6 +17,7 @@ Settings has a fourth tab, **Audiences**: the list on the left, the selected aud
 | A5 | Delete Students (confirm); open a Translate popup; then Restore shipped audiences | Students is gone from the popup's picker; Restore brings it back at the end of the list |
 | A6 | Delete audiences until one is left | Delete… is disabled for the last one |
 | A7 | In General, switch the clipboard option on and off twice quickly | Each click is written; no "changed on disk" message |
+| A8 | With another app's window in front (e.g. Safari, full size), choose Settings… in the menu; close it; then choose History… | Each window opens in front of Safari, not behind it |
 
 ## Update 2026-10-20: the settings window, first part (#61, #60)
 

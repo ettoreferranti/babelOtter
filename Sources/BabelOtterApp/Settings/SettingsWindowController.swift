@@ -27,10 +27,7 @@ final class SettingsWindowController {
         self.window = window
         model.configurationChanged()
         model.windowShown()
-        if window.isMiniaturized { window.deminiaturize(nil) }
-        // An accessory app has to bring itself forward for a normal window.
-        NSApp.activate()
-        window.makeKeyAndOrderFront(nil)
+        window.present()
     }
 
     /// config.json was reloaded.
