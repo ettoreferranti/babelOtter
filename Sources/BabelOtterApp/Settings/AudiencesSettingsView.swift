@@ -120,7 +120,6 @@ private struct AudienceDetail: View {
                 TextField("Name", text: $name)
                     .focused($focused, equals: .name)
                     .onSubmit { commitName() }
-                Text("id: \(profile.id)").font(.caption).foregroundStyle(.secondary)
                 RefusalText(text: refusal(.name))
                 Picker("Register", selection: Binding(
                     get: { profile.register },
@@ -130,10 +129,18 @@ private struct AudienceDetail: View {
                         }
                     })
                 ) {
-                    Text("Sie").tag(Register.formal)
-                    Text("du").tag(Register.informal)
+                    Text("Formal").tag(Register.formal)
+                    Text("Informal").tag(Register.informal)
                 }
                 .pickerStyle(.segmented)
+                // The form the chosen register gives in each language that
+                // has one: Formal shows "Sie", Informal "du".
+                ForEach(model.configuration.enabledLanguages, id: \.code) { language in
+                    if let forms = language.addressForms {
+                        Text("\(language.displayName): \(forms.form(for: profile.register))")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
             }
             Section("Tone guidance") {
                 TextEditor(text: $guidance)

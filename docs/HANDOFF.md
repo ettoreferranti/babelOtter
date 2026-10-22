@@ -2,6 +2,20 @@
 
 Read this first if you are picking babelOtter up in a new session.
 
+## Update 2026-10-21: formality per target language (#110); epic #11's stories done
+
+An audience's `register` is now `"formal"` or `"informal"` (the old `"Sie"`/`"du"` still load; the next save writes the new values). A language carries its pronouns as data: `"addressForms" : {"formal" : "Sie", "informal" : "du"}` on de-ch, `null` on English; a language without the key gets the shipped language's forms for its code, so an existing de-ch keeps Sie/du. Prompts name the target's form (`Address the reader as "Sie".`) or, for a language without forms, the register in words (`Write in a formal register.`); the inference list and Correct follow the same rule. The popup shows "Students (Sie)" into German and "Students (formal)" into English; the Audiences tab offers Formal / Informal, and under it the form the chosen one gives in each language that has forms ("Swiss Standard German: Sie"). The audience's id is no longer shown in the tab (it stays in `config.json`). The Settings window can now be resized, and keeps its size when the tab changes. Italian or French are then one `addressForms` line each. A German written as `de`, `de-de` or `de-at` without the key gets the same forms (by base code). **No going back:** once this build saves `config.json`, a build from before #110 cannot read `"formal"` and falls back to the defaults for the whole file (and would overwrite it on its next save); keep a copy of `config.json` if you might run an older build. Spec: `docs/superpowers/specs/2026-10-21-formality-design.md`.
+
+**Manual check (yours).** Rebuild first (`Tools/make-app.sh --run`).
+
+| # | Do | Expect |
+|---|---|---|
+| F1 | Start lingoSwen; change any setting; look at `config.json` | Your audiences still load; `register` reads `"formal"`/`"informal"`; de-ch has `"addressForms"` with Sie/du, English `null` |
+| F2 | Translate an English email to Students into German | Uses Sie, as before; the picker shows "Students (Sie)" |
+| F3 | Translate a German text into English with Administration; then pick Informal | The picker shows "Administration (formal)"; the English is formal, then casual |
+| F4 | Open Settings, Audiences; switch Students between Formal and Informal; then resize the window and switch tabs | Under the control, "Swiss Standard German: Sie", then "…: du"; no id line; the window resizes and keeps its size across tabs |
+| F5 | Correct a German du-text to Students (formal) | The register error is reported as before |
+
 ## Update 2026-10-21: the Glossary tab and a concept glossary (#59, #61 third part)
 
 The glossary is now a **concept glossary**: one row per term, one term per configured language (`"glossary": {"concepts": [{"de-ch": "Modul", "en": "module"}]}`). Translating from A to B uses every row with a term in both, so adding French adds a column, not rows. The old `entries` format still loads, one concept each, and then applies in both directions; the next save writes `concepts`. A term for a language that is not configured is kept. Settings has a fifth tab, **Glossary**: a grid with a column per language and a list of do-not-translate terms below; + adds a row saved by its first term, − deletes a row. A term is unique per language ignoring case; at most 80 characters, 200 rows, 100 do-not-translate terms. Do-not-translate matching is exact, capitals included (as before). `PromptBuilder` and `Translator` are unchanged. Spec: `docs/superpowers/specs/2026-10-21-settings-glossary-design.md`. Two-language assumptions elsewhere are now criteria on #81; per-language formality is #110 (next).

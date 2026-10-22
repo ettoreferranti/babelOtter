@@ -29,6 +29,15 @@ final class PopupModel {
     private(set) var direction: Direction?
     /// Re-pitch's language, once known (#66).
     private(set) var language: LanguageCode?
+
+    /// The language the audience is written for: Translate's target,
+    /// Re-pitch's language, Correct's German; nil until known (#110).
+    var writingLanguage: LanguageConfig? {
+        if let target = direction?.target { return configuration.language(for: target) }
+        if let language { return configuration.language(for: language) }
+        if action == .correct { return configuration.germanLanguage }
+        return nil
+    }
     private(set) var text = ""
     private(set) var warnings: [String] = []
     private(set) var message: String?

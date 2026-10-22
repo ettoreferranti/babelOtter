@@ -59,6 +59,42 @@ public struct LocaleRule: Sendable, Equatable, Codable {
     }
 }
 
+/// How a language addresses a reader formally and informally (#110):
+/// Sie/du, Lei/tu, vous/tu. A language without the distinction (English)
+/// has none.
+public struct AddressForms: Sendable, Equatable, Codable {
+    public let formal: String
+    public let informal: String
+
+    public init(formal: String, informal: String) {
+        self.formal = formal
+        self.informal = informal
+    }
+
+    public func form(for register: Register) -> String {
+        switch register {
+        case .formal: return formal
+        case .informal: return informal
+        }
+    }
+
+    static let expected = "expected a formal and an informal form"
+
+    /// Both forms must be there and not blank.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let formal = try container.decode(String.self, forKey: .formal)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let informal = try container.decode(String.self, forKey: .informal)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if formal.isEmpty || informal.isEmpty {
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(codingPath: decoder.codingPath, debugDescription: Self.expected))
+        }
+        self.init(formal: formal, informal: informal)
+    }
+}
+
 /// A language babelOtter can translate to or from, defined entirely as data.
 ///
 /// `FR-LNG-01` says no language is hardcoded in logic, and `FR-LNG-03` says
@@ -71,12 +107,68 @@ public struct LanguageConfig: Sendable, Equatable, Codable {
     public let displayName: String
     public let localeRules: [LocaleRule]
     public var enabled: Bool
+    /// Nil for a language without a formal/informal distinction (#110).
+    public let addressForms: AddressForms?
 
-    public init(code: LanguageCode, displayName: String, localeRules: [LocaleRule], enabled: Bool) {
+    public init(
+        code: LanguageCode, displayName: String, localeRules: [LocaleRule], enabled: Bool,
+        addressForms: AddressForms? = nil
+    ) {
         self.code = code
         self.displayName = displayName
         self.localeRules = localeRules
         self.enabled = enabled
+        self.addressForms = addressForms
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case code, displayName, localeRules, enabled, addressForms
+    }
+
+    /// `addressForms` absent -- a file from before #110 -- takes the shipped
+    /// language's forms for the same code, else for the same base code
+    /// ("de" or "de-at" take de-ch's, as `Configuration.germanLanguage`
+    /// matches German), so no German loses Sie/du and no language is named
+    /// in logic; `null` means none.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let code = try container.decode(LanguageCode.self, forKey: .code)
+        var forms: AddressForms?
+        if container.contains(.addressForms) {
+            forms = try container.decodeIfPresent(AddressForms.self, forKey: .addressForms)
+        } else {
+            forms = Self.shippedForms(for: code)
+        }
+        self.init(
+            code: code,
+            displayName: try container.decode(String.self, forKey: .displayName),
+            localeRules: try container.decode([LocaleRule].self, forKey: .localeRules),
+            enabled: try container.decode(Bool.self, forKey: .enabled),
+            addressForms: forms)
+    }
+
+    static func shippedForms(for code: LanguageCode) -> AddressForms? {
+        for shipped in shippedDefaults where shipped.code == code {
+            return shipped.addressForms
+        }
+        for shipped in shippedDefaults where shipped.code.baseSubtag == code.baseSubtag {
+            return shipped.addressForms
+        }
+        return nil
+    }
+
+    /// Always writes `addressForms`, `null` for none, so the file shows it.
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(code, forKey: .code)
+        try container.encode(displayName, forKey: .displayName)
+        try container.encode(localeRules, forKey: .localeRules)
+        try container.encode(enabled, forKey: .enabled)
+        if let addressForms {
+            try container.encode(addressForms, forKey: .addressForms)
+        } else {
+            try container.encodeNil(forKey: .addressForms)
+        }
     }
 }
 
@@ -97,7 +189,8 @@ extension LanguageConfig {
         // "\u{00DF}" is the eszett. Written as an escape for the ASCII-only
         // source rule -- see AsciiSourceTests.
         localeRules: [LocaleRule(replace: "\u{00DF}", with: "ss")],
-        enabled: true
+        enabled: true,
+        addressForms: AddressForms(formal: "Sie", informal: "du")
     )
 
     /// What a fresh install gets: English and de-CH, both enabled (`FR-LNG-03`).

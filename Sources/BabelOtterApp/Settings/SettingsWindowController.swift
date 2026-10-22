@@ -44,7 +44,7 @@ final class SettingsWindowController {
         tabs.addTabViewItem(tab("Glossary", "character.book.closed", 540, GlossarySettingsView(model: model)))
         tabs.addTabViewItem(tab("Hotkeys", "keyboard", 360, HotKeysSettingsView(model: model)))
         let window = AppWindow(contentViewController: tabs)
-        window.styleMask = [.titled, .closable, .miniaturizable]
+        window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
         window.title = "Settings"
         window.isReleasedWhenClosed = false
         window.center()
@@ -52,12 +52,15 @@ final class SettingsWindowController {
         return window
     }
 
-    /// A fixed size per tab: a grouped Form has no natural height of its own.
+    /// A minimum size per tab, growing with the window: a grouped Form has
+    /// no natural height of its own. Only the minimum is passed on, so the
+    /// window can be resized and keeps its size when the tab changes.
     private func tab<Content: View>(
         _ label: String, _ symbol: String, _ height: CGFloat, _ view: Content
     ) -> NSTabViewItem {
-        let controller = NSHostingController(rootView: view.frame(width: 560, height: height))
-        controller.sizingOptions = [.preferredContentSize]
+        let controller = NSHostingController(rootView: view.frame(
+            minWidth: 560, maxWidth: .infinity, minHeight: height, maxHeight: .infinity))
+        controller.sizingOptions = [.minSize]
         let item = NSTabViewItem(viewController: controller)
         item.label = label
         item.image = NSImage(systemSymbolName: symbol, accessibilityDescription: label)

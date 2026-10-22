@@ -1,15 +1,47 @@
 import Foundation
 
-/// How the writer addresses the reader.
+/// How formally the writer addresses the reader (#110).
 ///
-/// Modelled as a named axis rather than a `Bool` because `FR-PRO-01` treats
-/// register as one of the things a profile *carries*, and because German's
-/// Sie/du split is not the only register distinction a later language might
-/// need. The raw values are the pronouns themselves, so the value can be dropped
-/// into a prompt without a translation table.
-public enum Register: String, Sendable, Codable, CaseIterable {
-    case formal = "Sie"
-    case informal = "du"
+/// Only the level: how a language expresses it -- Sie/du, Lei/tu, or no
+/// pronoun at all in English -- is that language's `AddressForms`, so an
+/// audience means the same whichever language it is written in.
+public enum Register: String, Sendable, CaseIterable, Codable {
+    case formal
+    case informal
+
+    static let expected = "expected \"formal\" or \"informal\""
+
+    /// "formal", for labels.
+    public var word: String { rawValue }
+
+    /// "a formal register", "an informal register", as a prompt says it
+    /// for a language without forms.
+    public var phrase: String {
+        switch self {
+        case .formal: return "a formal register"
+        case .informal: return "an informal register"
+        }
+    }
+
+    /// Also the values before #110, the German pronouns: "Sie", "du".
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let written = try container.decode(String.self)
+        switch written.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "formal", "sie":
+            self = .formal
+        case "informal", "du":
+            self = .informal
+        default:
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(codingPath: decoder.codingPath, debugDescription: Self.expected))
+        }
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 /// A named bundle of register, tone guidance and glossary bias.
@@ -51,6 +83,15 @@ public struct AudienceProfile: Sendable, Equatable, Codable, Identifiable {
 }
 
 extension AudienceProfile {
+
+    /// "Students (Sie)" for a language with address forms, "Students
+    /// (formal)" for one without, and the name alone before the language
+    /// is known (#110).
+    public func label(in language: LanguageConfig?) -> String {
+        guard let language else { return name }
+        guard let forms = language.addressForms else { return "\(name) (\(register.word))" }
+        return "\(name) (\(forms.form(for: register)))"
+    }
 
     public static let students = AudienceProfile(
         id: "students",
