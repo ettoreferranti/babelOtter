@@ -17,12 +17,12 @@ final class SettingsWindowController {
         source: ConfigurationSource, layout: @escaping () -> KeyLayout,
         client: @escaping () -> OllamaClient, suspendHotKeys: @escaping () -> Void,
         resumeHotKeys: @escaping () -> Void, modelsChanged: @escaping () -> Void,
-        reloadConfiguration: @escaping () -> Void
+        reloadConfiguration: @escaping () -> Void, openSetupGuide: @escaping () -> Void
     ) {
         model = SettingsModel(
             source: source, layout: layout, client: client, suspendHotKeys: suspendHotKeys,
             resumeHotKeys: resumeHotKeys, modelsChanged: modelsChanged,
-            reloadConfiguration: reloadConfiguration)
+            reloadConfiguration: reloadConfiguration, openSetupGuide: openSetupGuide)
     }
 
     func show() {

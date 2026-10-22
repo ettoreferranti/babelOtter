@@ -63,6 +63,8 @@ final class SettingsModel: ObservableObject {
     private let modelsChanged: () -> Void
     /// Re-reads config.json into the app, as the watcher would.
     private let reloadConfiguration: () -> Void
+    /// The setup window from its first step, from General.
+    let openSetupGuide: () -> Void
     /// Only the latest list of installed models is shown.
     private var modelsGeneration = 0
     let layout: () -> KeyLayout
@@ -73,9 +75,10 @@ final class SettingsModel: ObservableObject {
         source: ConfigurationSource, layout: @escaping () -> KeyLayout,
         client: @escaping () -> OllamaClient, suspendHotKeys: @escaping () -> Void,
         resumeHotKeys: @escaping () -> Void, modelsChanged: @escaping () -> Void,
-        reloadConfiguration: @escaping () -> Void
+        reloadConfiguration: @escaping () -> Void, openSetupGuide: @escaping () -> Void
     ) {
         self.reloadConfiguration = reloadConfiguration
+        self.openSetupGuide = openSetupGuide
         self.source = source
         self.layout = layout
         self.client = client

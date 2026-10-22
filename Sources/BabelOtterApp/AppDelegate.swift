@@ -51,21 +51,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// While a settings hotkey recorder listens, no hotkey is registered,
     /// so pressing one records it rather than running its action (#61).
     private var hotKeysSuspended = false
-    private lazy var setupWindow = SetupWindowController(
+    private lazy var setupWindow: SetupWindowController = SetupWindowController(
         settings: settingsWindow.settingsModel,
         environment: { [unowned self] in self.environment },
         startOllama: { [unowned self] in self.startOllama() })
     private lazy var privacyWindow = PrivacyWindowController(
         historyPolicy: { [unowned self] in self.history.policy },
         historyUnavailable: { [unowned self] in self.history.unavailableReason })
-    private lazy var settingsWindow = SettingsWindowController(
+    private lazy var settingsWindow: SettingsWindowController = SettingsWindowController(
         source: source,
         layout: { [unowned self] in self.lastLayout },
         client: { [unowned self] in self.environment.client },
         suspendHotKeys: { [unowned self] in self.suspendHotKeys() },
         resumeHotKeys: { [unowned self] in self.resumeHotKeys() },
         modelsChanged: { [unowned self] in self.monitor.refresh() },
-        reloadConfiguration: { [unowned self] in self.configurationChanged() })
+        reloadConfiguration: { [unowned self] in self.configurationChanged() },
+        openSetupGuide: { [unowned self] in self.setupWindow.showFull() })
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         buildMenu()
@@ -267,9 +268,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         self.historyItem = historyItem
         menu.addItem(historyItem)
         menu.addItem(action("Privacy\u{2026}", #selector(showPrivacyAction)))
-        menu.addItem(action("Setup Guide\u{2026}", #selector(showSetupAction)))
-        menu.addItem(action("Check Again", #selector(refreshStatusAction)))
-        menu.addItem(action("Open Configuration Folder", #selector(openConfiguration)))
+        // Setup Guide and the configuration file are in Settings > General;
+        // the status above re-checks each time the menu opens.
         menu.addItem(.separator())
         menu.addItem(withTitle: "Quit lingoSwen", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         item.menu = menu
@@ -283,7 +283,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
 
-    @objc private func refreshStatusAction() { monitor.refresh() }
 
     @objc private func showHistoryAction() { historyWindow.show() }
 
@@ -291,7 +290,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func showPrivacyAction() { privacyWindow.show() }
 
-    @objc private func showSetupAction() { setupWindow.showFull() }
 
     /// A fresh install -- no config.json at launch, setup never finished --
     /// is walked through setup (#70); an existing one is left alone. Step 1
@@ -434,11 +432,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             try? await Task.sleep(for: .seconds(3))
             self?.monitor.refresh()
         }
-    }
-
-    @objc private func openConfiguration() {
-        let home = FileManager.default.homeDirectoryForCurrentUser
-        NSWorkspace.shared.open(home.appending(path: "Library/Application Support/\(BabelOtter.bundleIdentifier)"))
     }
 
     @objc private func translateSelectionAction() { startAction(.translate) }

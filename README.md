@@ -33,8 +33,8 @@ leaving your machine.
 > Settings… in the menu covers languages, history, timeout, clipboard, a
 > model per action, audiences, the glossary and do-not-translate list, and
 > hotkeys (#61, #60, #59); Privacy… shows live privacy status (#72, #73);
-> a first launch is walked through setup, and Setup Guide… reopens it (#70,
-> #71) — see
+> a first launch is walked through setup, and Settings › General › Run Setup
+> Guide… reopens it (#70, #71) — see
 > [`docs/HANDOFF.md`](docs/HANDOFF.md) for exactly what is done and skipped.
 >
 > **To build and run it:**

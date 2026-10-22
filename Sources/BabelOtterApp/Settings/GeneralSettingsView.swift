@@ -60,6 +60,14 @@ struct GeneralSettingsView: View {
             }
             .formStyle(.grouped)
             .disabled(model.isReadOnly)
+            // Outside the form, so they work while config.json is broken --
+            // when showing the file is most needed.
+            HStack {
+                Button("Show config.json in Finder") { model.showFile() }
+                Spacer()
+                Button("Run Setup Guide\u{2026}") { model.openSetupGuide() }
+            }
+            .padding([.horizontal, .bottom])
         }
         .onAppear { resetDrafts() }
         .onChange(of: model.configuration) { resetDrafts() }
