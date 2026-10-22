@@ -34,11 +34,13 @@ public enum PrivacyReport {
         + "can carry to your other devices; see PRIVACY.md."
 
     /// `historyRefusal` is why the history folder is refused (inside
-    /// iCloud), nil when it is accepted.
+    /// iCloud), nil when it is accepted. `historyUnavailable` is why the
+    /// history store is not saving (it could not be opened), as the history
+    /// recorder knows it: the panel says what history really does.
     public static func lines(
         endpoint: OllamaEndpoint, listening: ListeningExposure, historyFolder: String,
-        historyRefusal: StorageLocationError?, history: HistoryPolicy,
-        packages: Int = BuildFacts.thirdPartyPackages
+        historyRefusal: StorageLocationError?, historyUnavailable: String? = nil,
+        history: HistoryPolicy, packages: Int = BuildFacts.thirdPartyPackages
     ) -> [PrivacyLine] {
         [
             PrivacyLine(
@@ -46,7 +48,7 @@ public enum PrivacyReport {
                 detail: "\(endpoint.baseURL.absoluteString) - this Mac only (loopback).",
                 mark: .ok, remedy: nil),
             listeningLine(listening),
-            historyLine(historyFolder, historyRefusal, history),
+            historyLine(historyFolder, historyRefusal, historyUnavailable, history),
             PrivacyLine(
                 title: "Dependencies",
                 detail: packagesText(packages) + "; checked against the allowlist on every change.",
@@ -64,8 +66,11 @@ public enum PrivacyReport {
         let risk = " Other devices on your network can use your Ollama and see what is sent to it."
         switch listening {
         case .loopbackOnly(let hosts):
+            // lsof without admin rights sees only this user's processes.
             return PrivacyLine(
-                title: title, detail: "This Mac only (\(hosts.joined(separator: ", "))).",
+                title: title,
+                detail: "This Mac only (\(hosts.joined(separator: ", "))), for the Ollama running "
+                    + "as you. One run by another user or as root would not be seen here.",
                 mark: .ok, remedy: nil)
         case .exposed(let hosts, let everywhere):
             var reach = "This network"
@@ -76,18 +81,24 @@ public enum PrivacyReport {
         case .unknown:
             return PrivacyLine(
                 title: title,
-                detail: "Unknown: Ollama is not running, or macOS did not say. "
-                    + "This is not a sign that it is safe.",
+                detail: "Unknown: Ollama is not running, is run by another user or as root, or "
+                    + "macOS did not say. This is not a sign that it is safe.",
                 mark: .unknown, remedy: nil)
         }
     }
 
     static func historyLine(
-        _ folder: String, _ refusal: StorageLocationError?, _ policy: HistoryPolicy
+        _ folder: String, _ refusal: StorageLocationError?, _ unavailable: String?,
+        _ policy: HistoryPolicy
     ) -> PrivacyLine {
         if refusal != nil {
             return PrivacyLine(
                 title: "History", detail: "\(folder) is inside iCloud, so history is not saved.",
+                mark: .warning, remedy: nil)
+        }
+        if let unavailable {
+            return PrivacyLine(
+                title: "History", detail: "\(folder): history is not saved - \(unavailable).",
                 mark: .warning, remedy: nil)
         }
         return PrivacyLine(

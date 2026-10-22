@@ -5,13 +5,13 @@
 
 ## 1. What it does
 
-**Privacy...** in the menu (after History...) opens a small window that reports, line by line, what can be checked about lingoSwen's privacy right now. Each line has a mark: a check (as it should be), a warning, or a question mark (could not be determined, never reported as safe). **Check Again** re-reads everything; the window also re-reads when it is opened.
+**Privacy...** in the menu (after History...) opens a small window that reports, line by line, what can be checked about lingoSwen's privacy right now. Each line has a mark: a check (as it should be), a warning, or a question mark (could not be determined, never reported as safe). **Check Again** re-reads everything; the window also re-reads when it is opened. A check clears the lines first and shows a spinner, so an earlier result never stands in for the current one; only the latest check's result is shown.
 
 | Line | Shows | Mark |
 |---|---|---|
 | Model connection | `http://127.0.0.1:11434`, "this Mac only (loopback)" | Check: `OllamaEndpoint` can only be built from a loopback address, so this is a fact of the build, not a measurement |
-| Ollama listens on | the addresses Ollama's port is open on, as macOS reports them | Check for loopback only; **warning** for any other address ("all networks" for `*`, `0.0.0.0` or `::`; "this network" for a specific address); question mark when nothing is reported (Ollama not running, or another user's process) |
-| History | the folder (`~/Library/Application Support/ch.lingoswen/`), and the retention in words ("kept 90 days", "off") | Check when the folder is outside iCloud; warning when it is inside (history is then not saved, #67) |
+| Ollama listens on | the addresses Ollama's port is open on, as macOS reports them | Check for loopback only, worded "for the Ollama running as you": lsof without admin rights does not see another user's or root's processes, and the panel says so; **warning** for any other address ("all networks" for `*`, `0.0.0.0` or `::`; "this network" for a specific address); question mark when nothing is reported (not running, run by another user or as root) |
+| History | the folder (`~/Library/Application Support/ch.lingoswen/`), and the retention in words ("kept 90 days", "off") | Check when the folder is outside iCloud and the history recorder opened its database; warning when the folder is inside iCloud, when the recorder could not open the database (its own reason, so the panel says what history really does), or on any unexpected error |
 | Dependencies | "0 third-party packages", "checked against the allowlist on every change" | Check |
 | Telemetry | "No telemetry, analytics or crash reporting. Nothing is sent anywhere but the local model." | Check (a statement, not a measurement; worded so) |
 

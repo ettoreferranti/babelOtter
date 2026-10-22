@@ -11,9 +11,14 @@ final class PrivacyModel: ObservableObject {
     @Published var copied = false
 
     private let historyPolicy: () -> HistoryPolicy
+    private let historyUnavailable: () -> String?
+    /// Only the latest check's result is shown.
+    private var generation = 0
+    private var copies = 0
 
-    init(historyPolicy: @escaping () -> HistoryPolicy) {
+    init(historyPolicy: @escaping () -> HistoryPolicy, historyUnavailable: @escaping () -> String?) {
         self.historyPolicy = historyPolicy
+        self.historyUnavailable = historyUnavailable
     }
 
     /// The bundled copy, nil when running outside the app bundle.
@@ -21,24 +26,32 @@ final class PrivacyModel: ObservableObject {
         Bundle.main.url(forResource: "PRIVACY", withExtension: "md")
     }
 
+    /// Clears what is shown first: an earlier check must not stand in for
+    /// this one while it runs.
     func check() {
+        generation += 1
+        let current = generation
+        lines = []
         checking = true
         Task {
             let listening = await ListeningProbeRunner.run()
             let locator = AppStorage.locator()
             let folder = locator.applicationSupportDirectory()
             var refusal: StorageLocationError?
+            var unavailable = historyUnavailable()
             do {
                 try locator.validate(folder)
             } catch let error as StorageLocationError {
                 refusal = error
             } catch {
-                refusal = nil
+                // Never read an unexpected failure as "accepted".
+                unavailable = error.localizedDescription
             }
+            guard current == generation else { return }
             lines = PrivacyReport.lines(
                 endpoint: .loopback, listening: listening,
                 historyFolder: Self.abbreviated(folder), historyRefusal: refusal,
-                history: historyPolicy())
+                historyUnavailable: unavailable, history: historyPolicy())
             checking = false
         }
     }
@@ -46,9 +59,11 @@ final class PrivacyModel: ObservableObject {
     func copy(_ command: String) {
         SystemPasteboard().write(command, concealed: false)
         copied = true
+        copies += 1
+        let current = copies
         Task {
             try? await Task.sleep(for: .seconds(1.5))
-            copied = false
+            if current == copies { copied = false }
         }
     }
 
@@ -73,8 +88,8 @@ final class PrivacyWindowController {
     private let model: PrivacyModel
     private var window: AppWindow?
 
-    init(historyPolicy: @escaping () -> HistoryPolicy) {
-        model = PrivacyModel(historyPolicy: historyPolicy)
+    init(historyPolicy: @escaping () -> HistoryPolicy, historyUnavailable: @escaping () -> String?) {
+        model = PrivacyModel(historyPolicy: historyPolicy, historyUnavailable: historyUnavailable)
     }
 
     func show() {

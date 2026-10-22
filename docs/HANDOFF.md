@@ -11,7 +11,7 @@ Read this first if you are picking babelOtter up in a new session.
 | # | Do | Expect |
 |---|---|---|
 | P1 | Choose Privacy… in the menu | The window opens in front; five lines, all ✓ with Ollama running as installed |
-| P2 | Quit Ollama; Check Again; start Ollama again | "Ollama listens on" shows ? and "Unknown … not a sign that it is safe", not ✓ |
+| P2 | Quit Ollama; Check Again; start Ollama again | The lines clear and a spinner shows while checking; "Ollama listens on" shows ? and "Unknown … not a sign that it is safe", not ✓ |
 | P3 | `launchctl setenv OLLAMA_HOST 0.0.0.0:11434`, quit and restart Ollama, Check Again; press Copy; then `launchctl unsetenv OLLAMA_HOST`, restart Ollama, Check Again | ⚠ "All networks (*)", the risk sentence and the command; Copy puts `launchctl setenv OLLAMA_HOST 127.0.0.1:11434` on the clipboard; after unsetting, ✓ again |
 | P4 | Press Open PRIVACY.md | It opens in your Markdown app |
 

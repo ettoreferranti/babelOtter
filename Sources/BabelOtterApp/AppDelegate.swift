@@ -52,7 +52,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// so pressing one records it rather than running its action (#61).
     private var hotKeysSuspended = false
     private lazy var privacyWindow = PrivacyWindowController(
-        historyPolicy: { [unowned self] in self.history.policy })
+        historyPolicy: { [unowned self] in self.history.policy },
+        historyUnavailable: { [unowned self] in self.history.unavailableReason })
     private lazy var settingsWindow = SettingsWindowController(
         source: source,
         layout: { [unowned self] in self.lastLayout },
