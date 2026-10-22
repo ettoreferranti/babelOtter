@@ -19,6 +19,8 @@ mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 cp "$bin" "$app/Contents/MacOS/lingoSwen"
 cp Tools/app/Info.plist "$app/Contents/Info.plist"
 cp Tools/app/Mascot.png "$app/Contents/Resources/Mascot.png"
+# The Privacy panel opens this build's own copy (#72).
+cp PRIVACY.md "$app/Contents/Resources/PRIVACY.md"
 
 # The app icon, from the same picture padded to a square.
 work="$(mktemp -d)"
