@@ -101,6 +101,10 @@ struct SetupView: View {
                     ForEach(choice.options, id: \.self) { name in Text(name).tag(name) }
                 }
                 .fixedSize()
+                .disabled(model.settings.isReadOnly)
+                if let refusal = model.modelRefusal {
+                    Text(refusal).font(.caption).foregroundStyle(.red)
+                }
                 if choice.isInstalled {
                     status(true, "\(model.facts.chosenModel) is installed.")
                 } else if let download = model.settings.download {

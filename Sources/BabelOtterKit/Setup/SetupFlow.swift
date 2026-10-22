@@ -70,12 +70,22 @@ public enum SetupFlow {
 }
 
 /// Whether the setup window opens by itself at launch (#70).
+///
+/// The answer is kept in its own flag rather than read from config.json,
+/// because the first launch writes config.json: a fresh user who closed
+/// the window early must see it again, though the file now exists.
 public enum SetupGate {
 
-    /// Only a fresh install: no config.json at launch, and setup never
-    /// finished. An existing install is not interrupted.
-    public static func shouldOpen(configurationExisted: Bool, setupCompleted: Bool) -> Bool {
-        if configurationExisted { return false }
+    /// What to store when the flag is not set yet: done for an install
+    /// that already had config.json, pending for a fresh one.
+    public static func initialCompleted(configurationExisted: Bool) -> Bool {
+        configurationExisted
+    }
+
+    /// `setupCompleted` nil: never decided, which `initialCompleted`
+    /// answers. Otherwise open until Finish set it true.
+    public static func shouldOpen(configurationExisted: Bool, setupCompleted: Bool?) -> Bool {
+        guard let setupCompleted else { return !initialCompleted(configurationExisted: configurationExisted) }
         return !setupCompleted
     }
 }

@@ -21,8 +21,9 @@ A window titled **Set Up lingoSwen**: the five steps in a sidebar, the current o
 
 ### 1.2 When it appears
 
-- **Fresh install:** no `config.json` at launch (the configuration is then written with the defaults, as today) and setup not recorded as done: the window opens at step 1 after launch. The first-launch system Accessibility prompt is no longer shown on its own; step 1 asks for it.
-- **Existing install:** `config.json` already existed at launch: setup counts as done and nothing appears.
+- **Decided once, in `setupCompleted`.** The first launch writes `config.json`, so the file can answer "fresh or existing?" only once. When the flag is not set yet, it is written then: done (true) if `config.json` already existed, pending (false) if not. From then on the window opens at launch while the flag is false, and Finish sets it true. (The first version read the file every launch, so a fresh user who closed the window early never saw it again; caught in review.)
+- **Fresh install:** the window opens at step 1 after launch, and at every launch until Finish. The first-launch system Accessibility prompt is no longer shown on its own; step 1 asks for it, and so does the menu's Accessibility remedy, which now opens the setup window's Accessibility step.
+- **Existing install:** setup is recorded as done the first time this build runs; nothing appears, even if `config.json` is later deleted.
 - **Any time:** **Setup Guide...** in the menu opens the window at step 1.
 - **Not finished:** a fresh install that closes the window before Finish sees it again at the next launch.
 
@@ -45,7 +46,7 @@ When Accessibility is missing and an action is triggered (hotkey or menu), the s
 - `SetupStep`: `.accessibility, .ollama, .model, .hotkeys, .tryIt`, with titles.
 - `SetupFacts`: `accessibilityGranted`, `daemon: DaemonProbe?` (nil while checking), `chosenModel`, `testSucceeded`.
 - `SetupFlow.blocker(for step: SetupStep, facts: SetupFacts) -> String?`: nil when the step may be left forward, otherwise the reason shown beside Continue ("Grant Accessibility to continue.", "Ollama isn't running.", "Checking Ollama...", "<model> is not installed.", "Translate the sentence to finish."). All wording here, tested.
-- `SetupGate.shouldOpen(configurationExisted: Bool, setupCompleted: Bool) -> Bool`: true only for no file and not completed.
+- `SetupGate.initialCompleted(configurationExisted:)` and `SetupGate.shouldOpen(configurationExisted:setupCompleted: Bool?)`: undecided follows the file; decided opens until finished.
 - `SetupFlow.sampleSentence`.
 
 ## 4. The app (`Sources/BabelOtterApp/Setup/`)

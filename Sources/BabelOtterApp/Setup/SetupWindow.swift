@@ -32,6 +32,7 @@ final class SetupModel: ObservableObject {
     private let startOllama: () -> Void
     private var loop: Task<Void, Never>?
     private var run: Task<Void, Never>?
+    private var probing = false
 
     init(settings: SettingsModel, environment: @escaping () -> AppEnvironment, startOllama: @escaping () -> Void) {
         self.settings = settings
@@ -46,8 +47,9 @@ final class SetupModel: ObservableObject {
 
     // MARK: - Checking
 
-    /// Accessibility every second; Ollama every other second while its
-    /// steps show.
+    /// Accessibility every second; Ollama every other second while a step
+    /// that needs it shows, in its own task so a slow answer never delays
+    /// the Accessibility check.
     func startChecking() {
         loop?.cancel()
         loop = Task { [weak self] in
@@ -57,11 +59,25 @@ final class SetupModel: ObservableObject {
                 self.facts.accessibilityGranted = AXIsProcessTrusted()
                 self.facts.chosenModel = self.settings.configuration.model(for: .translate)
                 if tick % 2 == 0 {
-                    if self.mode == .full { await self.probe() }
+                    if self.needsOllama { self.probeInBackground() }
                 }
                 tick += 1
                 try? await Task.sleep(for: .seconds(1))
             }
+        }
+    }
+
+    private var needsOllama: Bool {
+        if mode != .full { return false }
+        return step == .ollama || step == .model
+    }
+
+    private func probeInBackground() {
+        if probing { return }
+        probing = true
+        Task { [weak self] in
+            await self?.probe()
+            self?.probing = false
         }
     }
 
@@ -76,7 +92,14 @@ final class SetupModel: ObservableObject {
         let probe = await client.probe()
         facts.daemon = probe
         ollamaInstalled = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.electron.ollama") != nil
-        if case .reachable = probe { settings.loadModelsQuietly() }
+    }
+
+    /// A fresh walk-through, or another model: the test is due again.
+    func resetTest() {
+        run?.cancel()
+        facts.testSucceeded = false
+        translation = ""
+        translationError = nil
     }
 
     // MARK: - Steps
@@ -93,11 +116,15 @@ final class SetupModel: ObservableObject {
 
     /// The same model for every action.
     func chooseModel(_ name: String) {
-        settings.edit(.model(.translate)) { editor in
+        let written = settings.edit(.model(.translate)) { editor in
             for action in Action.allCases { try editor.setModel(name, for: action) }
         }
         facts.chosenModel = settings.configuration.model(for: .translate)
+        if written { resetTest() }
     }
+
+    /// Why the last model choice was not written, if it was not.
+    var modelRefusal: String? { settings.refusals[.model(.translate)] }
 
     func next() {
         guard blocker == nil else { return }
@@ -139,7 +166,8 @@ final class SetupModel: ObservableObject {
                         }
                     }
                 } catch {
-                    self.translationError = PopupModel.describe(error)
+                    // Closing the window cancels the run: not a failure.
+                    if !Task.isCancelled { self.translationError = PopupModel.describe(error) }
                 }
             }
         }
@@ -162,10 +190,20 @@ final class SetupWindowController: NSObject, NSWindowDelegate {
     func showFull() {
         model.mode = .full
         model.step = .accessibility
+        model.resetTest()
         present()
     }
 
+    /// Over a full walk-through already open, only moves it to the step,
+    /// keeping its place in setup.
     func showAccessibilityOnly() {
+        if isOpen {
+            if model.mode == .full {
+                model.step = .accessibility
+                window?.present()
+                return
+            }
+        }
         model.mode = .accessibilityOnly
         model.step = .accessibility
         present()

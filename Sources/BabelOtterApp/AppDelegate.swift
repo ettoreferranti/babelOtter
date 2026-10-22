@@ -297,10 +297,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// is walked through setup (#70); an existing one is left alone. Step 1
     /// asks for Accessibility, so no separate prompt is shown.
     private func openSetupIfFresh() {
-        let completed = UserDefaults.standard.bool(forKey: SetupModel.completedKey)
-        guard SetupGate.shouldOpen(configurationExisted: source.fileExistedAtLaunch, setupCompleted: completed)
-        else { return }
-        setupWindow.showFull()
+        let defaults = UserDefaults.standard
+        let existed = source.fileExistedAtLaunch
+        let completed = defaults.object(forKey: SetupModel.completedKey) as? Bool
+        let opens = SetupGate.shouldOpen(configurationExisted: existed, setupCompleted: completed)
+        // Decided once: the first launch writes config.json, so the file
+        // cannot answer the question again (a fresh user who closed the
+        // window early must see it next time; an existing one never).
+        if completed == nil {
+            defaults.set(SetupGate.initialCompleted(configurationExisted: existed), forKey: SetupModel.completedKey)
+        }
+        if opens { setupWindow.showFull() }
     }
 
     func menuWillOpen(_ menu: NSMenu) {
@@ -398,7 +405,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard let remedy = sender.representedObject as? ReadinessRemedy else { return }
         switch remedy {
         case .openAccessibilitySettings:
-            AccessibilitySettings.open()
+            // The setup step asks macOS's prompt first, which adds
+            // lingoSwen to the list the pane shows (#70).
+            setupWindow.showAccessibilityOnly()
         case .startOllama:
             startOllama()
         case .copyPullCommand(let command):

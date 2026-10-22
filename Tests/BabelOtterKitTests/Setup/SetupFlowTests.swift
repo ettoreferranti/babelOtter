@@ -32,8 +32,9 @@ struct SetupFlowTests {
         #expect(SetupFlow.blocker(for: .ollama, facts: facts(daemon: .reachable(models: []))) == nil)
     }
 
-    @Test("the model blocks until the chosen one is installed")
+    @Test("the model blocks until the chosen one is installed, by its exact name")
     func model() {
+        #expect(SetupFlow.blocker(for: .model, facts: facts(daemon: .reachable(models: ["m:latest"]))) == "m is not installed.")
         #expect(SetupFlow.blocker(for: .model, facts: facts(model: "other")) == "other is not installed.")
         #expect(SetupFlow.blocker(for: .model, facts: facts(daemon: nil)) == "Checking Ollama\u{2026}")
         #expect(SetupFlow.blocker(for: .model, facts: facts(daemon: .unreachable(detail: "x"))) == "Ollama isn't running.")
@@ -51,6 +52,7 @@ struct SetupFlowTests {
         #expect(SetupStep.allCases.map(\.title) == ["Accessibility", "Ollama", "Model", "Hotkeys", "Try it"])
         #expect(SetupStep.ollama < SetupStep.model)
         #expect(!(SetupStep.tryIt < SetupStep.hotkeys))
+        #expect(!(SetupStep.ollama < SetupStep.ollama))
         #expect(SetupFlow.sampleSentence == "Please register for the module by Friday.")
     }
 }
@@ -58,10 +60,16 @@ struct SetupFlowTests {
 @Suite("The setup window opens by itself only on a fresh install")
 struct SetupGateTests {
 
-    @Test("no config.json and never finished: open; otherwise not", arguments: [
-        (false, false, true), (false, true, false), (true, false, false), (true, true, false),
+    @Test("undecided: a fresh install opens, an existing one does not", arguments: [(false, true), (true, false)])
+    func undecided(existed: Bool, opens: Bool) {
+        #expect(SetupGate.shouldOpen(configurationExisted: existed, setupCompleted: nil) == opens)
+        #expect(SetupGate.initialCompleted(configurationExisted: existed) == !opens)
+    }
+
+    @Test("once decided, it opens until finished, whether config.json exists or not", arguments: [
+        (false, false, true), (true, false, true), (false, true, false), (true, true, false),
     ])
-    func gate(existed: Bool, completed: Bool, opens: Bool) {
+    func decided(existed: Bool, completed: Bool, opens: Bool) {
         #expect(SetupGate.shouldOpen(configurationExisted: existed, setupCompleted: completed) == opens)
     }
 }

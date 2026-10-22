@@ -207,15 +207,9 @@ final class SettingsModel: ObservableObject {
     // MARK: - Models
 
     func loadModels() {
-        installed = .loading
-        loadModelsQuietly()
-    }
-
-    /// Without showing "loading" first: for the setup window's periodic
-    /// checks, so the list does not flicker.
-    func loadModelsQuietly() {
         modelsGeneration += 1
         let generation = modelsGeneration
+        installed = .loading
         let client = client()
         Task {
             let result: InstalledModels
