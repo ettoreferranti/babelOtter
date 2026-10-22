@@ -15,8 +15,6 @@ final class PopupModel {
         case translating
         case finished
         case failed(String)
-        /// Accessibility is not granted, so nothing was captured.
-        case needsAccessibility
     }
 
     let action: Action
@@ -169,7 +167,7 @@ final class PopupModel {
         }
         switch phase {
         case .translating, .finished, .failed: return true
-        case .capturing, .choosingDirection, .choosingAudience, .needsAccessibility: return false
+        case .capturing, .choosingDirection, .choosingAudience: return false
         }
     }
 
@@ -248,17 +246,6 @@ final class PopupModel {
 
     func displayName(_ code: LanguageCode) -> String {
         configuration.language(for: code)?.displayName ?? code.description
-    }
-
-    /// Shown instead of a capture when Accessibility is not granted (#28).
-    func requireAccessibility() {
-        guard !isDismissed else { return }
-        phase = .needsAccessibility
-    }
-
-    func openAccessibilitySettings() {
-        AccessibilitySettings.open()
-        dismiss()
     }
 
     /// Whether there is a result worth keeping. For Correct, a text with no
@@ -649,7 +636,8 @@ final class PopupModel {
 
     /// Names an error for what it is, rather than always blaming Ollama:
     /// only a transport failure means the daemon could not be reached.
-    private static func describe(_ error: any Error) -> String {
+    /// Also the setup window's wording for its test translation (#70).
+    static func describe(_ error: any Error) -> String {
         if let failure = error as? TranslationError {
             switch failure {
             case .emptyResponse:

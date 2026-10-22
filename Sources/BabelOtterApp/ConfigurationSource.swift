@@ -25,6 +25,10 @@ final class ConfigurationSource {
     /// the settings window is read-only, so it never overwrites the file
     /// (#61).
     private(set) var fileProblems: [String] = []
+    /// Whether config.json was there at launch: its absence marks a fresh
+    /// install, for the setup window (#70). True when the folder could not
+    /// be prepared, so a broken folder does not pass for a first run.
+    let fileExistedAtLaunch: Bool
 
     init() {
         let locator = AppStorage.locator()
@@ -46,12 +50,14 @@ final class ConfigurationSource {
             self.problems = problems
             self.isFallback = !result.problems.isEmpty
             self.fileProblems = Self.summaries(result.problems)
+            self.fileExistedAtLaunch = loaded.fileFound
         } catch {
             self.store = nil
             self.configuration = .default
             self.problems = ["using defaults - \(Self.describe(error))"]
             self.isFallback = true
             self.fileProblems = self.problems
+            self.fileExistedAtLaunch = true
         }
     }
 

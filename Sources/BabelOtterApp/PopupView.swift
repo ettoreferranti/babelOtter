@@ -130,10 +130,6 @@ struct PopupView: View {
             }
         case .failed(let reason):
             Text(reason).foregroundStyle(.secondary)
-        case .needsAccessibility:
-            Text("lingoSwen needs Accessibility permission to read your selection.")
-            Text("Turn it on for lingoSwen in System Settings, then try again.")
-                .font(.caption).foregroundStyle(.secondary)
         }
     }
 
@@ -182,15 +178,7 @@ struct PopupView: View {
     }
 
     @ViewBuilder private var actions: some View {
-        if model.phase == .needsAccessibility {
-            HStack {
-                Button("Open System Settings") { model.openAccessibilitySettings() }
-                    .keyboardShortcut(.defaultAction)
-                Spacer()
-                Button("Dismiss") { model.dismiss() }
-                    .keyboardShortcut(.cancelAction)
-            }
-        } else if model.phase == .choosingAudience {
+        if model.phase == .choosingAudience {
             HStack {
                 Button("Re-pitch") { model.startRepitch() }
                     .keyboardShortcut(instructionFocused ? nil : .defaultAction)
