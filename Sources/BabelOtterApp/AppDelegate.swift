@@ -51,6 +51,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// While a settings hotkey recorder listens, no hotkey is registered,
     /// so pressing one records it rather than running its action (#61).
     private var hotKeysSuspended = false
+    private lazy var setupWindow = SetupWindowController(
+        settings: settingsWindow.settingsModel,
+        environment: { [unowned self] in self.environment },
+        startOllama: { [unowned self] in self.startOllama() })
     private lazy var privacyWindow = PrivacyWindowController(
         historyPolicy: { [unowned self] in self.history.policy },
         historyUnavailable: { [unowned self] in self.history.unavailableReason })
@@ -74,7 +78,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         history.onRecord = { [weak self] in self?.historyWindow.recorded() }
         applyHistoryPolicy()
         pushHistoryProblem()
-        promptForAccessibilityIfNeeded()
+        openSetupIfFresh()
         monitor.onChange = { [weak self] report in self?.render(report) }
         render(nil)
         monitor.start()
@@ -263,6 +267,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         self.historyItem = historyItem
         menu.addItem(historyItem)
         menu.addItem(action("Privacy\u{2026}", #selector(showPrivacyAction)))
+        menu.addItem(action("Setup Guide\u{2026}", #selector(showSetupAction)))
         menu.addItem(action("Check Again", #selector(refreshStatusAction)))
         menu.addItem(action("Open Configuration Folder", #selector(openConfiguration)))
         menu.addItem(.separator())
@@ -277,16 +282,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return item
     }
 
-    /// The system prompt, at first launch only. Afterwards a missing grant is
-    /// explained in the popup and the menu, never by a dialog (#28).
-    private func promptForAccessibilityIfNeeded() {
-        let key = "promptedForAccessibility"
-        guard !UserDefaults.standard.bool(forKey: key) else { return }
-        UserDefaults.standard.set(true, forKey: key)
-        guard !AXIsProcessTrusted() else { return }
-        let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
-        _ = AXIsProcessTrustedWithOptions(options)
-    }
 
     @objc private func refreshStatusAction() { monitor.refresh() }
 
@@ -295,6 +290,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func showSettingsAction() { settingsWindow.show() }
 
     @objc private func showPrivacyAction() { privacyWindow.show() }
+
+    @objc private func showSetupAction() { setupWindow.showFull() }
+
+    /// A fresh install -- no config.json at launch, setup never finished --
+    /// is walked through setup (#70); an existing one is left alone. Step 1
+    /// asks for Accessibility, so no separate prompt is shown.
+    private func openSetupIfFresh() {
+        let defaults = UserDefaults.standard
+        let existed = source.fileExistedAtLaunch
+        let completed = defaults.object(forKey: SetupModel.completedKey) as? Bool
+        let opens = SetupGate.shouldOpen(configurationExisted: existed, setupCompleted: completed)
+        // Decided once: the first launch writes config.json, so the file
+        // cannot answer the question again (a fresh user who closed the
+        // window early must see it next time; an existing one never).
+        if completed == nil {
+            defaults.set(SetupGate.initialCompleted(configurationExisted: existed), forKey: SetupModel.completedKey)
+        }
+        if opens { setupWindow.showFull() }
+    }
 
     func menuWillOpen(_ menu: NSMenu) {
         // A backstop for a layout change whose notification was held back
@@ -391,7 +405,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard let remedy = sender.representedObject as? ReadinessRemedy else { return }
         switch remedy {
         case .openAccessibilitySettings:
-            AccessibilitySettings.open()
+            // The setup step asks macOS's prompt first, which adds
+            // lingoSwen to the list the pane shows (#70).
+            setupWindow.showAccessibilityOnly()
         case .startOllama:
             startOllama()
         case .copyPullCommand(let command):
@@ -491,24 +507,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
-    /// No capture starts, so the panel may take focus at once: Return opens
-    /// System Settings, Escape dismisses. A second press replaces this popup
-    /// rather than stacking another.
+    /// The setup window at its Accessibility step alone (#71, `FR-ONB-02`):
+    /// it re-checks every second, says when the grant is back, and the
+    /// action then works without a restart.
     private func showAccessibilityNeeded(for action: Action) {
         currentModel?.dismiss()
-        let model = PopupModel(
-            action: action,
-            application: nil,
-            environment: environment,
-            record: { [weak self] record in self?.history.record(record) },
-            close: { [weak self] in self?.panel.dismiss() },
-            reopen: { [weak self] model in
-                guard let self else { return }
-                self.currentModel = model
-                self.panel.show(PopupView(model: model))
-            })
-        model.requireAccessibility()
-        currentModel = model
-        panel.show(PopupView(model: model), anchor: .pointer)
+        setupWindow.showAccessibilityOnly()
     }
 }

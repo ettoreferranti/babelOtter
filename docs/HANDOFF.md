@@ -2,6 +2,22 @@
 
 Read this first if you are picking babelOtter up in a new session.
 
+## Update 2026-10-22: first-run setup and re-presented steps (#70, #71); epic #13 complete
+
+**Set Up lingoSwen** is a window of five steps — Accessibility, Ollama, Model, Hotkeys, Try it — with Continue disabled (and the reason shown) until the step checks out. Accessibility is re-read every second and Ollama every other second while the window is open, so a grant or a start is noticed without a restart. Model writes one model for every action and can download a missing one (the Models tab's code); Hotkeys is the Settings tab's view; Try it translates an editable sentence for real, and Finish is enabled only after a result. It opens by itself only on a fresh install, until Finish: `setupCompleted` in `UserDefaults` is decided once (true if `config.json` already existed, false if not) and Finish sets it true; existing installs are marked done the first time this build runs. **Setup Guide…** in the menu opens it any time, and the menu's Accessibility remedy opens its Accessibility step. When Accessibility is missing and an action is triggered, the window opens at the Accessibility step alone ("Granted - try the action again." once it is back), replacing the popup's message, which is removed. The first-launch system prompt is gone: step 1 asks for it. Kit: `Setup/SetupFlow.swift` (`SetupStep`, `SetupFlow.blocker`, `SetupGate`); app: `Setup/`. Spec: `docs/superpowers/specs/2026-10-22-onboarding-design.md`. **M3 is now down to its remaining non-epic items; see the milestone.**
+
+**Manual check (yours).** Rebuild first (`Tools/make-app.sh --run`). O1 simulates a fresh install by moving your `config.json` aside; O6 puts it back.
+
+| # | Do | Expect |
+|---|---|---|
+| O1 | Quit; `mv ~/Library/Application\ Support/ch.lingoswen/config.json ~/Library/Application\ Support/ch.lingoswen/config.json.mine && defaults delete ch.lingoswen setupCompleted`; start lingoSwen | The setup window opens at Accessibility (already granted: a check, Continue enabled) |
+| O2 | Walk the steps: Ollama; Model (keep the default); Hotkeys (keep); Try it: Translate; Finish | Each step shows its check; the translation streams in; Finish closes the window |
+| O3 | Quit and start again | No setup window |
+| O7 | Quit; `mv` config.json aside again and `defaults delete ch.lingoswen setupCompleted`; start; close the setup window at step 1 without finishing; quit and start again; then Finish it | The window opens again on the second start; after Finish it stays away (then do O6) |
+| O4 | Revoke lingoSwen in System Settings › Privacy & Security › Accessibility; select text and press Control-Option-T; turn it back on | The setup window opens at Accessibility only; after turning it on it says "Granted - try the action again."; Done closes it; the hotkey works again without a restart |
+| O5 | Choose Setup Guide… in the menu | The window opens at step 1 with the sidebar |
+| O6 | Quit; `mv ~/Library/Application\ Support/ch.lingoswen/config.json.mine ~/Library/Application\ Support/ch.lingoswen/config.json`; start | Your settings are back |
+
 ## Update 2026-10-22: the Privacy panel and the Ollama binding warning (#72, #73)
 
 **Privacy…** in the menu (after History…) opens a window of five lines, each marked as it should be (✓), warning (⚠) or unknown (?): the model connection (`http://127.0.0.1:11434`, loopback by construction), where Ollama listens (asked of macOS with `lsof -nP -iTCP:11434 -sTCP:LISTEN -F n`, read-only, no network call; unknown is never shown as safe), the history folder with its iCloud check and the retention in words, dependencies (`BuildFacts.thirdPartyPackages`, kept equal to the package graph by a test), and the absence of telemetry. An Ollama listening beyond this Mac gets a warning, the risk in one sentence, and `launchctl setenv OLLAMA_HOST 127.0.0.1:11434` with Copy. **Check Again** re-reads; opening the window does too. `Tools/make-app.sh` now bundles `PRIVACY.md`, which **Open PRIVACY.md** opens. Kit: `Privacy/ListeningProbe.swift`, `Privacy/PrivacyReport.swift`; app: `Privacy/`. Spec: `docs/superpowers/specs/2026-10-22-privacy-panel-design.md`. **Next in epic #13:** #70 (a first run that checks itself) and #71 (setup steps again when a permission is revoked).

@@ -8,6 +8,9 @@ import SwiftUI
 final class SettingsWindowController {
 
     private let model: SettingsModel
+    /// Shared with the setup window, whose Model and Hotkeys steps are the
+    /// same code as these tabs (#70).
+    var settingsModel: SettingsModel { model }
     private var window: AppWindow?
 
     init(
