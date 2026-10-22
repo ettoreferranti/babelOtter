@@ -51,6 +51,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// While a settings hotkey recorder listens, no hotkey is registered,
     /// so pressing one records it rather than running its action (#61).
     private var hotKeysSuspended = false
+    private lazy var privacyWindow = PrivacyWindowController(
+        historyPolicy: { [unowned self] in self.history.policy },
+        historyUnavailable: { [unowned self] in self.history.unavailableReason })
     private lazy var settingsWindow = SettingsWindowController(
         source: source,
         layout: { [unowned self] in self.lastLayout },
@@ -259,6 +262,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let historyItem = action("History\u{2026}", #selector(showHistoryAction))
         self.historyItem = historyItem
         menu.addItem(historyItem)
+        menu.addItem(action("Privacy\u{2026}", #selector(showPrivacyAction)))
         menu.addItem(action("Check Again", #selector(refreshStatusAction)))
         menu.addItem(action("Open Configuration Folder", #selector(openConfiguration)))
         menu.addItem(.separator())
@@ -289,6 +293,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func showHistoryAction() { historyWindow.show() }
 
     @objc private func showSettingsAction() { settingsWindow.show() }
+
+    @objc private func showPrivacyAction() { privacyWindow.show() }
 
     func menuWillOpen(_ menu: NSMenu) {
         // A backstop for a layout change whose notification was held back
