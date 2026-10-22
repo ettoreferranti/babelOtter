@@ -1,6 +1,19 @@
-# Handoff — state as of 2026-10-21
+# Handoff — state as of 2026-10-22
 
 Read this first if you are picking babelOtter up in a new session.
+
+## Update 2026-10-22: the Privacy panel and the Ollama binding warning (#72, #73)
+
+**Privacy…** in the menu (after History…) opens a window of five lines, each marked as it should be (✓), warning (⚠) or unknown (?): the model connection (`http://127.0.0.1:11434`, loopback by construction), where Ollama listens (asked of macOS with `lsof -nP -iTCP:11434 -sTCP:LISTEN -F n`, read-only, no network call; unknown is never shown as safe), the history folder with its iCloud check and the retention in words, dependencies (`BuildFacts.thirdPartyPackages`, kept equal to the package graph by a test), and the absence of telemetry. An Ollama listening beyond this Mac gets a warning, the risk in one sentence, and `launchctl setenv OLLAMA_HOST 127.0.0.1:11434` with Copy. **Check Again** re-reads; opening the window does too. `Tools/make-app.sh` now bundles `PRIVACY.md`, which **Open PRIVACY.md** opens. Kit: `Privacy/ListeningProbe.swift`, `Privacy/PrivacyReport.swift`; app: `Privacy/`. Spec: `docs/superpowers/specs/2026-10-22-privacy-panel-design.md`. **Next in epic #13:** #70 (a first run that checks itself) and #71 (setup steps again when a permission is revoked).
+
+**Manual check (yours).** Rebuild first (`Tools/make-app.sh --run`).
+
+| # | Do | Expect |
+|---|---|---|
+| P1 | Choose Privacy… in the menu | The window opens in front; five lines, all ✓ with Ollama running as installed |
+| P2 | Quit Ollama; Check Again; start Ollama again | "Ollama listens on" shows ? and "Unknown … not a sign that it is safe", not ✓ |
+| P3 | `launchctl setenv OLLAMA_HOST 0.0.0.0:11434`, quit and restart Ollama, Check Again; press Copy; then `launchctl unsetenv OLLAMA_HOST`, restart Ollama, Check Again | ⚠ "All networks (*)", the risk sentence and the command; Copy puts `launchctl setenv OLLAMA_HOST 127.0.0.1:11434` on the clipboard; after unsetting, ✓ again |
+| P4 | Press Open PRIVACY.md | It opens in your Markdown app |
 
 ## Update 2026-10-21: formality per target language (#110); epic #11's stories done
 
