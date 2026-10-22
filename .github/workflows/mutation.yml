@@ -180,6 +180,7 @@ jobs:
           Sources/BabelOtterKit/Settings/AudienceID.swift
           Sources/BabelOtterKit/Privacy/ListeningProbe.swift
           Sources/BabelOtterKit/Privacy/PrivacyReport.swift
+          Sources/BabelOtterKit/Setup/SetupFlow.swift
           Sources/BabelOtterKit/Hotkeys/HotKeyPlan.swift
           Sources/BabelOtterKit/Hotkeys/HotKeySpec.swift
           Sources/BabelOtterKit/Hotkeys/KeyLayout.swift
