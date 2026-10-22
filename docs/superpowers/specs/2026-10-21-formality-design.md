@@ -13,7 +13,7 @@
   - The audience list for inference: `- students: Students, formal ("Sie"). <tone>` with forms, `- students: Students, formal. <tone>` without; its header reads `(id: name, formality, tone)`.
   - Correct: with forms, as today (`... who should be addressed as "Sie". A mismatch is a register error.`); without, `... which should be written in a formal register. A mismatch is a register error.`
 - **The popup's audience picker** shows `Students (Sie)` for a target with forms and `Students (formal)` for one without.
-- **The Audiences tab** offers Formal / Informal, with a hint under it listing each enabled language that has forms: `Sie / du in Swiss Standard German`.
+- **The Audiences tab** offers Formal / Informal, and under it the form the chosen one gives in each enabled language that has forms: `Swiss Standard German: Sie` for Formal, `...: du` for Informal. (Changed after a manual check: the first version listed both forms, which did not follow the choice. The audience's id is no longer shown in the tab either.)
 
 ## 2. Decisions
 
