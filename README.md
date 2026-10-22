@@ -52,8 +52,8 @@ leaving your machine.
 > it, the script signs ad hoc and warns.
 >
 > Configuration lives at
-> `~/Library/Application Support/ch.lingoswen/config.json` (menu bar icon >
-> *Open Configuration Folder*), written with defaults on first launch.
+> `~/Library/Application Support/ch.lingoswen/config.json` (Settings › General
+> › *Show config.json in Finder*), written with defaults on first launch.
 >
 > Requirements are captured as GitHub issues
 > (see [the backlog](../../issues)); the architecture is in
