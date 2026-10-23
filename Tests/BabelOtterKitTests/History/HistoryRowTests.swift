@@ -39,10 +39,10 @@ struct HistoryRowTests {
     @Test("a removed audience or language shows its id")
     func removed() {
         let row = HistoryRow(
-            .sample(sourceLanguage: LanguageCode("fr"), targetLanguage: LanguageCode("it"),
+            .sample(sourceLanguage: LanguageCode("nl"), targetLanguage: LanguageCode("pt"),
                     profileID: "gone"),
             configuration: configuration)
-        #expect(row.languages == "fr \u{2192} it")
+        #expect(row.languages == "nl \u{2192} pt")
         #expect(row.audience == "gone")
     }
 

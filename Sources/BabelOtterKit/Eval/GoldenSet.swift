@@ -22,25 +22,48 @@ public struct CorrectionCase: Sendable, Equatable {
     public let clean: Bool
 }
 
-public enum TranslationDirection: String, Sendable, Equatable, CaseIterable {
-    case englishToSwissGerman = "en-de-ch"
-    case swissGermanToEnglish = "de-ch-en"
+/// A golden case's direction, between any two shipped languages (#81),
+/// written as the two codes joined by a hyphen: `en-de-ch`, `de-ch-en`,
+/// `en-fr`. Data, so a new direction needs cases, not code.
+public struct TranslationDirection: Sendable, Equatable, Hashable {
+    public let direction: Direction
 
-    public var direction: Direction {
-        switch self {
-        case .englishToSwissGerman:
-            return Direction(source: LanguageConfig.english.code, target: LanguageConfig.swissGerman.code)
-        case .swissGermanToEnglish:
-            return Direction(source: LanguageConfig.swissGerman.code, target: LanguageConfig.english.code)
-        }
+    public init(source: LanguageConfig, target: LanguageConfig) {
+        self.direction = Direction(source: source.code, target: target.code)
+        self.targetRules = target.localeRules
     }
 
-    /// Whether the target is the German locale, whose output must carry no eszett.
-    var targetIsGerman: Bool {
-        switch self {
-        case .englishToSwissGerman: return true
-        case .swissGermanToEnglish: return false
+    /// Parsed by matching a shipped code on either side of a hyphen; nil
+    /// for an unknown code or a language into itself.
+    public init?(rawValue: String) {
+        let raw = LanguageCode(rawValue).rawValue
+        for source in LanguageConfig.shippedDefaults where raw.hasPrefix(source.code.rawValue + "-") {
+            let rest = String(raw.dropFirst(source.code.rawValue.count + 1))
+            for target in LanguageConfig.shippedDefaults where target.code.rawValue == rest {
+                if target.code != source.code {
+                    self.init(source: source, target: target)
+                    return
+                }
+            }
         }
+        return nil
+    }
+
+    public var rawValue: String { direction.source.rawValue + "-" + direction.target.rawValue }
+
+    /// The target's orthography rules, whose patterns must not appear in the
+    /// output: de-CH's eszett. Empty for a target without rules.
+    let targetRules: [LocaleRule]
+
+    public static let englishToSwissGerman = TranslationDirection(source: .english, target: .swissGerman)
+    public static let swissGermanToEnglish = TranslationDirection(source: .swissGerman, target: .english)
+
+    public static func == (left: TranslationDirection, right: TranslationDirection) -> Bool {
+        left.direction == right.direction
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(rawValue)
     }
 }
 
@@ -191,8 +214,8 @@ public struct GoldenSet: Sendable, Equatable {
         try checkID(raw.id, ids: &ids, fail: fail)
         guard !raw.text.isEmpty else { throw fail("text", "is empty") }
         guard let direction = TranslationDirection(rawValue: raw.direction) else {
-            let known = TranslationDirection.allCases.map(\.rawValue).joined(separator: ", ")
-            throw fail("direction", "\"\(raw.direction)\" is not one of: \(known)")
+            let known = LanguageConfig.shippedDefaults.map(\.code.rawValue).joined(separator: ", ")
+            throw fail("direction", "\"\(raw.direction)\" is not two different languages of: \(known)")
         }
         let profile = try checkedProfile(raw.profile, fail: fail)
         guard !raw.reference.isEmpty else { throw fail("reference", "is empty") }

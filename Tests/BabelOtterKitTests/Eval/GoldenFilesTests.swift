@@ -48,6 +48,22 @@ struct GoldenFilesTests {
         #expect(cases.filter { $0.text.contains("\n\n") }.count >= 2)
         #expect(cases.filter { !$0.terms.isEmpty }.count >= 3)
         #expect(cases.contains { $0.profileID != "colleagues" })
-        #expect(!cases.contains { $0.direction.targetIsGerman && $0.reference.contains("\u{00DF}") })
+        #expect(!cases.contains { testCase in
+            testCase.direction.targetRules.contains { testCase.reference.contains($0.replace) }
+        })
+    }
+
+    @Test("French and Italian to and from English: five cases each, with terms and profiles (#81)")
+    func frenchAndItalianCoverage() throws {
+        let cases = try Self.golden().translation
+        for raw in ["en-fr", "fr-en", "en-it", "it-en"] {
+            let direction = try #require(TranslationDirection(rawValue: raw))
+            let these = cases.filter { $0.direction == direction }
+            #expect(these.count >= 5, "\(raw)")
+            #expect(these.contains { $0.profileID != "colleagues" }, "\(raw)")
+            #expect(these.contains { $0.text.contains("\n- ") }, "\(raw)")
+        }
+        let withTerms = cases.filter { !$0.terms.isEmpty }.map(\.direction.rawValue)
+        #expect(Set(withTerms).isSuperset(of: ["en-fr", "fr-en", "en-it", "it-en"]))
     }
 }

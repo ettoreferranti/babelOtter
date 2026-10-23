@@ -152,4 +152,104 @@ struct NaturalLanguageRecognizerTests {
             """
         #expect(detector.detect(text).languageCode?.baseSubtag == LanguageCode("de"))
     }
+
+    @Test("a constrained recognizer only answers with the languages it is limited to")
+    func constrained() {
+        let english = """
+            The committee has agreed to postpone the decision until the next meeting, \
+            when the revised budget figures will finally be available for review.
+            """
+        let recognizer = NaturalLanguageRecognizer(constraints: [LanguageCode("fr"), LanguageCode("it")])
+        let guesses = Set(recognizer.hypotheses(for: english).keys)
+        #expect(!guesses.isEmpty)
+        #expect(guesses.isSubset(of: [LanguageCode("fr"), LanguageCode("it")]))
+        #expect(Set(NaturalLanguageRecognizer().hypotheses(for: english).keys).contains(LanguageCode("en")))
+    }
+
+    @Test("French and Italian paragraphs detect as themselves among four languages")
+    func frenchAndItalian() {
+        let recognizer = NaturalLanguageRecognizer(
+            constraints: ["en", "de-ch", "fr", "it"].map(LanguageCode.init))
+        let constrained = LanguageDetector(recognizer: recognizer, floor: 0.5, minimumLength: 12)
+        let french = """
+            Le comité a décidé de reporter la décision à la prochaine séance, \
+            lorsque les chiffres révisés du budget seront enfin disponibles.
+            """
+        let italian = """
+            Il comitato ha deciso di rinviare la decisione alla prossima riunione, \
+            quando le cifre riviste del bilancio saranno finalmente disponibili.
+            """
+        #expect(constrained.detect(french).languageCode == LanguageCode("fr"))
+        #expect(constrained.detect(italian).languageCode == LanguageCode("it"))
+    }
+}
+
+@Suite("Detection screens with the open recognizer, then chooses among the enabled languages (#81)")
+struct DetectionConstraintTests {
+
+    private func screened(_ detector: LanguageDetector) -> ScreenedRecognizer? {
+        detector.recognizer as? ScreenedRecognizer
+    }
+
+    @Test("a detector built from configuration screens, then limits to the enabled base codes")
+    func fromConfiguration() throws {
+        var configuration = Configuration.default
+        let two = try #require(screened(LanguageDetector(configuration: configuration)))
+        #expect((two.constrained as? NaturalLanguageRecognizer)?.constraints == [LanguageCode("en"), LanguageCode("de")])
+        #expect((two.open as? NaturalLanguageRecognizer)?.constraints.isEmpty == true)
+        #expect(two.enabled == [LanguageCode("en"), LanguageCode("de")])
+        #expect(two.floor == configuration.detectionConfidenceFloor)
+        configuration.languages[2].enabled = true
+        configuration.detectionConfidenceFloor = 0.8
+        let three = try #require(screened(LanguageDetector(configuration: configuration)))
+        #expect((three.constrained as? NaturalLanguageRecognizer)?.constraints
+            == [LanguageCode("en"), LanguageCode("de"), LanguageCode("fr")])
+        #expect(three.floor == 0.8)
+    }
+
+    @Test("an injected recognizer is used as given")
+    func injected() {
+        let detector = LanguageDetector(
+            configuration: .default, recognizer: NaturalLanguageRecognizer(constraints: [LanguageCode("it")]))
+        #expect((detector.recognizer as? NaturalLanguageRecognizer)?.constraints == [LanguageCode("it")])
+        #expect(NaturalLanguageRecognizer().constraints.isEmpty)
+    }
+
+    private let enabled = [LanguageCode("en"), LanguageCode("de-ch")]
+
+    @Test("a confident guess outside the enabled languages stands; the constrained one is not asked")
+    func outsiderStands() {
+        let open = StubRecognizer([LanguageCode("it"): 0.99, LanguageCode("es"): 0.01])
+        let constrained = StubRecognizer([LanguageCode("de"): 0.72])
+        let subject = ScreenedRecognizer(open: open, constrained: constrained, enabled: enabled, floor: 0.65)
+        #expect(subject.hypotheses(for: "x") == [LanguageCode("it"): 0.99, LanguageCode("es"): 0.01])
+        #expect(!constrained.wasConsulted)
+    }
+
+    @Test("an outsider exactly at the floor stands too")
+    func outsiderAtFloor() {
+        let constrained = StubRecognizer([LanguageCode("de"): 0.9])
+        let subject = ScreenedRecognizer(
+            open: StubRecognizer([LanguageCode("it"): 0.65]), constrained: constrained, enabled: enabled, floor: 0.65)
+        #expect(subject.hypotheses(for: "x") == [LanguageCode("it"): 0.65])
+    }
+
+    @Test("an enabled guess, by base code, or an unsure outsider goes to the constrained recognizer")
+    func constrainedOtherwise() {
+        let constrained = StubRecognizer([LanguageCode("fr"): 0.8])
+        for open in [[LanguageCode("de"): 0.95], [LanguageCode("it"): 0.64, LanguageCode("fr"): 0.3], [:]] {
+            let subject = ScreenedRecognizer(
+                open: StubRecognizer(open), constrained: constrained, enabled: enabled, floor: 0.65)
+            #expect(subject.hypotheses(for: "x") == [LanguageCode("fr"): 0.8], "\(open)")
+        }
+    }
+
+    @Test("with English and German on, an Italian sentence is Italian, not German (live)")
+    func italianNotEnabled() {
+        let italian = """
+            Il comitato ha deciso di rinviare la decisione alla prossima riunione, \
+            quando le cifre riviste del bilancio saranno finalmente disponibili.
+            """
+        #expect(LanguageDetector(configuration: .default).detect(italian).languageCode == LanguageCode("it"))
+    }
 }

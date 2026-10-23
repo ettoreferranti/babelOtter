@@ -38,15 +38,22 @@ final class ConfigurationSource {
             let result = ConfigurationReload.apply(
                 previous: .default, loaded: loaded, fileExists: loaded.fileFound, isLaunch: true)
             var problems = Self.summaries(result.problems)
+            var configuration = result.configuration
             if !loaded.fileFound {
                 do {
                     try store.save(result.configuration)
                 } catch {
                     problems += ["using defaults - could not write the file (\(error.localizedDescription))"]
                 }
+            } else if result.problems.isEmpty, let added = configuration.addingMissingShippedLanguages() {
+                // A file from before French and Italian shipped gains them,
+                // switched off, once (#81). Never written over a file with
+                // problems; if the write fails they are still offered now.
+                configuration = added
+                try? store.save(added)
             }
             self.store = store
-            self.configuration = result.configuration
+            self.configuration = configuration
             self.problems = problems
             self.isFallback = !result.problems.isEmpty
             self.fileProblems = Self.summaries(result.problems)

@@ -72,13 +72,60 @@ struct TargetLanguageResolverTests {
         let resolver = TargetLanguageResolver(languages: [.english, .swissGerman, french])
         #expect(
             resolver.resolve(confident("en"))
-                == .ambiguousPairing(candidates: [LanguageCode("de-ch"), LanguageCode("fr")]))
+                == .ambiguousPairing(
+                    source: LanguageCode("en"), candidates: [LanguageCode("de-ch"), LanguageCode("fr")]))
+    }
+
+    private static func on(_ language: LanguageConfig) -> LanguageConfig {
+        var enabled = language
+        enabled.enabled = true
+        return enabled
+    }
+
+    private let fourEnabled = TargetLanguageResolver(
+        languages: [LanguageConfig.english, .swissGerman, on(.french), on(.italian)])
+
+    @Test("with several targets, the one remembered for the source settles it (#81)")
+    func rememberedTarget() {
+        let remembered = [LanguageCode("fr"): LanguageCode("de-ch"), LanguageCode("en"): LanguageCode("it")]
+        #expect(fourEnabled.resolve(confident("fr"), remembered: remembered)
+            == .resolved(source: LanguageCode("fr"), target: LanguageCode("de-ch")))
+        #expect(fourEnabled.resolve(confident("en"), remembered: remembered)
+            == .resolved(source: LanguageCode("en"), target: LanguageCode("it")))
+        // A base-code detection finds the configured source, and its memory.
+        #expect(fourEnabled.resolve(confident("de"), remembered: [LanguageCode("de-ch"): LanguageCode("fr")])
+            == .resolved(source: LanguageCode("de-ch"), target: LanguageCode("fr")))
+    }
+
+    @Test("a source with nothing remembered asks, carrying the source and the other languages")
+    func nothingRemembered() {
+        #expect(fourEnabled.resolve(confident("it"), remembered: [LanguageCode("fr"): LanguageCode("en")])
+            == .ambiguousPairing(
+                source: LanguageCode("it"),
+                candidates: [LanguageCode("en"), LanguageCode("de-ch"), LanguageCode("fr")]))
+    }
+
+    @Test("a remembered target that is disabled, unknown or the source itself is ignored")
+    func staleMemoryIgnored() {
+        let others = [LanguageCode("de-ch"), LanguageCode("fr")]
+        let threeEnabled = TargetLanguageResolver(
+            languages: [.english, .swissGerman, Self.on(.french), .italian])
+        for stale in ["it", "nl", "en"] {
+            #expect(threeEnabled.resolve(confident("en"), remembered: [LanguageCode("en"): LanguageCode(stale)])
+                == .ambiguousPairing(source: LanguageCode("en"), candidates: others), "\(stale)")
+        }
+    }
+
+    @Test("with two languages the memory is not consulted")
+    func twoIgnoreMemory() {
+        #expect(standard.resolve(confident("en"), remembered: [LanguageCode("en"): LanguageCode("fr")])
+            == .resolved(source: LanguageCode("en"), target: LanguageCode("de-ch")))
     }
 
     @Test("a single enabled language has no other side")
     func oneEnabled() {
         let resolver = TargetLanguageResolver(languages: [.english])
-        #expect(resolver.resolve(confident("en")) == .ambiguousPairing(candidates: []))
+        #expect(resolver.resolve(confident("en")) == .ambiguousPairing(source: LanguageCode("en"), candidates: []))
     }
 
     @Test("an ambiguous detection passes through, carrying its reason")

@@ -12,7 +12,9 @@ struct GlossarySettingsView: View {
     @State private var addingConcept = false
     @State private var addingTerm = false
 
-    private var languages: [LanguageConfig] { model.configuration.languages }
+    /// A column per enabled language (#81); a switched-off language's terms
+    /// stay in the file untouched.
+    private var languages: [LanguageConfig] { model.configuration.enabledLanguages }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {

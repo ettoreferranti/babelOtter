@@ -132,5 +132,139 @@
     "direction": "de-ch-en",
     "profile": "informal",
     "reference": "Do you fancy coming to the lake with us on Sunday? Jonas is bringing the barbecue."
+  },
+  {
+    "id": "en-fr-bureau-otterbach",
+    "text": "The new office in Otterbach opens on Monday. Please use the side entrance until the work is finished.",
+    "direction": "en-fr",
+    "terms": ["Otterbach"],
+    "reference": "Le nouveau bureau d'Otterbach ouvre lundi. Veuillez utiliser l'entrée latérale jusqu'à la fin des travaux."
+  },
+  {
+    "id": "en-fr-liste-excursion",
+    "text": "For the excursion on Friday, please bring:\n- a packed lunch\n- sturdy shoes\n- a rain jacket",
+    "direction": "en-fr",
+    "profile": "students",
+    "reference": "Pour l'excursion de vendredi, veuillez apporter :\n- un pique-nique\n- de bonnes chaussures\n- une veste de pluie"
+  },
+  {
+    "id": "en-fr-lettre-inscription",
+    "text": "Dear Ms Example\n\nThank you for your registration. We will send you the timetable by the end of the month.",
+    "direction": "en-fr",
+    "profile": "administration",
+    "reference": "Madame Example,\n\nNous vous remercions de votre inscription. Nous vous enverrons l'emploi du temps d'ici la fin du mois."
+  },
+  {
+    "id": "en-fr-repas-samedi",
+    "text": "Are you free on Saturday? We're having a few friends over for dinner and it would be great if you came.",
+    "direction": "en-fr",
+    "profile": "informal",
+    "reference": "Tu es libre samedi ? On invite quelques amis à dîner et ce serait super si tu venais."
+  },
+  {
+    "id": "en-fr-reponse-tardive",
+    "text": "Sorry for the late reply. I was away for a few days and only saw your message this morning.",
+    "direction": "en-fr",
+    "reference": "Désolé pour cette réponse tardive. J'étais absent quelques jours et je n'ai vu votre message que ce matin."
+  },
+  {
+    "id": "fr-en-reunion-reportee",
+    "text": "La réunion de demain est reportée à jeudi, car Mme Exemple est malade. L'ordre du jour reste le même.",
+    "direction": "fr-en",
+    "reference": "Tomorrow's meeting has been postponed to Thursday because Ms Exemple is ill. The agenda stays the same."
+  },
+  {
+    "id": "fr-en-echange-riverside",
+    "text": "L'échange avec notre école partenaire de Riverside aura lieu en mai cette année. Les inscriptions sont ouvertes jusqu'à la fin du mois.",
+    "direction": "fr-en",
+    "terms": ["Riverside"],
+    "reference": "This year, the exchange with our partner school in Riverside will take place in May. Registration is open until the end of the month."
+  },
+  {
+    "id": "fr-en-liste-documents",
+    "text": "Pour l'inscription, nous avons besoin des documents suivants :\n- une copie de votre pièce d'identité\n- une photo récente\n- le formulaire signé",
+    "direction": "fr-en",
+    "profile": "administration",
+    "reference": "For the registration, we need the following documents:\n- a copy of your identity card\n- a recent photo\n- the signed form"
+  },
+  {
+    "id": "fr-en-retour-travail",
+    "text": "Votre travail est bien structuré. Pour le prochain texte, faites toutefois attention à citer correctement vos sources.",
+    "direction": "fr-en",
+    "profile": "students",
+    "reference": "Your work is well structured. For the next text, however, make sure you cite your sources correctly."
+  },
+  {
+    "id": "fr-en-merci-demenagement",
+    "text": "Chère Léa,\n\nMerci beaucoup pour ton aide lors du déménagement samedi. Sans toi, nous n'aurions jamais fini à temps.",
+    "direction": "fr-en",
+    "profile": "informal",
+    "reference": "Dear Léa\n\nThank you so much for your help with the move on Saturday. Without you, we would never have finished in time."
+  },
+  {
+    "id": "en-it-weidenhof-chiusa",
+    "text": "The Weidenhof school is closed on Monday because of a staff training day. Lessons start again on Tuesday.",
+    "direction": "en-it",
+    "terms": ["Weidenhof"],
+    "reference": "La scuola Weidenhof è chiusa lunedì a causa di una giornata di formazione del personale. Le lezioni riprendono martedì."
+  },
+  {
+    "id": "en-it-scadenza-modulo",
+    "text": "Please submit the completed form by 15 March at the latest. Late submissions cannot be considered.",
+    "direction": "en-it",
+    "profile": "administration",
+    "reference": "La preghiamo di inviare il modulo compilato entro il 15 marzo al più tardi. Gli invii tardivi non possono essere presi in considerazione."
+  },
+  {
+    "id": "en-it-lista-ufficio",
+    "text": "Before you leave the office:\n- switch off the lights\n- close the windows\n- lock the door",
+    "direction": "en-it",
+    "reference": "Prima di lasciare l'ufficio:\n- spegnete le luci\n- chiudete le finestre\n- chiudete a chiave la porta"
+  },
+  {
+    "id": "en-it-diapositive",
+    "text": "Could you send me the slides from yesterday's meeting? I'd like to look at them again before Friday.",
+    "direction": "en-it",
+    "reference": "Potresti mandarmi le diapositive della riunione di ieri? Vorrei riguardarle prima di venerdì."
+  },
+  {
+    "id": "en-it-lago-domenica",
+    "text": "Do you fancy coming to the lake with us on Sunday? Jonas is bringing the barbecue.",
+    "direction": "en-it",
+    "profile": "informal",
+    "reference": "Ti va di venire al lago con noi domenica? Jonas porta il barbecue."
+  },
+  {
+    "id": "it-en-strada-chiusa",
+    "text": "La strada davanti alla scuola sarà chiusa da lunedì per lavori. Si prega di usare l'ingresso sul retro.",
+    "direction": "it-en",
+    "reference": "The road in front of the school will be closed from Monday for roadworks. Please use the rear entrance."
+  },
+  {
+    "id": "it-en-bici-otterbach",
+    "text": "Chi va a Otterbach in bicicletta può lasciarla gratuitamente alla stazione. Il deposito è aperto tutto il giorno.",
+    "direction": "it-en",
+    "terms": ["Otterbach"],
+    "reference": "Anyone cycling to Otterbach can leave their bike at the station free of charge. The bike park is open all day."
+  },
+  {
+    "id": "it-en-lista-ordine-giorno",
+    "text": "Ordine del giorno per la riunione di martedì:\n- budget 2027\n- nuovo orario\n- varie",
+    "direction": "it-en",
+    "reference": "Agenda for Tuesday's meeting:\n- budget 2027\n- new timetable\n- any other business"
+  },
+  {
+    "id": "it-en-festa-estate",
+    "text": "Cari genitori,\n\nVenerdì 14 giugno la scuola festeggia la sua festa d'estate. Siete tutti cordialmente invitati.",
+    "direction": "it-en",
+    "profile": "administration",
+    "reference": "Dear parents\n\nOn Friday, 14 June, the school is holding its summer party. You are all cordially invited."
+  },
+  {
+    "id": "it-en-consegna-compito",
+    "text": "Ricordatevi di consegnare il compito entro giovedì. Chi ha domande può scrivermi in qualsiasi momento.",
+    "direction": "it-en",
+    "profile": "students",
+    "reference": "Remember to hand in the assignment by Thursday. If you have any questions, you can write to me at any time."
   }
 ]

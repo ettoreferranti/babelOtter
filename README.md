@@ -88,10 +88,14 @@ add a free-text style note per invocation ("shorter", "more encouraging").
 
 ### Language configuration
 
-Languages are pure configuration, not hardcoded. v1 ships with **English** and
-**Swiss Standard German (de-CH)** enabled — which means `ß` is never emitted,
-always `ss`. Adding French, Italian or anything else is a config entry with its
-own locale rules.
+Languages are pure configuration, not hardcoded. lingoSwen ships with **English**
+and **Swiss Standard German (de-CH)** enabled — which means `ß` is never emitted,
+always `ss` — and **French** and **Italian** switched off; Settings › General
+turns them on. Any other language is a config entry with its own locale rules.
+
+With three or more languages on, Translate goes to the target you last chose for
+the detected language (it asks the first time), and the popup's header becomes a
+menu for picking another. Correct and Explain still work on German only (#81).
 
 ### Terminology control
 

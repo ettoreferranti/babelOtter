@@ -9,7 +9,12 @@ final class PopupModel {
 
     enum Phase: Equatable {
         case capturing
-        case choosingDirection([LanguageCode])
+        /// "Which language is this?": Re-pitch's question, and Translate's
+        /// when detection could not tell and three or more languages are on
+        /// (#81).
+        case choosingSource([LanguageCode])
+        /// "Translate into:", from `source` when it is known (#81).
+        case choosingTarget(source: LanguageCode?, candidates: [LanguageCode])
         /// Re-pitch: the language is known; waiting for the audience (#66).
         case choosingAudience
         case translating
@@ -51,6 +56,7 @@ final class PopupModel {
     var instruction = ""
 
     let configuration: Configuration
+    private let targetMemory = TargetMemory()
     private let translator: Translator
     private let corrector: Corrector
     private let explainer: Explainer
@@ -167,7 +173,7 @@ final class PopupModel {
         }
         switch phase {
         case .translating, .finished, .failed: return true
-        case .capturing, .choosingDirection, .choosingAudience: return false
+        case .capturing, .choosingSource, .choosingTarget, .choosingAudience: return false
         }
     }
 
@@ -213,11 +219,11 @@ final class PopupModel {
             } else if !usesDirection {
                 runOnSelection()
             } else {
-                switch translator.direction(for: snapshot.text) {
+                switch translator.direction(for: snapshot.text, remembered: targetMemory.remembered) {
                 case .success(let direction):
                     run(direction)
-                case .failure(.directionUnknown(let candidates)):
-                    phase = .choosingDirection(candidates)
+                case .failure(.directionUnknown(let source, let candidates)):
+                    askForDirection(source: source, candidates: candidates)
                 case .failure(.languageNotConfigured(let code)):
                     phase = .failed("This looks like \(code), which is not one of your languages.")
                 case .failure(.emptyResponse):
@@ -227,14 +233,65 @@ final class PopupModel {
         }
     }
 
-    func choose(target: LanguageCode) {
+    /// Unknown source: with three or more languages ask which language it
+    /// is first; otherwise ask for the target (from the other language when
+    /// there are two).
+    private func askForDirection(source: LanguageCode?, candidates: [LanguageCode]) {
+        if source == nil, TargetChoice.usesMenu(configuration: configuration) {
+            phase = .choosingSource(configuration.enabledLanguages.map(\.code))
+        } else {
+            phase = .choosingTarget(source: source, candidates: candidates)
+        }
+    }
+
+    /// The answer to "Which language is this?".
+    func choose(source: LanguageCode) {
         guard !isDismissed else { return }
         if action == .repitch {
-            language = target
+            language = source
             phase = .choosingAudience
             return
         }
-        guard let direction = translator.direction(into: target) else { return }
+        switch translator.direction(from: source, remembered: targetMemory.remembered) {
+        case .success(let direction):
+            run(direction)
+        case .failure(.directionUnknown(let known, let candidates)):
+            phase = .choosingTarget(source: known ?? source, candidates: candidates)
+        case .failure(let error):
+            phase = .failed(Self.describe(error))
+        }
+    }
+
+    /// The answer to "Translate into:"; remembered for the source with three
+    /// or more languages (#81). With two the choice is forced, and keeping it
+    /// would skip the question once a third language is switched on.
+    func choose(target: LanguageCode) {
+        guard !isDismissed else { return }
+        guard case .choosingTarget(let source, _) = phase else { return }
+        guard let direction = translator.direction(from: source, into: target) else { return }
+        if TargetChoice.usesMenu(configuration: configuration) { targetMemory.remember(direction) }
+        run(direction)
+    }
+
+    /// Whether the header shows the target menu rather than Swap (#81).
+    var usesTargetMenu: Bool { TargetChoice.usesMenu(configuration: configuration) }
+
+    /// The header menu's targets: the other enabled languages but the
+    /// current target, which Regenerate already covers (#81).
+    var menuTargets: [LanguageCode] {
+        guard usesTargetMenu else { return [] }
+        guard let direction else { return [] }
+        return TargetChoice.menuTargets(source: direction.source, configuration: configuration)
+            .filter { $0 != direction.target }
+    }
+
+    /// Re-runs into another target from the header menu, same source;
+    /// remembered for that source (#81).
+    func retarget(_ target: LanguageCode) {
+        guard !isDismissed, usesDirection else { return }
+        guard let source = direction?.source else { return }
+        guard let direction = translator.direction(from: source, into: target) else { return }
+        targetMemory.remember(direction)
         run(direction)
     }
 
@@ -506,8 +563,8 @@ final class PopupModel {
         case .success(let code):
             language = code
             phase = .choosingAudience
-        case .failure(.directionUnknown(let candidates)):
-            phase = .choosingDirection(candidates)
+        case .failure(.directionUnknown(_, let candidates)):
+            phase = .choosingSource(candidates)
         case .failure(.languageNotConfigured(let code)):
             phase = .failed("This looks like \(code), which is not one of your languages.")
         case .failure(.emptyResponse):
@@ -647,7 +704,7 @@ final class PopupModel {
             case .directionUnknown:
                 // Not reachable from here: `run(_:)` always calls in with an
                 // already-resolved direction, and `direction(for:)` /
-                // `direction(into:)` are what raise this, before a
+                // `direction(from:)` are what raise this, before a
                 // translation ever starts.
                 return "Could not tell which language this is."
             }

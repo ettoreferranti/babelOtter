@@ -8,8 +8,9 @@ public enum Resolution: Sendable, Equatable {
     /// Detected something real, but the user has not enabled it.
     case notEnabled(LanguageCode)
     /// More than one plausible other side -- or none. Carries the candidates so a
-    /// picker can offer them.
-    case ambiguousPairing(candidates: [LanguageCode])
+    /// picker can offer them, and the source when it is known (#81), so the
+    /// target picked is translated from the detected language.
+    case ambiguousPairing(source: LanguageCode?, candidates: [LanguageCode])
     /// Detection itself declined to commit; ask the user (`FR-TRN-03`).
     case needsUserChoice(AmbiguityReason)
 }
@@ -31,10 +32,15 @@ public struct TargetLanguageResolver: Sendable {
         self.init(languages: configuration.languages)
     }
 
-    public func resolve(_ detection: Detection) -> Resolution {
+    /// `remembered` maps a source to the target last chosen for it (#81); it
+    /// settles the pairing when several targets are possible and the
+    /// remembered one is still enabled.
+    public func resolve(
+        _ detection: Detection, remembered: [LanguageCode: LanguageCode] = [:]
+    ) -> Resolution {
         guard case .confident(let detected, _) = detection else {
             guard case .ambiguous(let reason) = detection else {
-                return .ambiguousPairing(candidates: [])
+                return .ambiguousPairing(source: nil, candidates: [])
             }
             return .needsUserChoice(reason)
         }
@@ -48,10 +54,15 @@ public struct TargetLanguageResolver: Sendable {
         }
 
         let others = enabled.map(\.code).filter { $0 != source.code }
-        guard others.count == 1 else {
-            return .ambiguousPairing(candidates: others)
+        if others.count == 1 {
+            return .resolved(source: source.code, target: others[0])
         }
-        return .resolved(source: source.code, target: others[0])
+        if let target = remembered[source.code] {
+            if others.contains(target) {
+                return .resolved(source: source.code, target: target)
+            }
+        }
+        return .ambiguousPairing(source: source.code, candidates: others)
     }
 
     /// Equal outright, or equal once both are reduced to their base subtag.

@@ -45,7 +45,7 @@ public enum Detection: Sendable, Equatable {
 /// package can promise NFR-P1.
 public struct LanguageDetector: Sendable {
 
-    private let recognizer: any LanguageRecognizing
+    let recognizer: any LanguageRecognizing
     private let floor: Double
     private let minimumLength: Int
 
@@ -56,10 +56,17 @@ public struct LanguageDetector: Sendable {
     }
 
     /// Builds a detector from configuration, so the floor and minimum are the
-    /// user's rather than this type's.
-    public init(configuration: Configuration, recognizer: any LanguageRecognizing = NaturalLanguageRecognizer()) {
+    /// user's rather than this type's. Without an injected recognizer, the
+    /// system one is screened (#81): see `ScreenedRecognizer`.
+    public init(configuration: Configuration, recognizer: (any LanguageRecognizing)? = nil) {
+        let enabled = configuration.enabledLanguages.map(\.code)
+        let screened = ScreenedRecognizer(
+            open: NaturalLanguageRecognizer(),
+            constrained: NaturalLanguageRecognizer(constraints: enabled),
+            enabled: enabled,
+            floor: configuration.detectionConfidenceFloor)
         self.init(
-            recognizer: recognizer,
+            recognizer: recognizer ?? screened,
             floor: configuration.detectionConfidenceFloor,
             minimumLength: configuration.minimumLengthForDetection
         )
@@ -99,6 +106,40 @@ public struct LanguageDetector: Sendable {
     }
 }
 
+/// Detection in two passes (#81). French and Italian are easily confused on
+/// a short text, so the guess is made among the enabled languages only. But
+/// a recognizer limited that way rescales its confidences: with English and
+/// German enabled, an Italian sentence comes back as German, confidently, and
+/// Correct would correct it as German. So the open recognizer goes first; a
+/// confident guess outside the enabled languages stands, and is refused
+/// downstream as before. Otherwise the constrained guess is used.
+public struct ScreenedRecognizer: LanguageRecognizing {
+
+    let open: any LanguageRecognizing
+    let constrained: any LanguageRecognizing
+    /// Base subtags: `de-ch` is enabled when `de` is detected.
+    let enabled: [LanguageCode]
+    let floor: Double
+
+    public init(
+        open: any LanguageRecognizing, constrained: any LanguageRecognizing,
+        enabled: [LanguageCode], floor: Double
+    ) {
+        self.open = open
+        self.constrained = constrained
+        self.enabled = enabled.map(\.baseSubtag)
+        self.floor = floor
+    }
+
+    public func hypotheses(for text: String) -> [LanguageCode: Double] {
+        let wide = open.hypotheses(for: text)
+        for (code, confidence) in wide where confidence >= floor {
+            if !enabled.contains(code.baseSubtag) { return wide }
+        }
+        return constrained.hypotheses(for: text)
+    }
+}
+
 /// `NLLanguageRecognizer`, on-device and offline.
 public struct NaturalLanguageRecognizer: LanguageRecognizing {
 
@@ -106,12 +147,18 @@ public struct NaturalLanguageRecognizer: LanguageRecognizing {
     /// a coin toss, which is all the policy above needs.
     private let maximumHypotheses: Int
 
-    public init(maximumHypotheses: Int = 2) {
+    /// The languages a guess is limited to, by base subtag (`de-ch` is `de`);
+    /// empty means any language.
+    let constraints: [LanguageCode]
+
+    public init(maximumHypotheses: Int = 2, constraints: [LanguageCode] = []) {
         self.maximumHypotheses = maximumHypotheses
+        self.constraints = constraints.map(\.baseSubtag)
     }
 
     public func hypotheses(for text: String) -> [LanguageCode: Double] {
         let recognizer = NLLanguageRecognizer()
+        recognizer.languageConstraints = constraints.map { NLLanguage(rawValue: $0.rawValue) }
         recognizer.processString(text)
         let raw = recognizer.languageHypotheses(withMaximum: maximumHypotheses)
         return Dictionary(

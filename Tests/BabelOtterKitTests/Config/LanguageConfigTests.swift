@@ -39,6 +39,56 @@ struct LanguageConfigTests {
         #expect(enabled == [LanguageCode("en"), LanguageCode("de-ch")])
     }
 
+    @Test("French and Italian ship switched off, with their address forms and no rules (#81)")
+    func frenchAndItalianShipOff() {
+        #expect(LanguageConfig.shippedDefaults.map(\.code)
+            == ["en", "de-ch", "fr", "it"].map(LanguageCode.init))
+        #expect(!LanguageConfig.french.enabled)
+        #expect(!LanguageConfig.italian.enabled)
+        #expect(LanguageConfig.french.addressForms == AddressForms(formal: "vous", informal: "tu"))
+        #expect(LanguageConfig.italian.addressForms == AddressForms(formal: "Lei", informal: "tu"))
+        #expect(LanguageConfig.french.localeRules.isEmpty)
+        #expect(LanguageConfig.italian.localeRules.isEmpty)
+    }
+
+    @Test("a file without French and Italian gains them, switched off, after its own languages")
+    func missingShippedLanguagesAppended() throws {
+        var twoLanguages = Configuration.default
+        twoLanguages.languages = [.english, .swissGerman]
+        let added = try #require(twoLanguages.addingMissingShippedLanguages())
+        #expect(added.languages.map(\.code) == ["en", "de-ch", "fr", "it"].map(LanguageCode.init))
+        #expect(added.languages.filter(\.enabled).map(\.code) == [LanguageCode("en"), LanguageCode("de-ch")])
+        #expect(added.languages[2] == .french)
+        #expect(added.languages[3] == .italian)
+        // Only the languages change.
+        var withoutLanguages = added
+        withoutLanguages.languages = twoLanguages.languages
+        #expect(withoutLanguages == twoLanguages)
+    }
+
+    @Test("a language sharing the base code counts as present; nothing missing gives nil")
+    func missingShippedLanguagesBaseCode() throws {
+        var custom = Configuration.default
+        let swissFrench = LanguageConfig(
+            code: LanguageCode("fr-CH"), displayName: "Swiss French", localeRules: [], enabled: true)
+        let german = LanguageConfig(
+            code: LanguageCode("de"), displayName: "German", localeRules: [], enabled: true)
+        custom.languages = [swissFrench, .english, german]
+        let added = try #require(custom.addingMissingShippedLanguages())
+        #expect(added.languages.map(\.code) == ["fr-ch", "en", "de", "it"].map(LanguageCode.init))
+        #expect(added.addingMissingShippedLanguages() == nil)
+        #expect(Configuration.default.addingMissingShippedLanguages() == nil)
+    }
+
+    @Test("an appended language is switched off even if the shipped one were on")
+    func appendedAreOff() throws {
+        var onlyFrench = Configuration.default
+        onlyFrench.languages = [LanguageConfig.french]
+        let added = try #require(onlyFrench.addingMissingShippedLanguages())
+        // English and de-CH ship enabled, but are appended off like any other.
+        #expect(added.languages.filter(\.enabled).isEmpty)
+    }
+
     @Test("a language added purely as data round-trips through Codable")
     func addedByConfigurationAlone() throws {
         let french = LanguageConfig(
