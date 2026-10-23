@@ -28,6 +28,32 @@ Read this first if you are picking babelOtter up in a new session.
 
 **Starting a new session:** "Read docs/HANDOFF.md and let's decide what to do next in M4." Everything above, plus the per-feature updates below, is the context.
 
+## Update 2026-10-23: Correct and Explain beyond German (#81, part 2)
+
+On branch `feat/correct-explain-languages`, not yet a PR. Spec `docs/superpowers/specs/2026-10-23-correct-explain-languages-design.md`, plan `docs/superpowers/plans/2026-10-23-correct-explain-languages.md`. With it, #81 is complete.
+
+- **My language** (`Configuration.myLanguage`, absent = English; Settings › General picker; it cannot be switched off). Correct's notes and Explain's text are written in it; Correct's false-friend check is against it.
+- **`TextLanguage`** decides the language Correct and Explain work on: a confident enabled guess; when unsure, the one enabled language that is not mine if there is exactly one (keeps today's en + de behaviour); else ask. Explain refuses my language (`alreadyMine`).
+- **Corrector / Explainer** take `in: LanguageCode?`; nil resolves. `notGerman` is gone (`notEnabled`, `needsLanguage`, `alreadyMine`). The popup resolves before sending, as Re-pitch does, and reuses `language`.
+- **Prompts:** learner framing ("learning X, thinks in Y") or native-speaker framing for my own language; the language's `correctionNotes` (data: German's examples moved out of code; French and Italian new; written to the file only when changed). Reply keys lost `_en` (`explanation`, `summary`).
+- **Eval:** correction cases carry `language` (default de-ch); 10 French + 11 Italian cases; the runner corrects in the case's language, not via detection. `EvalFailure.notGerman` → `wrongLanguage` (old reports still load).
+- `Configuration.germanLanguage` is gone.
+
+**Manual check (yours).** Rebuild first (`Tools/make-app.sh --run`).
+
+| # | Do | Expect |
+|---|---|---|
+| C1 | Today's setup (English mine, en + de on): Correct and Explain a German text; Correct a short German fragment | As before: corrections with English notes; an English explanation; the fragment is not asked about |
+| C2 | Enable French; Correct a French text with two errors | Corrected in French; notes in English |
+| C3 | Explain a French text | An English explanation |
+| C4 | Explain an English text | "This is already in English." |
+| C5 | Correct an English text with a typo | Proofread; no learner or false-friend notes |
+| C6 | Set My language to Italian (enable it first); Correct a German text | Notes in Italian |
+| C7 | Try to switch off the language set as My language | "… is your language; choose another first." |
+| C8 | With en, de, fr on, Correct a short ambiguous text ("Ok merci") | "Which language is this?", then the correction |
+
+**Risk to your setup:** nothing is written until you change a setting; then `myLanguage` appears in `config.json`. Set My language back to English to undo C6.
+
 ## Update 2026-10-23: sign, notarize and distribute (#82), done
 
 Merged as #118, with a fix in #119. #82 is closed: all the checks below passed and `v1.0.1` was released. `Tools/release.sh` turns a clean checkout of a `vX.Y.Z` tag into `build/lingoSwen-X.Y.Z.dmg`: version stamped from the tag, hardened runtime, Developer ID signature, notarized, stapled, checked with `spctl`. Spec `docs/superpowers/specs/2026-10-23-sign-notarize-design.md`. The decisions that matter:

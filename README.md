@@ -95,7 +95,14 @@ turns them on. Any other language is a config entry with its own locale rules.
 
 With three or more languages on, Translate goes to the target you last chose for
 the detected language (it asks the first time), and the popup's header becomes a
-menu for picking another. Correct and Explain still work on German only (#81).
+menu for picking another.
+
+**My language** (Settings › General, English by default) is the language you read
+best. Correct works on any enabled language and explains its changes in my
+language; a text in my own language is proofread as a native speaker's. Explain
+explains a text in any other enabled language, in my language. Each language can
+carry its own notes for Correct (`correctionNotes` in `config.json`); German,
+French and Italian ship with some.
 
 ### Terminology control
 
