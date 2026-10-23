@@ -109,20 +109,24 @@ public struct LanguageConfig: Sendable, Equatable, Codable {
     public var enabled: Bool
     /// Nil for a language without a formal/informal distinction (#110).
     public let addressForms: AddressForms?
+    /// What Correct's prompt says about this language in particular (#81):
+    /// the errors to look for and an example explanation. Nil for none.
+    public let correctionNotes: String?
 
     public init(
         code: LanguageCode, displayName: String, localeRules: [LocaleRule], enabled: Bool,
-        addressForms: AddressForms? = nil
+        addressForms: AddressForms? = nil, correctionNotes: String? = nil
     ) {
         self.code = code
         self.displayName = displayName
         self.localeRules = localeRules
         self.enabled = enabled
         self.addressForms = addressForms
+        self.correctionNotes = correctionNotes
     }
 
     private enum CodingKeys: String, CodingKey {
-        case code, displayName, localeRules, enabled, addressForms
+        case code, displayName, localeRules, enabled, addressForms, correctionNotes
     }
 
     /// `addressForms` absent -- a file from before #110 -- takes the shipped
@@ -139,12 +143,30 @@ public struct LanguageConfig: Sendable, Equatable, Codable {
         } else {
             forms = Self.shippedForms(for: code)
         }
+        // Absent takes the shipped notes, as addressForms does; null is none.
+        var notes: String?
+        if container.contains(.correctionNotes) {
+            notes = try container.decodeIfPresent(String.self, forKey: .correctionNotes)
+        } else {
+            notes = Self.shippedNotes(for: code)
+        }
         self.init(
             code: code,
             displayName: try container.decode(String.self, forKey: .displayName),
             localeRules: try container.decode([LocaleRule].self, forKey: .localeRules),
             enabled: try container.decode(Bool.self, forKey: .enabled),
-            addressForms: forms)
+            addressForms: forms,
+            correctionNotes: notes)
+    }
+
+    static func shippedNotes(for code: LanguageCode) -> String? {
+        for shipped in shippedDefaults where shipped.code == code {
+            return shipped.correctionNotes
+        }
+        for shipped in shippedDefaults where shipped.code.baseSubtag == code.baseSubtag {
+            return shipped.correctionNotes
+        }
+        return nil
     }
 
     static func shippedForms(for code: LanguageCode) -> AddressForms? {
@@ -169,6 +191,15 @@ public struct LanguageConfig: Sendable, Equatable, Codable {
         } else {
             try container.encodeNil(forKey: .addressForms)
         }
+        // Written only when it differs from what ships, so the file stays
+        // readable and improved notes reach a file that never changed them.
+        if correctionNotes != Self.shippedNotes(for: code) {
+            if let correctionNotes {
+                try container.encode(correctionNotes, forKey: .correctionNotes)
+            } else {
+                try container.encodeNil(forKey: .correctionNotes)
+            }
+        }
     }
 }
 
@@ -190,7 +221,15 @@ extension LanguageConfig {
         // source rule -- see AsciiSourceTests.
         localeRules: [LocaleRule(replace: "\u{00DF}", with: "ss")],
         enabled: true,
-        addressForms: AddressForms(formal: "Sie", informal: "du")
+        addressForms: AddressForms(formal: "Sie", informal: "du"),
+        correctionNotes: """
+            Resolve case errors by changing articles and endings, not the noun: \
+            "mit der Lehrer" becomes "mit dem Lehrer", not "mit der Lehrerin". \
+            Personal pronouns such as du, ich and wir have no grammatical gender; \
+            never give a pronoun's gender as the reason. Example explanations: \
+            "mit takes the dative, so der becomes dem"; "Leiterin refers to Anna, \
+            a woman, so the noun takes its feminine form".
+            """
     )
 
     /// French, shipped switched off (#81). No orthography rules.
@@ -199,7 +238,16 @@ extension LanguageConfig {
         displayName: "French",
         localeRules: [],
         enabled: false,
-        addressForms: AddressForms(formal: "vous", informal: "tu")
+        addressForms: AddressForms(formal: "vous", informal: "tu"),
+        // Accented letters as escapes for the ASCII-only source rule.
+        correctionNotes: """
+            Check the agreement of past participles (with \u{00EA}tre, and with \
+            avoir when the direct object comes first) and of adjectives. Check \
+            accents and elision: a or \u{00E0}, ou or o\u{00F9}, "le ami" becomes \
+            "l'ami", "que il" becomes "qu'il". Confusing ces and ses, or son and \
+            sont, is an error. Example explanation: "the participle agrees with \
+            the feminine subject, so parti becomes partie".
+            """
     )
 
     /// Italian, shipped switched off (#81). No orthography rules.
@@ -208,7 +256,15 @@ extension LanguageConfig {
         displayName: "Italian",
         localeRules: [],
         enabled: false,
-        addressForms: AddressForms(formal: "Lei", informal: "tu")
+        addressForms: AddressForms(formal: "Lei", informal: "tu"),
+        // Accented letters as escapes for the ASCII-only source rule.
+        correctionNotes: """
+            Check articulated prepositions ("di il" becomes "del", "in la" \
+            becomes "nella", "a gli" becomes "agli"), the agreement of adjectives \
+            and of past participles with essere, double consonants, and accents: \
+            e or \u{00E8}, "perche" becomes "perch\u{00E9}". Example explanation: \
+            "in and la contract to nella".
+            """
     )
 
     /// What a fresh install gets: English and de-CH enabled (`FR-LNG-03`);

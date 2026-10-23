@@ -25,10 +25,10 @@ struct SettingsEditorTests {
 
     @Test("a language can be switched while two stay on")
     func languages() throws {
-        var configuration = Configuration.default
-        configuration.languages.append(french)
-        var editor = SettingsEditor(configuration: configuration)
+        var editor = SettingsEditor(configuration: .default)
         try editor.setLanguage(LanguageCode("fr"), enabled: true)
+        // English is my language until another is chosen (#81).
+        try editor.setMyLanguage(LanguageCode("fr"))
         try editor.setLanguage(LanguageCode("en"), enabled: false)
         #expect(editor.configuration.enabledLanguages.map(\.code.rawValue) == ["de-ch", "fr"])
         try expectRoundTrip(editor)

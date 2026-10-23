@@ -53,6 +53,11 @@ public struct Configuration: Sendable, Equatable, Codable {
     /// Optional so a file written before #26 still loads: nil means each
     /// action's default.
     public var hotkeys: HotKeyBindings?
+    /// The language the user reads best (#81): Correct's notes and Explain's
+    /// text are written in it, and Correct judges false friends against it.
+    /// Optional so an older file loads unchanged: nil means English. Use
+    /// `mine`.
+    public var myLanguage: LanguageCode?
 
     public init(
         languages: [LanguageConfig],
@@ -65,7 +70,8 @@ public struct Configuration: Sendable, Equatable, Codable {
         detectionConfidenceFloor: Double,
         minimumLengthForDetection: Int,
         strictCaptureOnly: Bool = false,
-        hotkeys: HotKeyBindings? = nil
+        hotkeys: HotKeyBindings? = nil,
+        myLanguage: LanguageCode? = nil
     ) {
         self.languages = languages
         self.profiles = profiles
@@ -78,6 +84,7 @@ public struct Configuration: Sendable, Equatable, Codable {
         self.minimumLengthForDetection = minimumLengthForDetection
         self.strictCaptureOnly = strictCaptureOnly
         self.hotkeys = hotkeys
+        self.myLanguage = myLanguage
     }
 
     public var enabledLanguages: [LanguageConfig] {
@@ -90,6 +97,29 @@ public struct Configuration: Sendable, Equatable, Codable {
 
     public func profile(id: String) -> AudienceProfile? {
         profiles.first { $0.id == id }
+    }
+
+    /// My language's code: English unless the file names another (#81).
+    public var myLanguageCode: LanguageCode {
+        myLanguage ?? LanguageConfig.english.code
+    }
+
+    /// My language as configured; English as shipped when it is not
+    /// configured, which `myLanguageProblem` reports.
+    public var mine: LanguageConfig {
+        language(for: myLanguageCode) ?? .english
+    }
+
+    /// Why `myLanguage` cannot be used, worded for "config.json: myLanguage
+    /// ..."; nil when it is an enabled language.
+    public var myLanguageProblem: String? {
+        guard let language = language(for: myLanguageCode) else {
+            return "\(myLanguageCode.rawValue) is not a configured language"
+        }
+        guard language.enabled else {
+            return "\(language.displayName) is switched off"
+        }
+        return nil
     }
 
     /// This configuration with every shipped language it lacks appended,

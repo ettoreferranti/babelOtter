@@ -95,6 +95,12 @@ public struct ConfigurationStore: Sendable {
         }
         do {
             let configuration = try JSONDecoder().decode(Configuration.self, from: data)
+            // A value the decoder accepts but nothing can use (#81).
+            if let problem = configuration.myLanguageProblem {
+                return LoadedConfiguration(
+                    configuration: .default,
+                    problems: [ConfigurationProblem(file: Self.fileName, field: "myLanguage", detail: problem)])
+            }
             return LoadedConfiguration(configuration: configuration, problems: [])
         } catch let error as DecodingError {
             return LoadedConfiguration(

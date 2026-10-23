@@ -6,6 +6,10 @@ public enum SettingsRefusal: Error, Sendable, Equatable {
     /// Translate needs a pair.
     case tooFewLanguages
     case unknownLanguage(LanguageCode)
+    /// My language (#81) must stay on; carries its display name.
+    case isMyLanguage(String)
+    /// Only an enabled language can be my language; carries its name.
+    case languageOff(String)
     /// The value is outside the range `message` names.
     case outOfRange(String)
     case emptyModel
@@ -33,6 +37,10 @@ public enum SettingsRefusal: Error, Sendable, Equatable {
             return "At least two languages stay on."
         case .unknownLanguage(let code):
             return "\(code.rawValue) is not a configured language."
+        case .isMyLanguage(let name):
+            return "\(name) is your language; choose another first."
+        case .languageOff(let name):
+            return "Switch \(name) on first."
         case .outOfRange(let range):
             return range
         case .emptyModel:
@@ -96,11 +104,26 @@ public struct SettingsEditor: Sendable, Equatable {
         guard let index = languages.firstIndex(where: { $0.code == code }) else {
             throw SettingsRefusal.unknownLanguage(code)
         }
+        let name = languages[index].displayName
         languages[index].enabled = enabled
         if languages.filter(\.enabled).count < Self.minimumLanguages {
             throw SettingsRefusal.tooFewLanguages
         }
+        if !enabled {
+            if code == configuration.myLanguageCode { throw SettingsRefusal.isMyLanguage(name) }
+        }
         configuration.languages = languages
+    }
+
+    /// The language explanations are written in (#81): an enabled one.
+    public mutating func setMyLanguage(_ code: LanguageCode) throws {
+        guard let language = configuration.language(for: code) else {
+            throw SettingsRefusal.unknownLanguage(code)
+        }
+        guard language.enabled else {
+            throw SettingsRefusal.languageOff(language.displayName)
+        }
+        configuration.myLanguage = code
     }
 
     public mutating func setRetention(_ retention: HistoryRetention) throws {
