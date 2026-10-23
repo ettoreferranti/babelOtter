@@ -27,6 +27,16 @@ struct GeneralSettingsView: View {
                             get: { language.enabled },
                             set: { on in model.edit(.languages) { try $0.setLanguage(language.code, enabled: on) } }))
                     }
+                    // Correct's notes and Explain's text are written in it (#81).
+                    Picker("My language", selection: Binding(
+                        get: { model.configuration.myLanguageCode },
+                        set: { code in model.edit(.languages) { try $0.setMyLanguage(code) } })) {
+                        ForEach(model.configuration.enabledLanguages, id: \.code) { language in
+                            Text(language.displayName).tag(language.code)
+                        }
+                    }
+                    Text("Correct explains its changes, and Explain writes, in this language.")
+                        .font(.caption).foregroundStyle(.secondary)
                     RefusalText(text: model.refusals[.languages])
                 }
                 .disabled(model.isReadOnly)

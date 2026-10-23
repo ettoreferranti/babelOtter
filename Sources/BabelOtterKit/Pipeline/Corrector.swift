@@ -35,7 +35,8 @@ public enum CorrectionFailure: Error, Equatable {
     case emptyResponse
 }
 
-/// German text in, a checked correction out (`FR-COR-01`..`06`).
+/// A text in any enabled language in, a checked correction out
+/// (`FR-COR-01`..`06`, #81).
 ///
 /// Shaped like `Translator`. The differences are deliberate: parsing is
 /// strict (a correction that cannot be read is never shown as one), a second
