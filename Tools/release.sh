@@ -71,7 +71,10 @@ plist="$app/Contents/Info.plist"
 # runtime restricts.
 codesign --force --options runtime --timestamp --sign "$identity" "$app"
 codesign --verify --strict --deep "$app"
-codesign --display --verbose=1 "$app" 2>&1 | grep -q 'flags=.*runtime' || fail "the app was signed without the hardened runtime."
+# Captured first: piped straight into grep -q, codesign is cut off by SIGPIPE
+# once grep has its match, and pipefail reads that as a failure.
+signature="$(codesign --display --verbose=1 "$app" 2>&1)"
+grep -q 'flags=.*runtime' <<<"$signature" || fail "the app was signed without the hardened runtime."
 
 # 4. Package: the app and an Applications link, in a signed compressed DMG.
 dmg="build/lingoSwen-$version.dmg"
