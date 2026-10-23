@@ -22,7 +22,6 @@ public struct TranslationScore: Sendable, Equatable, Codable {
 /// One translation scored against its case (spec 2026-09-30, section 4.3).
 public enum TranslationScorer {
 
-    static let esszett = "\u{00DF}"
     static let sentinelBrackets = ["\u{27E6}", "\u{27E7}"]
 
     public static func score(_ testCase: TranslationCase, outcome: TranslationOutcome) -> TranslationScore {
@@ -30,12 +29,12 @@ public enum TranslationScorer {
         case .failed(let failure):
             return TranslationScore(
                 caseID: testCase.id, failure: failure,
-                esszettAbsent: germanCheck(testCase, passed: false), missingTerms: testCase.terms,
+                esszettAbsent: localeCheck(testCase, output: nil), missingTerms: testCase.terms,
                 sentinelDebris: false, structureKept: false, chrF: 0)
         case .translated(let output):
             return TranslationScore(
                 caseID: testCase.id, failure: nil,
-                esszettAbsent: germanCheck(testCase, passed: !output.contains(esszett)),
+                esszettAbsent: localeCheck(testCase, output: output),
                 missingTerms: testCase.terms.filter { !output.contains($0) },
                 sentinelDebris: sentinelBrackets.contains { output.contains($0) },
                 structureKept: sameStructure(testCase.text, output),
@@ -43,9 +42,15 @@ public enum TranslationScorer {
         }
     }
 
-    private static func germanCheck(_ testCase: TranslationCase, passed: Bool) -> Bool? {
-        guard testCase.direction.targetIsGerman else { return nil }
-        return passed
+    /// Whether the output keeps the target's orthography rules (#81): no
+    /// rule's pattern appears in it. For de-CH that is the eszett check, which
+    /// is why the score keeps that name. Nil for a target without rules; a
+    /// failed run (no output) fails it.
+    private static func localeCheck(_ testCase: TranslationCase, output: String?) -> Bool? {
+        let rules = testCase.direction.targetRules
+        guard !rules.isEmpty else { return nil }
+        guard let output else { return false }
+        return !rules.contains { output.contains($0.replace) }
     }
 
     /// The same number of blocks and the same list markers, in order.

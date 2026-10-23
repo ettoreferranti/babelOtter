@@ -21,6 +21,16 @@ struct TranslationScorerTests {
         #expect(TranslationScorer.score(german, outcome: .translated("Stra\u{00DF}e.")).esszettAbsent == false)
         let english = translationCase("Strasse.", .swissGermanToEnglish)
         #expect(TranslationScorer.score(english, outcome: .translated("Street.")).esszettAbsent == nil)
+        #expect(TranslationScorer.score(german, outcome: .failed(.emptyResponse)).esszettAbsent == false)
+    }
+
+    @Test("the check follows the target's rules: French has none, de-CH from French has its own (#81)")
+    func localeRulesFollowTarget() throws {
+        let french = translationCase("Street.", try #require(TranslationDirection(rawValue: "en-fr")))
+        #expect(TranslationScorer.score(french, outcome: .translated("Stra\u{00DF}e.")).esszettAbsent == nil)
+        let fromFrench = translationCase("Rue.", try #require(TranslationDirection(rawValue: "fr-de-ch")))
+        #expect(TranslationScorer.score(fromFrench, outcome: .translated("Stra\u{00DF}e.")).esszettAbsent == false)
+        #expect(TranslationScorer.score(fromFrench, outcome: .translated("Strasse.")).esszettAbsent == true)
     }
 
     @Test("every term must come back verbatim")

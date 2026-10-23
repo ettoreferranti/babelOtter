@@ -55,8 +55,27 @@ struct GoldenSetTests {
         #expect(only.profileID == "colleagues")
         #expect(only.direction == .englishToSwissGerman)
         #expect(only.direction.direction == Direction(source: LanguageCode("en"), target: LanguageCode("de-CH")))
-        #expect(only.direction.targetIsGerman)
-        #expect(!TranslationDirection.swissGermanToEnglish.targetIsGerman)
+        #expect(only.direction.targetRules == LanguageConfig.swissGerman.localeRules)
+        #expect(TranslationDirection.swissGermanToEnglish.targetRules.isEmpty)
+    }
+
+    @Test("a direction is any two different shipped languages, read from their codes (#81)")
+    func directionsAreData() throws {
+        let pairs: [(String, String, String)] = [
+            ("en-de-ch", "en", "de-ch"), ("de-ch-en", "de-ch", "en"), ("en-fr", "en", "fr"),
+            ("fr-en", "fr", "en"), ("en-it", "en", "it"), ("it-en", "it", "en"),
+            ("fr-de-ch", "fr", "de-ch"), ("de-ch-it", "de-ch", "it"), ("EN-DE-CH", "en", "de-ch"),
+        ]
+        for (raw, source, target) in pairs {
+            let parsed = try #require(TranslationDirection(rawValue: raw), "\(raw)")
+            #expect(parsed.direction == Direction(source: LanguageCode(source), target: LanguageCode(target)))
+            #expect(parsed.rawValue == raw.lowercased())
+        }
+        for raw in ["en-nl", "nl-en", "en-en", "de-ch-de-ch", "en", "", "en-", "-en", "de-en", "en-de"] {
+            #expect(TranslationDirection(rawValue: raw) == nil, "\(raw)")
+        }
+        #expect(TranslationDirection(rawValue: "fr-en")?.targetRules.isEmpty == true)
+        #expect(TranslationDirection(rawValue: "fr-de-ch")?.targetRules == LanguageConfig.swissGerman.localeRules)
     }
 
     @Test("a clean case and a guard-only case are valid")
@@ -90,7 +109,8 @@ struct GoldenSetTests {
     }
 
     @Test("an invalid translation case names its id and field", arguments: [
-        (#"{"id": "t", "text": "Hi.", "direction": "en-fr", "reference": "Salut."}"#, "direction"),
+        (#"{"id": "t", "text": "Hi.", "direction": "en-nl", "reference": "Hoi."}"#, "direction"),
+        (#"{"id": "t", "text": "Hi.", "direction": "en-en", "reference": "Hi."}"#, "direction"),
         (#"{"id": "t", "text": "Hi.", "direction": "en-de-ch", "reference": ""}"#, "reference"),
         (#"{"id": "t", "text": "Hi.", "direction": "en-de-ch", "terms": ["Otterbach"], "reference": "Hallo."}"#, "terms[0]"),
         (#"{"id": "t", "text": "Hi Otterbach.", "direction": "en-de-ch", "terms": ["Otterbach"], "reference": "Hallo."}"#, "terms[0]"),
