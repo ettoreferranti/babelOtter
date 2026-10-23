@@ -45,7 +45,7 @@ public enum Detection: Sendable, Equatable {
 /// package can promise NFR-P1.
 public struct LanguageDetector: Sendable {
 
-    private let recognizer: any LanguageRecognizing
+    let recognizer: any LanguageRecognizing
     private let floor: Double
     private let minimumLength: Int
 
@@ -56,10 +56,15 @@ public struct LanguageDetector: Sendable {
     }
 
     /// Builds a detector from configuration, so the floor and minimum are the
-    /// user's rather than this type's.
-    public init(configuration: Configuration, recognizer: any LanguageRecognizing = NaturalLanguageRecognizer()) {
+    /// user's rather than this type's. Without an injected recognizer, the
+    /// system one only considers the enabled languages (#81): French and
+    /// Italian are easily confused on a short text, and a guess outside the
+    /// user's languages helps nobody.
+    public init(configuration: Configuration, recognizer: (any LanguageRecognizing)? = nil) {
+        let constrained = NaturalLanguageRecognizer(
+            constraints: configuration.enabledLanguages.map(\.code))
         self.init(
-            recognizer: recognizer,
+            recognizer: recognizer ?? constrained,
             floor: configuration.detectionConfidenceFloor,
             minimumLength: configuration.minimumLengthForDetection
         )
@@ -106,12 +111,18 @@ public struct NaturalLanguageRecognizer: LanguageRecognizing {
     /// a coin toss, which is all the policy above needs.
     private let maximumHypotheses: Int
 
-    public init(maximumHypotheses: Int = 2) {
+    /// The languages a guess is limited to, by base subtag (`de-ch` is `de`);
+    /// empty means any language.
+    let constraints: [LanguageCode]
+
+    public init(maximumHypotheses: Int = 2, constraints: [LanguageCode] = []) {
         self.maximumHypotheses = maximumHypotheses
+        self.constraints = constraints.map(\.baseSubtag)
     }
 
     public func hypotheses(for text: String) -> [LanguageCode: Double] {
         let recognizer = NLLanguageRecognizer()
+        recognizer.languageConstraints = constraints.map { NLLanguage(rawValue: $0.rawValue) }
         recognizer.processString(text)
         let raw = recognizer.languageHypotheses(withMaximum: maximumHypotheses)
         return Dictionary(

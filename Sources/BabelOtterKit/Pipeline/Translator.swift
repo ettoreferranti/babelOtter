@@ -66,7 +66,7 @@ public struct Translator: Sendable {
     public init(
         configuration: Configuration,
         chat: any ChatStreaming,
-        recognizer: any LanguageRecognizing = NaturalLanguageRecognizer()
+        recognizer: (any LanguageRecognizing)? = nil
     ) {
         self.configuration = configuration
         self.chat = chat

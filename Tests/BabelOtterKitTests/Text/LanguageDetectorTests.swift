@@ -152,4 +152,60 @@ struct NaturalLanguageRecognizerTests {
             """
         #expect(detector.detect(text).languageCode?.baseSubtag == LanguageCode("de"))
     }
+
+    @Test("a constrained recognizer only answers with the languages it is limited to")
+    func constrained() {
+        let english = """
+            The committee has agreed to postpone the decision until the next meeting, \
+            when the revised budget figures will finally be available for review.
+            """
+        let recognizer = NaturalLanguageRecognizer(constraints: [LanguageCode("fr"), LanguageCode("it")])
+        let guesses = Set(recognizer.hypotheses(for: english).keys)
+        #expect(!guesses.isEmpty)
+        #expect(guesses.isSubset(of: [LanguageCode("fr"), LanguageCode("it")]))
+        #expect(Set(NaturalLanguageRecognizer().hypotheses(for: english).keys).contains(LanguageCode("en")))
+    }
+
+    @Test("French and Italian paragraphs detect as themselves among four languages")
+    func frenchAndItalian() {
+        let recognizer = NaturalLanguageRecognizer(
+            constraints: ["en", "de-ch", "fr", "it"].map(LanguageCode.init))
+        let constrained = LanguageDetector(recognizer: recognizer, floor: 0.5, minimumLength: 12)
+        let french = """
+            Le comité a décidé de reporter la décision à la prochaine séance, \
+            lorsque les chiffres révisés du budget seront enfin disponibles.
+            """
+        let italian = """
+            Il comitato ha deciso di rinviare la decisione alla prossima riunione, \
+            quando le cifre riviste del bilancio saranno finalmente disponibili.
+            """
+        #expect(constrained.detect(french).languageCode == LanguageCode("fr"))
+        #expect(constrained.detect(italian).languageCode == LanguageCode("it"))
+    }
+}
+
+@Suite("Detection is limited to the enabled languages (#81)")
+struct DetectionConstraintTests {
+
+    private func constraints(_ detector: LanguageDetector) -> [LanguageCode]? {
+        (detector.recognizer as? NaturalLanguageRecognizer)?.constraints
+    }
+
+    @Test("a detector built from configuration limits the recognizer to the enabled base codes")
+    func fromConfiguration() {
+        var configuration = Configuration.default
+        #expect(constraints(LanguageDetector(configuration: configuration))
+            == [LanguageCode("en"), LanguageCode("de")])
+        configuration.languages[2].enabled = true
+        #expect(constraints(LanguageDetector(configuration: configuration))
+            == [LanguageCode("en"), LanguageCode("de"), LanguageCode("fr")])
+    }
+
+    @Test("an injected recognizer is used as given")
+    func injected() {
+        let detector = LanguageDetector(
+            configuration: .default, recognizer: NaturalLanguageRecognizer(constraints: [LanguageCode("it")]))
+        #expect(constraints(detector) == [LanguageCode("it")])
+        #expect(NaturalLanguageRecognizer().constraints.isEmpty)
+    }
 }
