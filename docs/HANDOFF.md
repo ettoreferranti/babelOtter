@@ -24,9 +24,32 @@ Read this first if you are picking babelOtter up in a new session.
 
 **Starting a new session:** "Read docs/HANDOFF.md and let's decide what to do next in M4." Everything above, plus the per-feature updates below, is the context.
 
+## Update 2026-10-23: sign, notarize and distribute (#82)
+
+On branch `feat/sign-notarize`. `Tools/release.sh` turns a clean checkout of a `vX.Y.Z` tag into `build/lingoSwen-X.Y.Z.dmg`: version stamped from the tag, hardened runtime, Developer ID signature, notarized, stapled, checked with `spctl`. Spec `docs/superpowers/specs/2026-10-23-sign-notarize-design.md`. The decisions that matter:
+
+- **Builds are handed out privately, never as public GitHub Releases.** The user's Apple membership is an organization team, and a team Developer ID carries the team's name in every signature. No identity, team ID or Apple ID is committed; the script finds the identity in the keychain by prefix and uses its hash, and notarytool reads the keychain profile `lingoswen-notary`. `ReleaseSecretsTests` refuses all three shapes in any tracked file (planted-defect checked).
+- **Local only.** CI signing is deferred (the org may not allow exporting the certificate); #82's CI criterion is re-scoped.
+- **Gatekeeper assessments are disabled on the user's Mac** (`spctl --status`). The script then skips the `spctl` verdict with a warning instead of failing; a real Gatekeeper test needs another Mac (M3).
+- `Info.plist` said 0.1.0; now 1.0.0, and releases stamp the tag's version.
+
+**The certificate** (Developer ID Application, G2) arrived and is in the user's login keychain; `find-identity -v` lists it (M2). It only became valid once Apple's intermediate *Developer ID Certification Authority (G2)* was installed (`https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer`): Xcode normally installs it, and this project never runs Xcode. **It expires 2027-11-22** (not five years); builds already signed stay valid (secure timestamp, notarized), but a new release after that date needs a new certificate from the Account Holder, made the same way from a signing request. The notary profile is stored and works.
+
+**Manual check (yours).**
+
+| # | Do | Expect |
+|---|---|---|
+| M1 | On the branch, untagged: `Tools/release.sh` | Stops before building: "HEAD is not a vX.Y.Z tag" |
+| M2 | ~~When the `.cer` arrives~~ Done 2026-10-23: `security find-identity -v -p codesigning` | One `Developer ID Application:` identity listed |
+| M3 | After merge, `git tag v1.0.1` on `main`; `Tools/release.sh` | Notarization accepted; the Gatekeeper-disabled warning (on this Mac); the DMG path and SHA-256 |
+| M4 | Copy the DMG to a Mac with Gatekeeper on that has never built lingoSwen; open it, drag to Applications, launch | No Gatekeeper block; the setup window opens; Get Info shows 1.0.1 |
+| M5 | On your Mac, quit the dev build and launch the installed one | Accessibility is asked again once (new signature); then Translate works |
+
+**Risk to your setup:** the installed app and the dev build share the bundle ID and `~/Library/Application Support/ch.lingoswen/` (config, history); never run both at once. The Accessibility grant holds for whichever signature was granted last; to go back, quit the installed app, `Tools/make-app.sh --run`, and grant again.
+
 ## Update 2026-10-23: French and Italian; Translate with three or more languages (#81, first PR)
 
-On branch `feat/more-languages`, not yet a PR. Spec `docs/superpowers/specs/2026-10-23-more-languages-design.md`, plan `docs/superpowers/plans/2026-10-23-more-languages.md`. Correct and Explain stay German-only; they are the second PR for #81, with its own design.
+Merged as #117; #81 stays open for part 2. Spec `docs/superpowers/specs/2026-10-23-more-languages-design.md`, plan `docs/superpowers/plans/2026-10-23-more-languages.md`. Correct and Explain stay German-only; they are the second PR for #81, with its own design.
 
 - **French (`fr`, vous/tu) and Italian (`it`, Lei/tu) ship switched off.** At launch, a clean `config.json` missing a shipped language (by base code, so a hand-written `fr-CH` counts) gains it, switched off, written back once.
 - **Detection chooses among the enabled languages after an open screen** (`ScreenedRecognizer`): a confident guess outside them stands and is refused as before; only otherwise is the constrained guess (`NLLanguageRecognizer.languageConstraints`) used. Constraining alone turned Italian into confident German with en+de on (review finding), so Correct would have corrected it as German.
@@ -35,7 +58,6 @@ On branch `feat/more-languages`, not yet a PR. Spec `docs/superpowers/specs/2026
 - **Golden set:** directions are data (`TranslationDirection(rawValue:)` over shipped codes); 20 synthetic fr↔en / it↔en cases; the eszett check follows the target's locale rules (the score keeps the `esszettAbsent` name).
 - Tests that used `fr`/`it` as "an unconfigured language" now use `nl`/`pt`.
 
-**#82 is parked** on the local branch `feat/sign-notarize` (built and reviewed; its own HANDOFF update is there), waiting for the Developer ID certificate from the team's Account Holder.
 
 **Manual check (yours).** Rebuild first (`Tools/make-app.sh --run`).
 

@@ -143,6 +143,18 @@ Recommended Ollama configuration — bind to loopback only:
 launchctl setenv OLLAMA_HOST 127.0.0.1:11434   # then restart Ollama
 ```
 
+## Installing a release build
+
+Release builds are signed with a Developer ID and notarized by Apple, but are
+not published here; they are handed out directly. If you were given
+`lingoSwen-X.Y.Z.dmg`:
+
+1. Install and start [Ollama](https://ollama.com) first (see above).
+2. Open the DMG and drag lingoSwen to Applications. A newer DMG installs over
+   the old one; there is no updater, because it would need the network.
+3. Open lingoSwen from Applications. The setup window walks through the
+   Accessibility grant and the models.
+
 ---
 
 ## Architecture
@@ -198,6 +210,36 @@ muter run \
 which pass, and it fails loudly if a new file under `Sources/BabelOtterKit/` is
 not assigned to one — so copy the lists from there rather than from here if the
 two ever disagree.
+
+### Making a release
+
+`Tools/release.sh` builds `build/lingoSwen-X.Y.Z.dmg` from a clean checkout of
+a `vX.Y.Z` tag: version stamped from the tag, signed with the hardened runtime,
+notarized, stapled, and checked with `spctl` where Gatekeeper is on. It runs on
+the maintainer's Mac only; nothing that names the signer is committed, and
+`ReleaseSecretsTests` keeps it that way. One-time setup:
+
+1. **A Developer ID Application certificate** in the login keychain. On a team
+   where only the Account Holder can create one, make the request yourself so
+   the private key never leaves your Mac: Keychain Access › Certificate
+   Assistant › *Request a Certificate From a Certificate Authority…*, saved to
+   disk; the Account Holder creates the certificate from it (profile type G2
+   Sub-CA) and sends back the `.cer`, which you double-click. Without Xcode,
+   Apple's intermediate is missing too, and `security find-identity -v -p
+   codesigning` lists nothing until it is installed: open
+   `https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer`. The
+   certificate is valid for about a year; a release after it expires needs a
+   new one, made the same way.
+2. **Notarization credentials** in a keychain profile, from an app-specific
+   password (account.apple.com › Sign-In and Security):
+
+   ```sh
+   xcrun notarytool store-credentials lingoswen-notary --apple-id … --team-id …
+   ```
+
+Then `git tag vX.Y.Z && Tools/release.sh`. With more than one Developer ID
+identity in the keychain, `BABELOTTER_RELEASE_IDENTITY` picks one;
+`BABELOTTER_NOTARY_PROFILE` names a different profile.
 
 ### Testing approach
 
