@@ -155,9 +155,17 @@ struct CorrectorTests {
     @Test("unsure, with one language that is not mine, goes to that one; with several, asks")
     func belowFloorRule() async throws {
         let chat = ScriptedChat([reply([long])])
-        _ = try await collect(corrector(chat, language: "en", confidence: 0.4)
+        _ = try await collect(corrector(chat, language: "de", confidence: 0.4)
             .correct(UserText(long), profile: .colleagues))
         #expect(try #require(chat.prompts.first).contains("The author is learning Swiss Standard German"))
+
+        // A below-floor guess of English, the other candidate, is a real doubt (review finding).
+        let doubtful = ScriptedChat([])
+        await #expect(throws: CorrectionFailure.needsLanguage([LanguageCode("en"), LanguageCode("de-ch")])) {
+            _ = try await collect(corrector(doubtful, language: "en", confidence: 0.4)
+                .correct(UserText(long), profile: .colleagues))
+        }
+        #expect(doubtful.prompts.isEmpty)
 
         let silent = ScriptedChat([])
         let three = corrector(silent, language: "en", confidence: 0.4) { $0.languages[2].enabled = true }

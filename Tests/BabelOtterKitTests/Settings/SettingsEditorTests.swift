@@ -33,7 +33,9 @@ struct SettingsEditorTests {
         #expect(editor.configuration.enabledLanguages.map(\.code.rawValue) == ["de-ch", "fr"])
         try expectRoundTrip(editor)
         let before = editor
-        expectRefusal(.tooFewLanguages) { try editor.setLanguage(LanguageCode("fr"), enabled: false) }
+        // French is now my language, which says so before the count does.
+        expectRefusal(.isMyLanguage("French")) { try editor.setLanguage(LanguageCode("fr"), enabled: false) }
+        expectRefusal(.tooFewLanguages) { try editor.setLanguage(LanguageCode("de-CH"), enabled: false) }
         #expect(editor == before)
         try editor.setLanguage(LanguageCode("fr"), enabled: true)
         #expect(editor == before)
@@ -42,7 +44,9 @@ struct SettingsEditorTests {
     @Test("with only two languages on, neither can be switched off")
     func lastTwo() {
         var editor = SettingsEditor(configuration: .default)
-        expectRefusal(.tooFewLanguages) { try editor.setLanguage(LanguageCode("en"), enabled: false) }
+        // English is my language (#81): that refusal names the reason that
+        // still holds once a third language is on.
+        expectRefusal(.isMyLanguage("English")) { try editor.setLanguage(LanguageCode("en"), enabled: false) }
         expectRefusal(.tooFewLanguages) { try editor.setLanguage(LanguageCode("de-CH"), enabled: false) }
         #expect(editor.configuration == .default)
         expectRefusal(.unknownLanguage(LanguageCode("nl"))) {

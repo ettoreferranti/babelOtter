@@ -104,13 +104,14 @@ public struct SettingsEditor: Sendable, Equatable {
         guard let index = languages.firstIndex(where: { $0.code == code }) else {
             throw SettingsRefusal.unknownLanguage(code)
         }
-        let name = languages[index].displayName
+        if !enabled {
+            if code == configuration.myLanguageCode {
+                throw SettingsRefusal.isMyLanguage(languages[index].displayName)
+            }
+        }
         languages[index].enabled = enabled
         if languages.filter(\.enabled).count < Self.minimumLanguages {
             throw SettingsRefusal.tooFewLanguages
-        }
-        if !enabled {
-            if code == configuration.myLanguageCode { throw SettingsRefusal.isMyLanguage(name) }
         }
         configuration.languages = languages
     }

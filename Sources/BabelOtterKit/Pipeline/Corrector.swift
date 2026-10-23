@@ -111,6 +111,7 @@ public struct Corrector: Sendable {
         } else {
             switch language(for: text) {
             case .known(let known): code = known
+            // Not produced for Correct, which does not exclude my language.
             case .mine(let mine): code = mine
             case .notEnabled(let other): throw CorrectionFailure.notEnabled(other)
             case .ask(let candidates): throw CorrectionFailure.needsLanguage(candidates)

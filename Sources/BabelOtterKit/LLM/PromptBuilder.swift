@@ -165,7 +165,12 @@ public struct PromptBuilder: Sendable {
     private func correctionNotes(_ request: PromptRequest) -> String? {
         guard request.action == .correct else { return nil }
         guard let notes = request.source.correctionNotes else { return nil }
-        return "Notes on \(request.source.displayName):\n\(notes)"
+        let heading = "Notes on \(request.source.displayName):\n\(notes)"
+        // The shipped notes' example explanations are English; say so, or a
+        // small model follows them rather than the explanation language.
+        guard request.mine.code.baseSubtag != LanguageConfig.english.code else { return heading }
+        return heading + "\nThe examples above are in English; write your explanations in "
+            + "\(request.mine.displayName)."
     }
 
     /// Derived from the target's locale rules rather than from its code, so a

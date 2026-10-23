@@ -387,6 +387,8 @@ struct PromptBuilderTests {
         #expect(french.contains("participle"))
         #expect(!french.contains("Lehrer"))
         #expect(french.contains("Write each explanation in Italian."))
+        #expect(french.contains("The examples above are in English; write your explanations in Italian."))
+        #expect(!german.contains("The examples above are in English"))
     }
 
     @Test("Correct on my own language: a native speaker, no false friends, no notes when none ship")

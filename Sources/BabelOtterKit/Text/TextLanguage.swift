@@ -17,7 +17,9 @@ public enum TextLanguageResolution: Sendable, Equatable {
 /// A confident detection names it. When detection is unsure -- too short,
 /// below the floor -- and exactly one enabled language is not my language,
 /// that one is assumed: with English and German on and English mine, a short
-/// fragment is German, as it was before #81. Otherwise the user is asked.
+/// fragment is German, as it was before #81. But a below-floor guess that
+/// names another candidate (English, for Correct) is a real doubt, and the
+/// user is asked; so is any case with several candidates.
 public enum TextLanguage {
 
     /// `excludingMine`: Explain's case, where a text in my language is
@@ -30,7 +32,7 @@ public enum TextLanguage {
         let others = enabled.filter { $0 != mine }
 
         if case .confident(let detected, _) = detection {
-            guard let code = enabled.first(where: { matches($0, detected) }) else {
+            guard let code = configured(detected, among: enabled) else {
                 return .notEnabled(detected)
             }
             if excludingMine {
@@ -38,17 +40,24 @@ public enum TextLanguage {
             }
             return .known(code)
         }
-        if others.count == 1 {
-            return .known(others[0])
-        }
+        var candidates = enabled
         if excludingMine {
-            return .ask(others)
+            candidates = others
         }
-        return .ask(enabled)
+        if others.count == 1 {
+            let assumed = others[0]
+            guard case .ambiguous(.belowFloor(let best, _, _)) = detection else { return .known(assumed) }
+            guard let guessed = configured(best, among: candidates) else { return .known(assumed) }
+            if guessed == assumed { return .known(assumed) }
+            return .ask(candidates)
+        }
+        return .ask(candidates)
     }
 
-    /// Equal outright, or equal once both are reduced to their base subtag.
-    private static func matches(_ configured: LanguageCode, _ detected: LanguageCode) -> Bool {
-        configured == detected || configured.baseSubtag == detected.baseSubtag
+    /// The enabled language for a detected code: the exact code first, then
+    /// the first with the same base subtag (`de` is `de-ch`).
+    private static func configured(_ detected: LanguageCode, among enabled: [LanguageCode]) -> LanguageCode? {
+        if enabled.contains(detected) { return detected }
+        return enabled.first { $0.baseSubtag == detected.baseSubtag }
     }
 }

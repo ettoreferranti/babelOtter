@@ -35,6 +35,34 @@ struct MyLanguageTests {
         #expect(decoded.myLanguageProblem == nil)
     }
 
+    @Test("not named and English off: the first enabled language, and no problem (review finding)")
+    func absentWithEnglishOff() throws {
+        var configuration = Configuration.default
+        configuration.languages[0].enabled = false
+        configuration.languages[2].enabled = true
+        #expect(configuration.myLanguage == nil)
+        #expect(configuration.myLanguageCode == LanguageCode("de-ch"))
+        #expect(configuration.myLanguageProblem == nil)
+
+        let folder = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let store = ConfigurationStore(directory: folder)
+        try store.save(configuration)
+        let loaded = store.load()
+        #expect(loaded.problems.isEmpty)
+        #expect(loaded.configuration == configuration)
+    }
+
+    @Test("a named base code finds the configured regional language")
+    func baseCodeNamed() {
+        var configuration = Configuration.default
+        configuration.myLanguage = LanguageCode("de")
+        #expect(configuration.myLanguageCode == LanguageCode("de-ch"))
+        #expect(configuration.mine == .swissGerman)
+        #expect(configuration.myLanguageProblem == nil)
+    }
+
     @Test("a language not configured, or switched off, is a problem naming why")
     func problems() {
         var configuration = Configuration.default

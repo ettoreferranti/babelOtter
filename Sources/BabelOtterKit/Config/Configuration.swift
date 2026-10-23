@@ -99,9 +99,19 @@ public struct Configuration: Sendable, Equatable, Codable {
         profiles.first { $0.id == id }
     }
 
-    /// My language's code: English unless the file names another (#81).
+    /// My language's code (#81). Named in the file: the configured language
+    /// with that code, else with that base code (`de` finds `de-ch`). Not
+    /// named: English while it is on, else the first enabled language, so a
+    /// file from before #81 with English off keeps working.
     public var myLanguageCode: LanguageCode {
-        myLanguage ?? LanguageConfig.english.code
+        guard let myLanguage else {
+            let english = LanguageConfig.english.code
+            if enabledLanguages.contains(where: { $0.code == english }) { return english }
+            return enabledLanguages.first?.code ?? english
+        }
+        if languages.contains(where: { $0.code == myLanguage }) { return myLanguage }
+        let sameBase = languages.first { $0.code.baseSubtag == myLanguage.baseSubtag }
+        return sameBase?.code ?? myLanguage
     }
 
     /// My language as configured; English as shipped when it is not
@@ -111,8 +121,9 @@ public struct Configuration: Sendable, Equatable, Codable {
     }
 
     /// Why `myLanguage` cannot be used, worded for "config.json: myLanguage
-    /// ..."; nil when it is an enabled language.
+    /// ..."; nil when it is an enabled language, or not named at all.
     public var myLanguageProblem: String? {
+        guard myLanguage != nil else { return nil }
         guard let language = language(for: myLanguageCode) else {
             return "\(myLanguageCode.rawValue) is not a configured language"
         }

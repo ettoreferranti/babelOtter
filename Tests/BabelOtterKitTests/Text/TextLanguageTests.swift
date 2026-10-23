@@ -80,6 +80,30 @@ struct TextLanguageTests {
         #expect(resolve(nothing, germanMine, excludingMine: true) == .ask([english, french]))
     }
 
+    @Test("a below-floor guess of another candidate asks; of the assumed one, or of mine for Explain, does not")
+    func belowFloorDoubt() {
+        let today = configuration([english, german])
+        func below(_ code: String) -> Detection {
+            .ambiguous(.belowFloor(best: LanguageCode(code), confidence: 0.4, floor: 0.65))
+        }
+        #expect(resolve(below("en"), today) == .ask([english, german]))
+        #expect(resolve(below("de"), today) == .known(german))
+        #expect(resolve(below("it"), today) == .known(german))
+        // Explain never offers my language, so a weak English guess is no doubt.
+        #expect(resolve(below("en"), today, excludingMine: true) == .known(german))
+    }
+
+    @Test("an exact code wins over a base-code match")
+    func exactFirst() {
+        var configuration = Configuration.default
+        let austrian = LanguageConfig(code: LanguageCode("de-AT"), displayName: "Austrian German", localeRules: [], enabled: true)
+        configuration.languages = [.english, austrian, .swissGerman]
+        configuration.myLanguage = german
+        #expect(resolve(confident("de-CH"), configuration, excludingMine: true) == .mine(german))
+        #expect(resolve(confident("de-at"), configuration, excludingMine: true) == .known(LanguageCode("de-at")))
+        #expect(resolve(confident("de"), configuration) == .known(LanguageCode("de-at")))
+    }
+
     @Test("unsure with one other assumes it, whichever language is mine")
     func assumesTheOnlyOther() {
         let germanMine = configuration([english, german], mine: german)
