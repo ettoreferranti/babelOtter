@@ -23,7 +23,11 @@ fail() {
 stage=""
 mount=""
 cleanup() {
-  if [[ -n "$mount" ]]; then hdiutil detach -quiet "$mount" || true; fi
+  if [[ -n "$mount" ]]; then
+    # Spotlight or syspolicyd can still hold the volume for a moment.
+    hdiutil detach -quiet "$mount" || hdiutil detach -quiet -force "$mount" || true
+    rmdir "$mount" 2>/dev/null || true
+  fi
   if [[ -n "$stage" ]]; then rm -rf "$stage"; fi
 }
 trap cleanup EXIT
@@ -36,12 +40,16 @@ tags="$(git tag --points-at HEAD | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' || true)"
 [[ "$(printf '%s\n' "$tags" | wc -l | tr -d ' ')" == 1 ]] || fail "HEAD has more than one vX.Y.Z tag: $(echo $tags)."
 version="${tags#v}"
 
-identities="$(security find-identity -v -p codesigning)"
+# Only Developer ID Application identities; a certificate in two keychains is
+# listed twice, hence sort -u.
+developer_ids="$(security find-identity -v -p codesigning | grep -F '"Developer ID Application:' || true)"
 if [[ -n "${BABELOTTER_RELEASE_IDENTITY:-}" ]]; then
   identity="$BABELOTTER_RELEASE_IDENTITY"
-  grep -qF -- "$identity" <<<"$identities" || fail "BABELOTTER_RELEASE_IDENTITY is not a valid signing identity in the keychain."
+  # The whole hash or the whole quoted name, never a substring of either.
+  awk -v id="$identity" '$2 == id || index($0, "\"" id "\"") { found = 1 } END { exit !found }' <<<"$developer_ids" \
+    || fail "BABELOTTER_RELEASE_IDENTITY is not a Developer ID Application identity in the keychain (give its full name or SHA-1 hash)."
 else
-  hashes="$(awk '/"Developer ID Application:/ { print $2 }' <<<"$identities")"
+  hashes="$(awk 'NF { print $2 }' <<<"$developer_ids" | sort -u)"
   found="$(grep -c . <<<"$hashes" || true)"
   [[ "$found" == 1 ]] || fail "expected one Developer ID Application identity in the keychain, found $found; set BABELOTTER_RELEASE_IDENTITY to choose one (README, Making a release)."
   identity="$hashes"
@@ -82,6 +90,8 @@ if [[ "$status" != "Accepted" ]]; then
   submission="$(plutil -extract id raw -o - - <<<"$result" 2>/dev/null || true)"
   if [[ -n "$submission" ]]; then
     xcrun notarytool log "$submission" --keychain-profile "$profile" >&2 || true
+  else
+    echo "notarytool said: $result" >&2
   fi
   fail "notarization was not accepted: $status."
 fi

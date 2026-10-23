@@ -24,7 +24,7 @@ Tools/release.sh            # on a clean checkout of a vX.Y.Z tag
 |---|---|---|
 | Account | The maintainer's existing team membership | It exists; a personal one costs a year's fee for no gain while builds stay private |
 | Where builds go | Privately to colleagues (an internal share or a direct link), never a public GitHub Release | A team Developer ID carries the team's legal name in every signature (`codesign -dv`, Gatekeeper's dialogs). On a public download it would say where the author works, which this repo must not |
-| What the repo holds | No identity name, team ID, Apple ID or password, anywhere | The script finds the identity in the keychain by its `Developer ID Application:` prefix; notarytool reads credentials from a keychain profile. A test keeps team-ID-shaped strings out of `Tools/` (section 4) |
+| What the repo holds | No identity name, team ID, Apple ID or password, anywhere | The script finds the identity in the keychain by its `Developer ID Application:` prefix; notarytool reads credentials from a keychain profile. A test keeps all three out of every file (section 4) |
 | Where it runs | Locally only, for now | The certificate never leaves the maintainer's Mac; an organization may not let it be exported to CI. CI signing can follow if that is allowed; #82's first criterion ("when CI runs") is re-scoped to the local script, and the issue says so |
 | Package | A notarized, stapled DMG | The usual drag-to-Applications install; a stapled DMG passes Gatekeeper offline |
 | Version | Taken from the tag; `Info.plist` in the repo says `1.0.0` | It still said `0.1.0`. The tag is the one source; the release refuses an untagged or dirty commit, so a build always matches a commit |
@@ -39,7 +39,7 @@ Tools/release.sh            # on a clean checkout of a vX.Y.Z tag
 
 The script is bash and outside the mutation gate; it is verified by running it (section 6). One guard goes in `Tests/` with the other repo guards:
 
-- `ReleaseSecretsTests`: no tracked file under `Tools/` contains a `Developer ID Application:` followed by a name, a 10-character team ID in parentheses (`\([A-Z0-9]{10}\)`), or an `@` address after `--apple-id`. Planted-defect check: a temporary line with each shape must fail it.
+- `ReleaseSecretsTests`: no file git tracks or would track (every one that decodes as UTF-8) contains a signing identity's prefix (`Developer ID Application/Installer:`, `Apple Development/Distribution:`) followed by a name; a team ID (ten capitals and digits, at least one of each) in parentheses, after `--team-id`, or assigned to `TEAM_ID`/`DEVELOPMENT_TEAM`; or an `@` address after `--apple-id`. Planted-defect check: a temporary file with each shape must fail it. (Widened from `Tools/` only after review.)
 - `Info.plist`'s `CFBundleShortVersionString` is `1.0.0`; no test (the release overwrites the bundle's copy).
 
 ## 5. Docs
@@ -60,7 +60,7 @@ Prerequisites:
 | # | Do | Expect |
 |---|---|---|
 | M1 | Run `Tools/release.sh` on the branch, untagged | Stops before building: "HEAD is not a vX.Y.Z tag" |
-| M2 | After merge, tag `v1.0.1` on `main`, run it | Notarization accepted; a DMG and its SHA-256 printed; `spctl` says "accepted, source=Notarized Developer ID" |
+| M2 | After merge, tag `v1.0.1` on `main`, run it | Notarization accepted; a DMG and its SHA-256 printed; `spctl` says "accepted, source=Notarized Developer ID", or, where Gatekeeper assessments are disabled (as on the maintainer's Mac), a warning that the check was skipped |
 | M3 | Copy the DMG to a Mac (or a user account) that has never built lingoSwen; open it and drag to Applications; launch | No Gatekeeper block; the setup window opens; Finder › Get Info on the app shows 1.0.1 |
 | M4 | On your own Mac, quit the dev build and launch the installed one | macOS asks for Accessibility again once (a new signature); after granting, Translate works |
 
