@@ -25,15 +25,17 @@ struct SettingsEditorTests {
 
     @Test("a language can be switched while two stay on")
     func languages() throws {
-        var configuration = Configuration.default
-        configuration.languages.append(french)
-        var editor = SettingsEditor(configuration: configuration)
+        var editor = SettingsEditor(configuration: .default)
         try editor.setLanguage(LanguageCode("fr"), enabled: true)
+        // English is my language until another is chosen (#81).
+        try editor.setMyLanguage(LanguageCode("fr"))
         try editor.setLanguage(LanguageCode("en"), enabled: false)
         #expect(editor.configuration.enabledLanguages.map(\.code.rawValue) == ["de-ch", "fr"])
         try expectRoundTrip(editor)
         let before = editor
-        expectRefusal(.tooFewLanguages) { try editor.setLanguage(LanguageCode("fr"), enabled: false) }
+        // French is now my language, which says so before the count does.
+        expectRefusal(.isMyLanguage("French")) { try editor.setLanguage(LanguageCode("fr"), enabled: false) }
+        expectRefusal(.tooFewLanguages) { try editor.setLanguage(LanguageCode("de-CH"), enabled: false) }
         #expect(editor == before)
         try editor.setLanguage(LanguageCode("fr"), enabled: true)
         #expect(editor == before)
@@ -42,7 +44,9 @@ struct SettingsEditorTests {
     @Test("with only two languages on, neither can be switched off")
     func lastTwo() {
         var editor = SettingsEditor(configuration: .default)
-        expectRefusal(.tooFewLanguages) { try editor.setLanguage(LanguageCode("en"), enabled: false) }
+        // English is my language (#81): that refusal names the reason that
+        // still holds once a third language is on.
+        expectRefusal(.isMyLanguage("English")) { try editor.setLanguage(LanguageCode("en"), enabled: false) }
         expectRefusal(.tooFewLanguages) { try editor.setLanguage(LanguageCode("de-CH"), enabled: false) }
         #expect(editor.configuration == .default)
         expectRefusal(.unknownLanguage(LanguageCode("nl"))) {

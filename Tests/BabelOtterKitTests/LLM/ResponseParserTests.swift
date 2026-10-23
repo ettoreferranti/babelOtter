@@ -57,7 +57,7 @@ struct ResponseParserTests {
         let raw = """
             {"corrected_blocks": ["gut"],
              "errors": [{"original":"a","corrected":"b","category":"gender",
-                         "explanation_en":"x","severity":"error"}]}
+                         "explanation":"x","severity":"error"}]}
             """
         let decoded = try ResponseParser.parseCorrect(raw)
         #expect(decoded.errors[0].category == .gender)

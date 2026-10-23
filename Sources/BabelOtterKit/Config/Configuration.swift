@@ -53,6 +53,11 @@ public struct Configuration: Sendable, Equatable, Codable {
     /// Optional so a file written before #26 still loads: nil means each
     /// action's default.
     public var hotkeys: HotKeyBindings?
+    /// The language the user reads best (#81): Correct's notes and Explain's
+    /// text are written in it, and Correct judges false friends against it.
+    /// Optional so an older file loads unchanged: nil means English. Use
+    /// `mine`.
+    public var myLanguage: LanguageCode?
 
     public init(
         languages: [LanguageConfig],
@@ -65,7 +70,8 @@ public struct Configuration: Sendable, Equatable, Codable {
         detectionConfidenceFloor: Double,
         minimumLengthForDetection: Int,
         strictCaptureOnly: Bool = false,
-        hotkeys: HotKeyBindings? = nil
+        hotkeys: HotKeyBindings? = nil,
+        myLanguage: LanguageCode? = nil
     ) {
         self.languages = languages
         self.profiles = profiles
@@ -78,6 +84,7 @@ public struct Configuration: Sendable, Equatable, Codable {
         self.minimumLengthForDetection = minimumLengthForDetection
         self.strictCaptureOnly = strictCaptureOnly
         self.hotkeys = hotkeys
+        self.myLanguage = myLanguage
     }
 
     public var enabledLanguages: [LanguageConfig] {
@@ -90,6 +97,40 @@ public struct Configuration: Sendable, Equatable, Codable {
 
     public func profile(id: String) -> AudienceProfile? {
         profiles.first { $0.id == id }
+    }
+
+    /// My language's code (#81). Named in the file: the configured language
+    /// with that code, else with that base code (`de` finds `de-ch`). Not
+    /// named: English while it is on, else the first enabled language, so a
+    /// file from before #81 with English off keeps working.
+    public var myLanguageCode: LanguageCode {
+        guard let myLanguage else {
+            let english = LanguageConfig.english.code
+            if enabledLanguages.contains(where: { $0.code == english }) { return english }
+            return enabledLanguages.first?.code ?? english
+        }
+        if languages.contains(where: { $0.code == myLanguage }) { return myLanguage }
+        let sameBase = languages.first { $0.code.baseSubtag == myLanguage.baseSubtag }
+        return sameBase?.code ?? myLanguage
+    }
+
+    /// My language as configured; English as shipped when it is not
+    /// configured, which `myLanguageProblem` reports.
+    public var mine: LanguageConfig {
+        language(for: myLanguageCode) ?? .english
+    }
+
+    /// Why `myLanguage` cannot be used, worded for "config.json: myLanguage
+    /// ..."; nil when it is an enabled language, or not named at all.
+    public var myLanguageProblem: String? {
+        guard myLanguage != nil else { return nil }
+        guard let language = language(for: myLanguageCode) else {
+            return "\(myLanguageCode.rawValue) is not a configured language"
+        }
+        guard language.enabled else {
+            return "\(language.displayName) is switched off"
+        }
+        return nil
     }
 
     /// This configuration with every shipped language it lacks appended,
@@ -160,16 +201,5 @@ extension Configuration {
     /// construction the one that produced the result (#67).
     public func model(for action: Action) -> String {
         models[action] ?? Configuration.defaultModel
-    }
-
-    /// The enabled German language, whatever its region, so its locale rules
-    /// (ss for de-CH) apply; Swiss Standard German, the shipped default,
-    /// when none is enabled. Correct and Explain read German.
-    public var germanLanguage: LanguageConfig {
-        enabledLanguages.first(where: Self.isGerman) ?? .swissGerman
-    }
-
-    private static func isGerman(_ language: LanguageConfig) -> Bool {
-        language.code.baseSubtag == LanguageCode("de")
     }
 }

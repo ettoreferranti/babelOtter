@@ -28,17 +28,17 @@ public struct CorrectionError: Sendable, Equatable, Codable {
     public let original: String
     public let corrected: String
     public let category: ErrorCategory
-    public let explanationEn: String
+    public let explanation: String
     public let severity: Severity
 
     public init(
         original: String, corrected: String, category: ErrorCategory,
-        explanationEn: String, severity: Severity
+        explanation: String, severity: Severity
     ) {
         self.original = original
         self.corrected = corrected
         self.category = category
-        self.explanationEn = explanationEn
+        self.explanation = explanation
         self.severity = severity
     }
 }
@@ -123,7 +123,7 @@ extension Severity {
 
 extension CorrectionError {
     enum CodingKeys: String, CodingKey {
-        case original, corrected, category, explanationEn, severity
+        case original, corrected, category, explanation, severity
     }
 
     public init(from decoder: any Decoder) throws {
@@ -133,7 +133,7 @@ extension CorrectionError {
             corrected: try container.decodeIfPresent(String.self, forKey: .corrected) ?? "",
             category: ErrorCategory.lenient(
                 try container.decodeIfPresent(String.self, forKey: .category) ?? ""),
-            explanationEn: try container.decodeIfPresent(String.self, forKey: .explanationEn) ?? "",
+            explanation: try container.decodeIfPresent(String.self, forKey: .explanation) ?? "",
             severity: Severity.lenient(
                 try container.decodeIfPresent(String.self, forKey: .severity) ?? ""))
     }
@@ -162,12 +162,12 @@ extension CorrectResponse {
 
 public struct ExplainNote: Sendable, Equatable, Codable {
     public let phrase: String
-    public let explanationEn: String
+    public let explanation: String
 }
 
 /// The explain contract (spec section 7).
 public struct ExplainResponse: Sendable, Equatable, Codable {
-    public let summaryEn: String
+    public let summary: String
     public let notes: [ExplainNote]
 }
 

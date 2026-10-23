@@ -17,7 +17,7 @@ private func testCase(
 
 private func item(_ original: String, _ category: ErrorCategory) -> CorrectionError {
     CorrectionError(
-        original: original, corrected: "x", category: category, explanationEn: "because",
+        original: original, corrected: "x", category: category, explanation: "because",
         severity: .error)
 }
 
@@ -35,11 +35,23 @@ struct CorrectionScorerTests {
 
     // MARK: Failures
 
+    @Test("a report from before #81 still loads: notGerman reads as wrongLanguage")
+    func oldFailureName() throws {
+        let decoder = JSONDecoder()
+        #expect(try decoder.decode(EvalFailure.self, from: Data(#""notGerman""#.utf8)) == .wrongLanguage)
+        #expect(try decoder.decode(EvalFailure.self, from: Data(#""wrongLanguage""#.utf8)) == .wrongLanguage)
+        #expect(try decoder.decode(EvalFailure.self, from: Data(#""timeout""#.utf8)) == .timeout)
+        #expect(throws: DecodingError.self) { try decoder.decode(EvalFailure.self, from: Data(#""bogus""#.utf8)) }
+        let written = String(decoding: try JSONEncoder().encode(EvalFailure.wrongLanguage), as: UTF8.self)
+        #expect(written == #""wrongLanguage""#)
+    }
+
     @Test("pipeline errors map to failure kinds")
     func failureMapping() {
         #expect(EvalFailure(CorrectionFailure.unreadableReply) == .unreadableReply)
         #expect(EvalFailure(CorrectionFailure.structureLost) == .structureLost)
-        #expect(EvalFailure(CorrectionFailure.notGerman) == .notGerman)
+        #expect(EvalFailure(CorrectionFailure.notEnabled(LanguageCode("it"))) == .wrongLanguage)
+        #expect(EvalFailure(CorrectionFailure.needsLanguage([])) == .wrongLanguage)
         #expect(EvalFailure(CorrectionFailure.emptyResponse) == .emptyResponse)
         #expect(EvalFailure(TranslationError.emptyResponse) == .emptyResponse)
         #expect(EvalFailure(URLError(.timedOut)) == .timeout)

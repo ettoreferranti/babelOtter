@@ -307,5 +307,178 @@
     "profile": "colleagues",
     "fixes": [],
     "clean": true
+  },
+  {
+    "id": "fr-participe-partie",
+    "language": "fr",
+    "text": "Hier soir, Marie est parti tôt parce qu'elle avait un train pour Otterbach.",
+    "terms": ["Otterbach"],
+    "fixes": [
+      { "wrong": "est parti", "right": ["est partie"], "category": "agreement" }
+    ],
+    "mustNot": ["il est parti"]
+  },
+  {
+    "id": "fr-a-accent",
+    "language": "fr",
+    "text": "Nous allons a la réunion de jeudi avec toute l'équipe.",
+    "fixes": [
+      { "wrong": "allons a la", "right": ["allons à la"], "category": "spelling" }
+    ]
+  },
+  {
+    "id": "fr-elision",
+    "language": "fr",
+    "text": "Je pense que il viendra demain matin avec les documents.",
+    "fixes": [
+      { "wrong": "que il", "right": ["qu'il"], "category": "spelling" }
+    ]
+  },
+  {
+    "id": "fr-sest-leve",
+    "language": "fr",
+    "text": "Hier, Paul c'est levé très tôt pour prendre le premier train.",
+    "fixes": [
+      { "wrong": "c'est levé", "right": ["s'est levé"], "category": "spelling" }
+    ]
+  },
+  {
+    "id": "fr-son-sont",
+    "language": "fr",
+    "text": "Les étudiants son très contents de leur nouvelle salle de cours.",
+    "profile": "students",
+    "fixes": [
+      { "wrong": "son très", "right": ["sont très"], "category": "spelling" }
+    ]
+  },
+  {
+    "id": "fr-faux-ami-librairie",
+    "language": "fr",
+    "text": "J'emprunte souvent des livres à la librairie de l'université.",
+    "fixes": [
+      { "wrong": "à la librairie", "right": ["à la bibliothèque"], "category": "false friend" }
+    ]
+  },
+  {
+    "id": "fr-genre-maison",
+    "language": "fr",
+    "text": "Nous avons visité un belle maison près du lac.",
+    "fixes": [
+      { "wrong": "un belle maison", "right": ["une belle maison"], "category": "gender" }
+    ],
+    "mustNot": ["appartement"]
+  },
+  {
+    "id": "fr-registre-formulaire",
+    "language": "fr",
+    "text": "Bonjour Madame, peux-tu m'envoyer le formulaire d'inscription ?",
+    "profile": "administration",
+    "fixes": [
+      { "wrong": "peux-tu", "right": ["pouvez-vous", "pourriez-vous"], "category": "register" }
+    ]
+  },
+  {
+    "id": "fr-clean-bibliotheque",
+    "language": "fr",
+    "text": "La bibliothèque sera fermée lundi en raison d'une formation du personnel.",
+    "fixes": [],
+    "clean": true
+  },
+  {
+    "id": "fr-clean-reponse",
+    "language": "fr",
+    "text": "Merci pour votre message. Je vous réponds dès que possible.",
+    "fixes": [],
+    "clean": true
+  },
+  {
+    "id": "it-preposizione-nella",
+    "language": "it",
+    "text": "Ho lasciato il libro in la borsa di Giulia.",
+    "fixes": [
+      { "wrong": "in la borsa", "right": ["nella borsa"], "category": "preposition" }
+    ]
+  },
+  {
+    "id": "it-preposizione-del",
+    "language": "it",
+    "text": "Questo è il computer di il professore di storia.",
+    "fixes": [
+      { "wrong": "di il professore", "right": ["del professore"], "category": "preposition" }
+    ]
+  },
+  {
+    "id": "it-e-accento",
+    "language": "it",
+    "text": "Il museo e chiuso il lunedì e il martedì mattina.",
+    "fixes": [
+      { "wrong": "e chiuso", "right": ["è chiuso"], "category": "spelling" }
+    ]
+  },
+  {
+    "id": "it-perche",
+    "language": "it",
+    "text": "Non sono venuto perche avevo la febbre.",
+    "fixes": [
+      { "wrong": "perche", "right": ["perché"], "category": "spelling" }
+    ]
+  },
+  {
+    "id": "it-doppie-abbiamo",
+    "language": "it",
+    "text": "Domani andiamo a Otterbach con il treno delle otto. Abiamo già i biglietti.",
+    "terms": ["Otterbach"],
+    "fixes": [
+      { "wrong": "Abiamo", "right": ["Abbiamo"], "category": "spelling" }
+    ]
+  },
+  {
+    "id": "it-accordo-regole",
+    "language": "it",
+    "text": "Le nuove regole sono molto chiari per tutti gli studenti.",
+    "profile": "students",
+    "fixes": [
+      { "wrong": "molto chiari", "right": ["molto chiare"], "category": "agreement" }
+    ]
+  },
+  {
+    "id": "it-participio-arrivate",
+    "language": "it",
+    "text": "Anna e Sara sono arrivati in ritardo alla lezione.",
+    "fixes": [
+      { "wrong": "sono arrivati", "right": ["sono arrivate"], "category": "agreement" }
+    ],
+    "mustNot": ["Marco"]
+  },
+  {
+    "id": "it-falso-amico-libreria",
+    "language": "it",
+    "text": "Prendo spesso in prestito libri dalla libreria dell'università.",
+    "fixes": [
+      { "wrong": "dalla libreria", "right": ["dalla biblioteca"], "category": "false friend" }
+    ]
+  },
+  {
+    "id": "it-registro-modulo",
+    "language": "it",
+    "text": "Buongiorno, puoi mandarmi il modulo di iscrizione?",
+    "profile": "administration",
+    "fixes": [
+      { "wrong": "puoi mandarmi", "right": ["può mandarmi", "potrebbe mandarmi", "può inviarmi", "potrebbe inviarmi", "mi può mandare", "mi potrebbe mandare"], "category": "register" }
+    ]
+  },
+  {
+    "id": "it-clean-biblioteca",
+    "language": "it",
+    "text": "La biblioteca resterà chiusa lunedì per una giornata di formazione del personale.",
+    "fixes": [],
+    "clean": true
+  },
+  {
+    "id": "it-clean-risposta",
+    "language": "it",
+    "text": "Grazie per il messaggio. Le rispondo appena possibile.",
+    "fixes": [],
+    "clean": true
   }
 ]

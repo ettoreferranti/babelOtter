@@ -29,7 +29,7 @@ struct ExplanationNoteRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(note.phrase).font(.callout.bold()).textSelection(.enabled)
-            Text(note.explanationEn).font(.caption).foregroundStyle(.secondary)
+            Text(note.explanation).font(.caption).foregroundStyle(.secondary)
                 .textSelection(.enabled)
         }
     }

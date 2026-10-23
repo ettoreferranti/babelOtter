@@ -45,6 +45,17 @@ struct GoldenSetTests {
             mustNot: [], clean: false)])
     }
 
+    @Test("a correction case is Swiss Standard German unless it names a shipped language (#81)")
+    func correctionLanguage() throws {
+        let german = try load(#"[{"id": "a", "text": "Hallo.", "fixes": [], "clean": true}]"#)
+        #expect(german.correction.first?.language == LanguageCode("de-ch"))
+        let french = try load(#"[{"id": "a", "language": "FR", "text": "Bonjour.", "fixes": [], "clean": true}]"#)
+        #expect(french.correction.first?.language == LanguageCode("fr"))
+        let error = correctionError(#"{"id": "a", "language": "nl", "text": "Hallo.", "fixes": [], "clean": true}"#)
+        #expect(error?.field == "language")
+        #expect(error?.caseID == "a")
+    }
+
     @Test("a translation case loads with its defaults and direction")
     func translationDefaults() throws {
         let set = try load("[]", """

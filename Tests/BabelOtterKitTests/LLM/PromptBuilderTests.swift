@@ -184,7 +184,7 @@ struct PromptBuilderTests {
     @Test("each action states its own schema")
     func schemaPerAction() {
         #expect(builder.build(request(action: .correct)).contains("corrected_blocks"))
-        #expect(builder.build(request(action: .explain)).contains("summary_en"))
+        #expect(builder.build(request(action: .explain)).contains("summary"))
         #expect(builder.build(request(action: .repitch)).contains("blocks"))
     }
 
@@ -360,14 +360,78 @@ struct PromptBuilderTests {
     func correctionErrorInit() {
         let item = CorrectionError(
             original: "a", corrected: "b", category: .spelling,
-            explanationEn: "why", severity: .error)
+            explanation: "why", severity: .error)
         #expect(item.corrected == "b")
+    }
+
+    private func languageRequest(
+        _ action: Action, text: LanguageConfig, into target: LanguageConfig, mine: LanguageConfig = .english
+    ) -> PromptRequest {
+        PromptRequest(
+            action: action, source: text, target: target, profile: .colleagues, blocks: ["x"], mine: mine)
+    }
+
+    @Test("Correct on a learned language: the learner framing, its notes, explanations in my language (#81)")
+    func correctLearned() {
+        let german = builder.build(languageRequest(.correct, text: .swissGerman, into: .swissGerman))
+        #expect(german.contains("The author is learning Swiss Standard German and often thinks in English"))
+        #expect(german.contains("A Swiss Standard German word used with the meaning of a similar English word"))
+        #expect(german.contains("Notes on Swiss Standard German:\n"))
+        #expect(german.contains("\"mit der Lehrer\" becomes \"mit dem Lehrer\""))
+        #expect(german.contains("Write each explanation in English."))
+        #expect(!german.contains("native speaker"))
+
+        let french = builder.build(languageRequest(.correct, text: .french, into: .french, mine: .italian))
+        #expect(french.contains("The author is learning French and often thinks in Italian"))
+        #expect(french.contains("Notes on French:\n"))
+        #expect(french.contains("participle"))
+        #expect(!french.contains("Lehrer"))
+        #expect(french.contains("Write each explanation in Italian."))
+        #expect(french.contains("The examples above are in English; write your explanations in Italian."))
+        #expect(!german.contains("The examples above are in English"))
+    }
+
+    @Test("Correct on my own language: a native speaker, no false friends, no notes when none ship")
+    func correctMine() {
+        let english = builder.build(languageRequest(.correct, text: .english, into: .english))
+        #expect(english.contains("The author is a native speaker of English"))
+        #expect(english.contains("do not treat regional usage as an error"))
+        #expect(!english.contains("is learning"))
+        #expect(!english.contains("Notes on"))
+        let italian = builder.build(languageRequest(.correct, text: .italian, into: .italian, mine: .italian))
+        #expect(italian.contains("The author is a native speaker of Italian"))
+        #expect(italian.contains("Notes on Italian:\n"))
+        #expect(italian.contains("Write each explanation in Italian."))
+    }
+
+    @Test("notes are Correct's only")
+    func notesOnlyForCorrect() {
+        for action in [Action.translate, .explain, .repitch] {
+            let prompt = builder.build(languageRequest(action, text: .swissGerman, into: .english))
+            #expect(!prompt.contains("Notes on"), "\(action)")
+        }
+    }
+
+    @Test("the reply keys name no language")
+    func neutralKeys() {
+        let correct = builder.build(languageRequest(.correct, text: .french, into: .french))
+        #expect(correct.contains(#""explanation": "...""#))
+        let explain = builder.build(languageRequest(.explain, text: .french, into: .english))
+        #expect(explain.contains(#"{"summary": "...", "notes""#))
+        #expect(!correct.contains("_en") && !explain.contains("_en"))
+    }
+
+    @Test("Explain names the text's language and explains in the target, my language (#81)")
+    func explainLanguages() {
+        let french = builder.build(languageRequest(.explain, text: .french, into: .italian, mine: .italian))
+        #expect(french.contains("Explain the French text below in plain Italian"))
+        #expect(french.contains("explain in Italian what it means"))
     }
 
     @Test("Explain asks for the meaning, and for notes on tricky phrases only, quoted exactly")
     func explainInstruction() {
-        let prompt = builder.build(request(action: .explain))
-        #expect(prompt.contains("Explain the German text below in plain English"))
+        let prompt = builder.build(languageRequest(.explain, text: .swissGerman, into: .english))
+        #expect(prompt.contains("Explain the Swiss Standard German text below in plain English"))
         #expect(prompt.contains("quote the phrase exactly as it is written in the text"))
         #expect(prompt.contains("Do not add notes for plain words."))
         #expect(prompt.contains("If nothing is tricky, notes is []."))

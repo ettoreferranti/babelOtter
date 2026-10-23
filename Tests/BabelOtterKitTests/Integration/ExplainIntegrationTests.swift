@@ -46,9 +46,9 @@ struct ExplainIntegrationTests {
         #expect(!result.summary.isEmpty)
     }
 
-    @Test("English is refused before any request")
+    @Test("English, my language, is refused before any request")
     func english() async {
-        await #expect(throws: ExplanationFailure.notGerman) {
+        await #expect(throws: ExplanationFailure.alreadyMine(LanguageCode("en"))) {
             _ = try await explain("The meeting starts tomorrow at ten o'clock in the main building.")
         }
     }

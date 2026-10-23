@@ -25,7 +25,7 @@ public enum ResponseParser {
     /// inside a JSON string literal and honours backslash escapes. The naive
     /// version -- first `{` to last `}` -- is nearly right and fails on exactly
     /// the responses this project produces most, because a correction's
-    /// `explanation_en` can quite reasonably contain a brace.
+    /// `explanation` can quite reasonably contain a brace.
     public static func extractJSONObject(from raw: String) -> String? {
         guard let start = raw.firstIndex(of: "{") else { return nil }
 

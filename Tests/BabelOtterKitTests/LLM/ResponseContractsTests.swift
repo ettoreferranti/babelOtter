@@ -56,14 +56,14 @@ struct ResponseContractsTests {
         let json = """
             { "corrected_blocks": ["Das ist gut"],
               "errors": [{ "original": "Der", "corrected": "Das", "category": "case",
-                           "explanation_en": "Neuter nominative.", "severity": "error" }] }
+                           "explanation": "Neuter nominative.", "severity": "error" }] }
             """
         let decoded = try decoder.decode(CorrectResponse.self, from: Data(json.utf8))
         #expect(decoded.correctedBlocks == ["Das ist gut"])
         #expect(decoded.errors.count == 1)
         #expect(decoded.errors[0].category == .grammaticalCase)
         #expect(decoded.errors[0].severity == .error)
-        #expect(decoded.errors[0].explanationEn == "Neuter nominative.")
+        #expect(decoded.errors[0].explanation == "Neuter nominative.")
     }
 
     @Test("a multi-word category decodes")
@@ -71,7 +71,7 @@ struct ResponseContractsTests {
         let json = """
             { "corrected_blocks": [],
               "errors": [{ "original": "a", "corrected": "b", "category": "word order",
-                           "explanation_en": "x", "severity": "suggestion" }] }
+                           "explanation": "x", "severity": "suggestion" }] }
             """
         let decoded = try decoder.decode(CorrectResponse.self, from: Data(json.utf8))
         #expect(decoded.errors[0].category == .wordOrder)
@@ -83,7 +83,7 @@ struct ResponseContractsTests {
             let json = """
                 { "corrected_blocks": [],
                   "errors": [{ "original": "a", "corrected": "b", "category": "\(category.rawValue)",
-                               "explanation_en": "x", "severity": "error" }] }
+                               "explanation": "x", "severity": "error" }] }
                 """
             let decoded = try decoder.decode(CorrectResponse.self, from: Data(json.utf8))
             #expect(decoded.errors[0].category == category)
@@ -100,7 +100,7 @@ struct ResponseContractsTests {
         let json = """
             { "corrected_blocks": ["x"],
               "errors": [{ "original": "a", "corrected": "b", "category": "word order|spelling",
-                           "explanation_en": "x", "severity": "error" }] }
+                           "explanation": "x", "severity": "error" }] }
             """
         let decoded = try decoder.decode(CorrectResponse.self, from: Data(json.utf8))
         #expect(decoded.errors[0].category == .wordOrder)
@@ -116,7 +116,7 @@ struct ResponseContractsTests {
         let json = """
             { "corrected_blocks": ["x"],
               "errors": [{ "original": "a", "corrected": "b", "category": "\(wire)",
-                           "explanation_en": "x", "severity": "error" }] }
+                           "explanation": "x", "severity": "error" }] }
             """
         let decoded = try decoder.decode(CorrectResponse.self, from: Data(json.utf8))
         #expect(decoded.errors[0].category == expected)
@@ -128,7 +128,7 @@ struct ResponseContractsTests {
             let json = """
                 { "corrected_blocks": ["x"],
                   "errors": [{ "original": "a", "corrected": "b", "category": "spelling",
-                               "explanation_en": "x", "severity": "\(wire)" }] }
+                               "explanation": "x", "severity": "\(wire)" }] }
                 """
             let decoded = try decoder.decode(CorrectResponse.self, from: Data(json.utf8))
             #expect(decoded.errors[0].severity == .error)
@@ -136,7 +136,7 @@ struct ResponseContractsTests {
         let suggestion = """
             { "corrected_blocks": ["x"],
               "errors": [{ "original": "a", "corrected": "b", "category": "spelling",
-                           "explanation_en": "x", "severity": " Suggestion" }] }
+                           "explanation": "x", "severity": " Suggestion" }] }
             """
         #expect(try decoder.decode(CorrectResponse.self, from: Data(suggestion.utf8))
             .errors[0].severity == .suggestion)
@@ -148,11 +148,11 @@ struct ResponseContractsTests {
             { "corrected_blocks": ["x"],
               "errors": [
                 { "original": "a", "corrected": "b", "category": "spelling",
-                  "explanation_en": "x", "severity": "error" },
+                  "explanation": "x", "severity": "error" },
                 { "original": "", "corrected": "", "category": "",
-                  "explanation_en": "", "severity": "" },
+                  "explanation": "", "severity": "" },
                 { "original": " ", "corrected": "", "category": "",
-                  "explanation_en": "", "severity": "" } ] }
+                  "explanation": "", "severity": "" } ] }
             """
         let decoded = try decoder.decode(CorrectResponse.self, from: Data(json.utf8))
         #expect(decoded.errors.count == 1)
@@ -163,7 +163,7 @@ struct ResponseContractsTests {
         let json = """
             { "corrected_blocks": ["x"],
               "errors": [{ "original": "ich ", "corrected": "", "category": "word order",
-                           "explanation_en": "drop the repeated subject", "severity": "error" }] }
+                           "explanation": "drop the repeated subject", "severity": "error" }] }
             """
         #expect(try decoder.decode(CorrectResponse.self, from: Data(json.utf8)).errors.count == 1)
     }
@@ -178,11 +178,11 @@ struct ResponseContractsTests {
     @Test("the explain example from the spec decodes")
     func explainExample() throws {
         let json = """
-            { "summary_en": "It is about a meeting.",
-              "notes": [{ "phrase": "auf Anhieb", "explanation_en": "straight away" }] }
+            { "summary": "It is about a meeting.",
+              "notes": [{ "phrase": "auf Anhieb", "explanation": "straight away" }] }
             """
         let decoded = try decoder.decode(ExplainResponse.self, from: Data(json.utf8))
-        #expect(decoded.summaryEn == "It is about a meeting.")
+        #expect(decoded.summary == "It is about a meeting.")
         #expect(decoded.notes[0].phrase == "auf Anhieb")
     }
 }

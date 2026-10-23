@@ -30,15 +30,15 @@ final class PopupModel {
         }
     }
     private(set) var direction: Direction?
-    /// Re-pitch's language, once known (#66).
+    /// The text's language, once known: Re-pitch's (#66), and the one
+    /// Correct and Explain work on (#81).
     private(set) var language: LanguageCode?
 
     /// The language the audience is written for: Translate's target,
-    /// Re-pitch's language, Correct's German; nil until known (#110).
+    /// Re-pitch's language, the text's language for Correct (#81); nil until known (#110).
     var writingLanguage: LanguageConfig? {
         if let target = direction?.target { return configuration.language(for: target) }
         if let language { return configuration.language(for: language) }
-        if action == .correct { return configuration.germanLanguage }
         return nil
     }
     private(set) var text = ""
@@ -217,7 +217,7 @@ final class PopupModel {
             if action == .repitch {
                 findLanguage(of: snapshot)
             } else if !usesDirection {
-                runOnSelection()
+                findTextLanguage(of: snapshot)
             } else {
                 switch translator.direction(for: snapshot.text, remembered: targetMemory.remembered) {
                 case .success(let direction):
@@ -250,6 +250,11 @@ final class PopupModel {
         if action == .repitch {
             language = source
             phase = .choosingAudience
+            return
+        }
+        if !usesDirection {
+            language = source
+            runOnSelection()
             return
         }
         switch translator.direction(from: source, remembered: targetMemory.remembered) {
@@ -587,6 +592,28 @@ final class PopupModel {
             fail: Self.describe)
     }
 
+    /// Correct and Explain settle the text's language before anything is
+    /// sent (#81): run in it, refuse it, or ask.
+    private func findTextLanguage(of snapshot: SelectionSnapshot) {
+        let resolution: TextLanguageResolution
+        if action == .explain {
+            resolution = explainer.language(for: snapshot.text)
+        } else {
+            resolution = corrector.language(for: snapshot.text)
+        }
+        switch resolution {
+        case .known(let code):
+            language = code
+            runOnSelection()
+        case .mine(let code):
+            phase = .failed("This is already in \(displayName(code)).")
+        case .notEnabled(let code):
+            phase = .failed("This looks like \(code), which is not one of your languages.")
+        case .ask(let candidates):
+            phase = .choosingSource(candidates)
+        }
+    }
+
     private func runOnSelection() {
         if action == .explain {
             runExplanation()
@@ -604,9 +631,9 @@ final class PopupModel {
         message = nil
         phase = .translating
         consume(
-            explainer.explain(snapshot.text, styleNote: styleNote),
+            explainer.explain(snapshot.text, in: language, styleNote: styleNote),
             apply: { model, event in model.applyExplanation(event) },
-            fail: Self.describeExplanation)
+            fail: { [configuration] error in Self.describeExplanation(error, configuration) })
     }
 
     private func applyExplanation(_ event: ExplanationEvent) {
@@ -621,19 +648,23 @@ final class PopupModel {
             warnings = result.warnings
             phase = .finished
             let model = configuration.model(for: action)
-            let language = configuration.germanLanguage.code
+            guard let language else { return }
+            let mine = configuration.myLanguageCode
             keep {
                 HistoryRecord(
-                    explanation: result, source: $0, language: language, model: model,
+                    explanation: result, source: $0, language: language, explainedIn: mine, model: model,
                     application: $1, date: Date())
             }
         }
     }
 
-    private static func describeExplanation(_ error: any Error) -> String {
+    private static func describeExplanation(_ error: any Error, _ configuration: Configuration) -> String {
         if let failure = error as? ExplanationFailure {
             switch failure {
-            case .notGerman: return "Explain works on German text."
+            case .alreadyMine(let code):
+                return "This is already in \(configuration.language(for: code)?.displayName ?? code.rawValue)."
+            case .notEnabled(let code): return "This looks like \(code), which is not one of your languages."
+            case .needsLanguage: return "Could not tell which language this is."
             case .unreadableReply:
                 return "The model's reply couldn't be read as an explanation. Try Regenerate."
             case .emptyResponse: return "Nothing came back from the model."
@@ -651,7 +682,7 @@ final class PopupModel {
         message = nil
         phase = .translating
         consume(
-            corrector.correct(snapshot.text, profile: audience.audience, styleNote: styleNote),
+            corrector.correct(snapshot.text, in: language, profile: audience.audience, styleNote: styleNote),
             apply: { model, event in model.applyCorrection(event) },
             fail: Self.describeCorrection)
     }
@@ -668,7 +699,7 @@ final class PopupModel {
             warnings = result.warnings
             phase = .finished
             let model = configuration.model(for: action)
-            let language = configuration.germanLanguage.code
+            guard let language else { return }
             let profileID = audience.audience.id
             keep { _, application in
                 HistoryRecord(
@@ -681,7 +712,8 @@ final class PopupModel {
     private static func describeCorrection(_ error: any Error) -> String {
         if let failure = error as? CorrectionFailure {
             switch failure {
-            case .notGerman: return "Correct works on German text."
+            case .notEnabled(let code): return "This looks like \(code), which is not one of your languages."
+            case .needsLanguage: return "Could not tell which language this is."
             case .unreadableReply:
                 return "The model's reply couldn't be read as a correction. Try Regenerate."
             case .structureLost: return "The model lost the text's structure. Try Regenerate."
