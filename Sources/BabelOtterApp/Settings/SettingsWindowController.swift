@@ -17,12 +17,12 @@ final class SettingsWindowController {
         source: ConfigurationSource, layout: @escaping () -> KeyLayout,
         client: @escaping () -> OllamaClient, suspendHotKeys: @escaping () -> Void,
         resumeHotKeys: @escaping () -> Void, modelsChanged: @escaping () -> Void,
-        reloadConfiguration: @escaping () -> Void
+        reloadConfiguration: @escaping () -> Void, openSetupGuide: @escaping () -> Void
     ) {
         model = SettingsModel(
             source: source, layout: layout, client: client, suspendHotKeys: suspendHotKeys,
             resumeHotKeys: resumeHotKeys, modelsChanged: modelsChanged,
-            reloadConfiguration: reloadConfiguration)
+            reloadConfiguration: reloadConfiguration, openSetupGuide: openSetupGuide)
     }
 
     func show() {
@@ -64,6 +64,8 @@ final class SettingsWindowController {
         let controller = NSHostingController(rootView: view.frame(
             minWidth: 560, maxWidth: .infinity, minHeight: height, maxHeight: .infinity))
         controller.sizingOptions = [.minSize]
+        // Toolbar tabs title the window after the selected tab.
+        controller.title = label
         let item = NSTabViewItem(viewController: controller)
         item.label = label
         item.image = NSImage(systemSymbolName: symbol, accessibilityDescription: label)

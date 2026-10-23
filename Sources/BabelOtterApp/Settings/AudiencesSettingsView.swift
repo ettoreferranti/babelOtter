@@ -117,9 +117,14 @@ private struct AudienceDetail: View {
     var body: some View {
         Form {
             Section {
-                TextField("Name", text: $name)
-                    .focused($focused, equals: .name)
-                    .onSubmit { commitName() }
+                LabeledContent("Name") {
+                    TextField("Name", text: $name)
+                        .labelsHidden()
+                        .textFieldStyle(.roundedBorder)
+                        .frame(maxWidth: 220)
+                        .focused($focused, equals: .name)
+                        .onSubmit { commitName() }
+                }
                 RefusalText(text: refusal(.name))
                 Picker("Register", selection: Binding(
                     get: { profile.register },
