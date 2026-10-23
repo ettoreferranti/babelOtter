@@ -224,7 +224,12 @@ the maintainer's Mac only; nothing that names the signer is committed, and
    the private key never leaves your Mac: Keychain Access › Certificate
    Assistant › *Request a Certificate From a Certificate Authority…*, saved to
    disk; the Account Holder creates the certificate from it (profile type G2
-   Sub-CA) and sends back the `.cer`, which you double-click.
+   Sub-CA) and sends back the `.cer`, which you double-click. Without Xcode,
+   Apple's intermediate is missing too, and `security find-identity -v -p
+   codesigning` lists nothing until it is installed: open
+   `https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer`. The
+   certificate is valid for about a year; a release after it expires needs a
+   new one, made the same way.
 2. **Notarization credentials** in a keychain profile, from an app-specific
    password (account.apple.com › Sign-In and Security):
 
