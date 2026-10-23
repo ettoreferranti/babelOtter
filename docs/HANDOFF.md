@@ -4,14 +4,14 @@ Read this first if you are picking babelOtter up in a new session.
 
 ## Update 2026-10-22: a shorter menu
 
-The menu is now: the status lines, the four actions, Settings…, History…, Privacy…, Quit. **Check Again** is gone (opening the menu already re-checks, and the status lines update in place while it is open). **Open Configuration Folder** and **Setup Guide…** moved to the bottom of Settings › General as **Show config.json in Finder** and **Run Setup Guide…**, outside the form so they work while `config.json` is broken. When `config.json` has a problem, the menu's problem line still offers "Show config.json in Finder" itself. Older sections below that mention these menu items predate this change.
+The menu is now: the status lines, the four actions, Settings…, History…, Privacy…, Quit. **Check Again** is gone (opening the menu already re-checks, and the status lines update in place while it is open). **Open Configuration Folder** and **Setup Guide…** moved to Settings › General, in a last section **Configuration**, as **Show config.json in Finder** and **Run Setup Guide…**; it scrolls with the form, and only the editable sections are disabled while `config.json` is broken, so these buttons always work. Also: the timeout, history-days and audience-name fields are bordered boxes (a plain field in a grouped form read as a label), and the Settings window is titled after its tab instead of "Untitled". When `config.json` has a problem, the menu's problem line still offers "Show config.json in Finder" itself. Older sections below that mention these menu items predate this change.
 
 **Manual check (yours).** Rebuild first (`Tools/make-app.sh --run`).
 
 | # | Do | Expect |
 |---|---|---|
 | M1 | Open the menu | Status, the four actions, Settings…, History…, Privacy…, Quit; no Check Again, Setup Guide or Open Configuration Folder |
-| M2 | Settings › General: press Show config.json in Finder; then Run Setup Guide… | Finder selects config.json; the setup window opens at step 1 |
+| M2 | Settings › General: scroll to Configuration; press Show config.json in Finder; then Run Setup Guide… | Finder selects config.json; the setup window opens at step 1; the window title reads "General"; the timeout is a bordered box |
 | M3 | Break config.json by hand (remove a comma); open Settings › General | The form is disabled, but both buttons still work; fix the file afterwards |
 
 ## Update 2026-10-22: first-run setup and re-presented steps (#70, #71); epic #13 complete

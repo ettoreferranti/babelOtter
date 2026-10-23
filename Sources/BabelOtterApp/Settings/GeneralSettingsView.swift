@@ -29,6 +29,7 @@ struct GeneralSettingsView: View {
                     }
                     RefusalText(text: model.refusals[.languages])
                 }
+                .disabled(model.isReadOnly)
                 Section("History") {
                     Picker("Keep records", selection: Binding(get: { keeping }, set: { wanted in setKeeping(wanted) })) {
                         Text("For a number of days").tag(Keeping.days)
@@ -36,18 +37,34 @@ struct GeneralSettingsView: View {
                         Text("Off - record nothing").tag(Keeping.off)
                     }
                     if keeping == .days {
-                        TextField("Days", text: $days)
-                            .focused($focused, equals: .retention)
-                            .onSubmit { commitDays() }
+                        // A bordered box: a plain field in a grouped form
+                        // reads as a label, not something to type in.
+                        LabeledContent("Days") {
+                            TextField("Days", text: $days)
+                                .labelsHidden()
+                                .textFieldStyle(.roundedBorder)
+                                .multilineTextAlignment(.trailing)
+                                .frame(width: 80)
+                                .focused($focused, equals: .retention)
+                                .onSubmit { commitDays() }
+                        }
                     }
                     RefusalText(text: model.refusals[.retention])
                 }
+                .disabled(model.isReadOnly)
                 Section("Requests") {
-                    TextField("Timeout in seconds", text: $timeout)
-                        .focused($focused, equals: .timeout)
-                        .onSubmit { commitTimeout() }
+                    LabeledContent("Timeout in seconds") {
+                        TextField("Seconds", text: $timeout)
+                            .labelsHidden()
+                            .textFieldStyle(.roundedBorder)
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 80)
+                            .focused($focused, equals: .timeout)
+                            .onSubmit { commitTimeout() }
+                    }
                     RefusalText(text: model.refusals[.timeout])
                 }
+                .disabled(model.isReadOnly)
                 Section("Clipboard") {
                     Toggle("Never read the selection through the clipboard", isOn: Binding(
                         get: { model.configuration.strictCaptureOnly },
@@ -55,19 +72,21 @@ struct GeneralSettingsView: View {
                     Text("Then apps that only offer the selection through Copy (Teams, Word, VS Code) can't be used.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
-                Text("Language detection's tuning values stay in config.json.")
-                    .font(.caption).foregroundStyle(.secondary)
+                .disabled(model.isReadOnly)
+                // Inside the form, so it scrolls into view in a short window;
+                // never disabled, as showing the file matters most while it
+                // is broken.
+                Section("Configuration") {
+                    HStack {
+                        Button("Show config.json in Finder") { model.showFile() }
+                        Spacer()
+                        Button("Run Setup Guide\u{2026}") { model.openSetupGuide() }
+                    }
+                    Text("Language detection's tuning values stay in config.json.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
             }
             .formStyle(.grouped)
-            .disabled(model.isReadOnly)
-            // Outside the form, so they work while config.json is broken --
-            // when showing the file is most needed.
-            HStack {
-                Button("Show config.json in Finder") { model.showFile() }
-                Spacer()
-                Button("Run Setup Guide\u{2026}") { model.openSetupGuide() }
-            }
-            .padding([.horizontal, .bottom])
         }
         .onAppear { resetDrafts() }
         .onChange(of: model.configuration) { resetDrafts() }

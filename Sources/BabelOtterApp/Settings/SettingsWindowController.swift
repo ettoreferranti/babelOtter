@@ -64,6 +64,8 @@ final class SettingsWindowController {
         let controller = NSHostingController(rootView: view.frame(
             minWidth: 560, maxWidth: .infinity, minHeight: height, maxHeight: .infinity))
         controller.sizingOptions = [.minSize]
+        // Toolbar tabs title the window after the selected tab.
+        controller.title = label
         let item = NSTabViewItem(viewController: controller)
         item.label = label
         item.image = NSImage(systemSymbolName: symbol, accessibilityDescription: label)
