@@ -335,11 +335,11 @@
     ]
   },
   {
-    "id": "fr-ses-cles",
+    "id": "fr-sest-leve",
     "language": "fr",
-    "text": "Paul a oublié ces clés chez lui, alors il ne peut pas ouvrir le bureau.",
+    "text": "Hier, Paul c'est levé très tôt pour prendre le premier train.",
     "fixes": [
-      { "wrong": "ces clés", "right": ["ses clés"], "category": "spelling" }
+      { "wrong": "c'est levé", "right": ["s'est levé"], "category": "spelling" }
     ]
   },
   {
@@ -352,11 +352,11 @@
     ]
   },
   {
-    "id": "fr-faux-ami-actuellement",
+    "id": "fr-faux-ami-librairie",
     "language": "fr",
-    "text": "J'ai cru que la réunion était lundi, mais actuellement elle a lieu mardi.",
+    "text": "J'emprunte souvent des livres à la librairie de l'université.",
     "fixes": [
-      { "wrong": "actuellement", "right": ["en fait", "en réalité"], "category": "false friend" }
+      { "wrong": "à la librairie", "right": ["à la bibliothèque"], "category": "false friend" }
     ]
   },
   {
@@ -451,11 +451,11 @@
     "mustNot": ["Marco"]
   },
   {
-    "id": "it-falso-amico-attualmente",
+    "id": "it-falso-amico-libreria",
     "language": "it",
-    "text": "Pensavo che la riunione fosse lunedì, ma attualmente è martedì.",
+    "text": "Prendo spesso in prestito libri dalla libreria dell'università.",
     "fixes": [
-      { "wrong": "attualmente", "right": ["in realtà", "in effetti"], "category": "false friend" }
+      { "wrong": "dalla libreria", "right": ["dalla biblioteca"], "category": "false friend" }
     ]
   },
   {
@@ -464,7 +464,7 @@
     "text": "Buongiorno, puoi mandarmi il modulo di iscrizione?",
     "profile": "administration",
     "fixes": [
-      { "wrong": "puoi mandarmi", "right": ["può mandarmi", "potrebbe mandarmi", "può inviarmi", "potrebbe inviarmi"], "category": "register" }
+      { "wrong": "puoi mandarmi", "right": ["può mandarmi", "potrebbe mandarmi", "può inviarmi", "potrebbe inviarmi", "mi può mandare", "mi potrebbe mandare"], "category": "register" }
     ]
   },
   {

@@ -8,7 +8,7 @@
 - **"My language"**, a new setting in Settings › General, chosen from the enabled languages and English by default. The model writes its explanations in it: Correct's note for each error, and Explain's summary and notes. It is also the language the author "thinks in" when Correct looks for false friends.
 - **Correct works on any enabled language.** The text's language is detected. A text in my language is proofread as a native speaker's text, with no learner or false-friend framing. Any other enabled language is corrected as a language the author is learning, with false friends judged against my language.
 - **Explain works on any enabled language except my language.** It explains the text in my language. A text already in my language is refused: "This is already in English."
-- **When detection is unsure** (too short, or below the floor) and exactly one enabled language is not my language, that one is assumed. With English and German enabled and English as my language, that is German, exactly as today. Otherwise the popup asks "Which language is this?", the step #117 added. A confident guess outside the enabled languages is refused as now.
+- **When detection is unsure** (too short, or below the floor) and exactly one enabled language is not my language, that one is assumed. With English and German enabled and English as my language, that is German, as today. Exception (revised after review): a below-floor guess that names another candidate, e.g. English for Correct, is a real doubt and the popup asks. On main, Correct refused such a text instead. Otherwise the popup asks "Which language is this?", the step #117 added. A confident guess outside the enabled languages is refused as now.
 - **Per-language correction notes** are data on each language, sent to the model with Correct's prompt. German keeps today's examples (case after prepositions, pronouns without gender), moved out of the code. French and Italian get their own: agreement of past participles and adjectives, accents, elision, and for Italian articulated prepositions. English gets none.
 - **The golden set** gains 10 synthetic correction cases for French and 10 for Italian. Correction cases name their language; the existing 38 remain German.
 - **The app's own wording stays English**, like the whole interface, e.g. Correct's rule note "Swiss Standard German writes ss, never ß". Only what the model writes follows my language.
@@ -28,7 +28,7 @@
 
 ## 3. Configuration
 
-- `Configuration.myLanguage: LanguageCode`, key `myLanguage`. A file without the key gets `en`, so every existing file keeps today's behaviour. A code that is not an enabled language is a configuration problem naming the field, like any other invalid value.
+- `Configuration.myLanguage: LanguageCode?`, key `myLanguage`. A file without the key gets English while it is on, else the first enabled language (revised after review: a file with English off must not become a problem). A named base code finds its configured region (`de` is `de-ch`). Only a named code that is not an enabled language is a configuration problem naming the field.
 - `LanguageConfig.correctionNotes: String?`, key `correctionNotes`. Absent from a file means the shipped notes for the same code or base code, as `addressForms` does. `null` means none. Shipped for `de-CH`, `fr` and `it`.
 - `SettingsEditor.setMyLanguage(_:)`: the code must be enabled. `setLanguage(_, enabled: false)` on my language is refused with `.isMyLanguage`.
 - `Configuration.germanLanguage` goes. Its callers ask for the text's language or my language instead.
@@ -38,8 +38,8 @@
 - `TextLanguage` (`Text/TextLanguage.swift`), pure. `resolve(_ detection: Detection, configuration:, excludingMine: Bool) -> Result<LanguageCode, TranslationError>`:
   - confident and enabled: that language (as configured, base-code match);
   - confident and not enabled: `.languageNotConfigured`;
-  - unsure: the single candidate if there is exactly one, else `.directionUnknown(source: nil, candidates:)`.
-  The candidates are the enabled languages, without my language when `excludingMine`. Correct passes `false`, Explain `true`. For Explain, a confident guess of my language is `ExplanationFailure.alreadyMine(language)`.
+  - unsure: the one enabled language that is not mine, if there is exactly one, unless a below-floor guess names a different candidate; otherwise ask.
+  The candidates to ask about are the enabled languages, without my language when `excludingMine`. An exact code match wins over a base-code match. (The code returns its own `TextLanguageResolution` rather than `Result`.) Correct passes `false`, Explain `true`. For Explain, a confident guess of my language is `ExplanationFailure.alreadyMine(language)`.
 - `Corrector.language(for:)` and `Explainer.language(for:)` wrap it. `correct(_:in:profile:styleNote:)` and `explain(_:in:...)` take the language. The German-only gates go: `CorrectionFailure.notGerman` and `ExplanationFailure.notGerman` are replaced by the resolution above and `alreadyMine`.
 - `PromptBuilder`:
   - Correct names the language, and "learning X and often thinks in Y" when X is not my language. Otherwise it says "a native speaker's text; correct errors only". The language's `correctionNotes` follow, and explanations are "in Y".
