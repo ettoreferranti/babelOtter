@@ -149,7 +149,13 @@ final class SetupModel: ObservableObject {
         run = Task { [weak self] in
             guard let self else { return }
             defer { self.translating = false }
-            switch translator.direction(for: text) {
+            var resolved = translator.direction(for: text, remembered: TargetMemory().remembered)
+            // Three or more languages and no target remembered for English:
+            // the first other one, so the test never stops to ask (#81).
+            if case .failure(.directionUnknown(let source?, let candidates)) = resolved, let first = candidates.first {
+                resolved = .success(Direction(source: source, target: first))
+            }
+            switch resolved {
             case .failure(let error):
                 self.translationError = PopupModel.describe(error)
                 return

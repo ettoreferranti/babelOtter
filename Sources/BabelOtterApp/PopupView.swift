@@ -42,11 +42,24 @@ struct PopupView: View {
             Text(model.headerTitle).font(.headline)
             Spacer()
             if model.action == .translate, let direction = model.direction {
-                Text("\(model.displayName(direction.source)) \u{2192} \(model.displayName(direction.target))")
-                    .font(.caption).foregroundStyle(.secondary)
-                Button("Swap", systemImage: "arrow.left.arrow.right") { model.swap() }
-                    .labelStyle(.iconOnly).buttonStyle(.borderless)
+                let title = "\(model.displayName(direction.source)) \u{2192} \(model.displayName(direction.target))"
+                if model.menuTargets.isEmpty {
+                    Text(title).font(.caption).foregroundStyle(.secondary)
+                    Button("Swap", systemImage: "arrow.left.arrow.right") { model.swap() }
+                        .labelStyle(.iconOnly).buttonStyle(.borderless)
+                        .disabled(model.phase == .capturing)
+                } else {
+                    // Three or more languages: pick another target, same source (#81).
+                    Menu {
+                        ForEach(model.menuTargets, id: \.self) { code in
+                            Button("Into " + model.displayName(code)) { model.retarget(code) }
+                        }
+                    } label: {
+                        Text(title).font(.caption)
+                    }
+                    .menuStyle(.borderlessButton).fixedSize()
                     .disabled(model.phase == .capturing)
+                }
             }
         }
     }
@@ -107,8 +120,15 @@ struct PopupView: View {
         switch model.phase {
         case .capturing:
             ProgressView("Reading the selection...").controlSize(.small)
-        case .choosingDirection(let candidates):
-            Text(model.action == .repitch ? "Which language is this?" : "Translate into:")
+        case .choosingSource(let candidates):
+            Text("Which language is this?")
+            HStack {
+                ForEach(candidates, id: \.self) { code in
+                    Button(model.displayName(code)) { model.choose(source: code) }
+                }
+            }
+        case .choosingTarget(_, let candidates):
+            Text("Translate into:")
             HStack {
                 ForEach(candidates, id: \.self) { code in
                     Button(model.displayName(code)) { model.choose(target: code) }
