@@ -218,10 +218,18 @@ macOS itself performs Gatekeeper / XProtect checks and may report app-launch
 hashes to Apple. This is operating-system behaviour, carries no user content,
 and is out of scope for any application.
 
-### Notarization would upload the binary to Apple
+macOS also checks a downloaded app's signature and notarization ticket the
+first time it is opened. That traffic is the operating system's too, and
+carries no user content.
 
-v1 is a local build only, which avoids this entirely. Should distribution be
-added later, notarization uploads the app binary (not user data) to Apple.
+### Notarization uploads the binary to Apple
+
+Release builds are notarized: at release time, on the maintainer's Mac,
+`Tools/release.sh` uploads the release DMG to Apple's notary service. The DMG
+holds the app binary and this document; it holds no user content,
+configuration or history, and nothing is uploaded from your Mac for it. A build
+you compile yourself with `Tools/make-app.sh` is never notarized. lingoSwen's
+own network activity is unchanged: loopback only.
 
 ---
 
