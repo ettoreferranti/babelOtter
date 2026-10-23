@@ -21,6 +21,19 @@ struct GoldenFilesTests {
         _ = try Self.golden()
     }
 
+    @Test("French and Italian correction: ten cases each, two clean, a guard, a profile (#81)")
+    func correctionLanguages() throws {
+        let cases = try Self.golden().correction
+        for code in ["fr", "it"] {
+            let these = cases.filter { $0.language == LanguageCode(code) }
+            #expect(these.count >= 10, "\(code)")
+            #expect(these.filter(\.clean).count >= 2, "\(code)")
+            #expect(these.contains { !$0.mustNot.isEmpty }, "\(code)")
+            #expect(these.contains { $0.profileID != "colleagues" }, "\(code)")
+        }
+        #expect(cases.filter { $0.language == LanguageCode("de-ch") }.count >= 38)
+    }
+
     @Test("correction covers every category twice, clean texts and the special cases")
     func correctionCoverage() throws {
         let cases = try Self.golden().correction

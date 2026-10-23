@@ -20,6 +20,9 @@ public struct CorrectionCase: Sendable, Equatable {
     public let mustNot: [String]
     /// An error-free text, for measuring over-correction.
     public let clean: Bool
+    /// The text's language (#81), a shipped code; Swiss Standard German when
+    /// the case does not say.
+    public var language: LanguageCode = LanguageConfig.swissGerman.code
 }
 
 /// A golden case's direction, between any two shipped languages (#81),
@@ -127,7 +130,7 @@ public struct GoldenSet: Sendable, Equatable {
     }
 
     private struct RawCorrectionCase: KnownFields {
-        static let fields: Set<String> = ["id", "text", "profile", "terms", "fixes", "mustNot", "clean"]
+        static let fields: Set<String> = ["id", "text", "profile", "terms", "fixes", "mustNot", "clean", "language"]
         let id: String
         let text: String
         let profile: String?
@@ -135,6 +138,7 @@ public struct GoldenSet: Sendable, Equatable {
         let fixes: [Checked<RawFix>]
         let mustNot: [String]?
         let clean: Bool?
+        let language: String?
     }
 
     private struct RawTranslationCase: KnownFields {
@@ -184,9 +188,18 @@ public struct GoldenSet: Sendable, Equatable {
         if !clean && fixes.isEmpty && mustNot.isEmpty {
             throw fail("fixes", "a case that is not clean needs at least one fix or mustNot guard")
         }
-        return CorrectionCase(
+        var testCase = CorrectionCase(
             id: raw.id, text: raw.text, profileID: profile, terms: terms, fixes: fixes,
             mustNot: mustNot, clean: clean)
+        if let language = raw.language {
+            let code = LanguageCode(language)
+            guard LanguageConfig.shippedDefaults.contains(where: { $0.code == code }) else {
+                let known = LanguageConfig.shippedDefaults.map(\.code.rawValue).joined(separator: ", ")
+                throw fail("language", "\"\(language)\" is not one of: \(known)")
+            }
+            testCase.language = code
+        }
+        return testCase
     }
 
     private static func validated(

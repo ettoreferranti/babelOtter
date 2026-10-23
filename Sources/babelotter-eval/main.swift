@@ -59,11 +59,16 @@ func correct(_ testCase: CorrectionCase, model: String, client: OllamaClient) as
     var configuration = Configuration.default
     configuration.models[.correct] = model
     configuration.doNotTranslate = testCase.terms
+    // The case's language, switched on and named, with English as my
+    // language (#81): the eval measures correction, not detection.
+    for index in configuration.languages.indices where configuration.languages[index].code == testCase.language {
+        configuration.languages[index].enabled = true
+    }
     let corrector = Corrector(configuration: configuration, chat: client)
     let profile = configuration.profile(id: testCase.profileID) ?? .colleagues
     let start = ContinuousClock.now
     do {
-        for try await event in corrector.correct(UserText(testCase.text), profile: profile) {
+        for try await event in corrector.correct(UserText(testCase.text), in: testCase.language, profile: profile) {
             if case .finished(let result) = event {
                 return Attempt(
                     outcome: .corrected(result), output: result.corrected.value, detail: nil,
