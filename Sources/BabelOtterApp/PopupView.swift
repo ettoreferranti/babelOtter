@@ -43,7 +43,7 @@ struct PopupView: View {
             Spacer()
             if model.action == .translate, let direction = model.direction {
                 let title = "\(model.displayName(direction.source)) \u{2192} \(model.displayName(direction.target))"
-                if model.menuTargets.isEmpty {
+                if !model.usesTargetMenu {
                     Text(title).font(.caption).foregroundStyle(.secondary)
                     Button("Swap", systemImage: "arrow.left.arrow.right") { model.swap() }
                         .labelStyle(.iconOnly).buttonStyle(.borderless)
@@ -55,7 +55,7 @@ struct PopupView: View {
                             Button("Into " + model.displayName(code)) { model.retarget(code) }
                         }
                     } label: {
-                        Text(title).font(.caption)
+                        Text(title).font(.caption).foregroundStyle(.secondary)
                     }
                     .menuStyle(.borderlessButton).fixedSize()
                     .disabled(model.phase == .capturing)

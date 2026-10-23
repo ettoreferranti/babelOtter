@@ -10,7 +10,7 @@ Each task ends with `swift build` and `swift test` green and one commit. Kit cod
 | 2 | Detection constrained to enabled languages | `Text/LanguageDetector.swift` | a recording fake sees the enabled base codes |
 | 3 | Resolver with memory; the source carried; `TranslationError.directionUnknown(source:candidates:)`; `Translator.direction(for:remembered:)`, `direction(from:into:)` | `Text/TargetLanguageResolver.swift`, `Pipeline/Translator.swift`, callers | resolver and direction cases from spec 6 |
 | 4 | `TargetChoice` | `Text/TargetChoice.swift` | menu targets, `usesMenu` |
-| 5 | Golden set: data directions, locale-rule check, runner enables all shipped languages; 20 new cases | `Eval/GoldenSet.swift`, `Eval/TranslationScorer.swift`, `babelotter-eval/main.swift`, `evals/golden/translation.json` | parsing, refusal, rule check |
+| 5 | Golden set: data directions, locale-rule check, 20 new cases (the runner needs no change: translating only needs configured languages) | `Eval/GoldenSet.swift`, `Eval/TranslationScorer.swift`, `babelotter-eval/main.swift`, `evals/golden/translation.json` | parsing, refusal, rule check |
 | 6 | Mutation gate: new files in PASS1 | `.github/workflows/mutation.yml` | - |
 | 7 | App: write back appended languages on load; `TargetMemory`; popup source/target steps and header menu; setup sample direction; glossary columns for enabled languages | app target | build; manual L1-L7 |
 | 8 | HANDOFF (L1-L7), README | docs | - |

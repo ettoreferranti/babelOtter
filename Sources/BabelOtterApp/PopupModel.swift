@@ -262,21 +262,27 @@ final class PopupModel {
         }
     }
 
-    /// The answer to "Translate into:"; remembered for the source (#81).
+    /// The answer to "Translate into:"; remembered for the source with three
+    /// or more languages (#81). With two the choice is forced, and keeping it
+    /// would skip the question once a third language is switched on.
     func choose(target: LanguageCode) {
         guard !isDismissed else { return }
         guard case .choosingTarget(let source, _) = phase else { return }
         guard let direction = translator.direction(from: source, into: target) else { return }
-        targetMemory.remember(direction)
+        if TargetChoice.usesMenu(configuration: configuration) { targetMemory.remember(direction) }
         run(direction)
     }
 
-    /// The header menu's targets, with three or more languages (#81); empty
-    /// otherwise, when the header shows Swap.
+    /// Whether the header shows the target menu rather than Swap (#81).
+    var usesTargetMenu: Bool { TargetChoice.usesMenu(configuration: configuration) }
+
+    /// The header menu's targets: the other enabled languages but the
+    /// current target, which Regenerate already covers (#81).
     var menuTargets: [LanguageCode] {
-        guard TargetChoice.usesMenu(configuration: configuration) else { return [] }
-        guard let source = direction?.source else { return [] }
-        return TargetChoice.menuTargets(source: source, configuration: configuration)
+        guard usesTargetMenu else { return [] }
+        guard let direction else { return [] }
+        return TargetChoice.menuTargets(source: direction.source, configuration: configuration)
+            .filter { $0 != direction.target }
     }
 
     /// Re-runs into another target from the header menu, same source;

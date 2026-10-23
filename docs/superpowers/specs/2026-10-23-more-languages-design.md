@@ -6,14 +6,14 @@
 ## 1. What it does
 
 - **French (`fr`) and Italian (`it`) ship**, switched off. In Settings › General they appear as toggles under English and Swiss Standard German. Their formality words are vous/tu and Lei/tu. No orthography rules.
-- **Existing installs get them too.** On load, any shipped language whose base code is missing from `config.json` is appended, switched off, and the file is written back once. A user's own `fr-CH` counts as French, so `fr` is not added beside it.
+- **Existing installs get them too.** At launch, any shipped language whose base code is missing from a clean `config.json` is appended, switched off, and the file is saved, in the app's own format as any Settings save is. It happens at every launch while one is missing, so deleting the entries brings them back. A user's own `fr-CH` counts as French, so `fr` is not added beside it.
 - **With exactly two languages enabled nothing changes**: one source, one target, Swap reverses them.
 - **With three or more**, Translate detects the source and then:
   - uses the **target last chosen for that source**, if it is still enabled;
-  - otherwise opens **"Translate into:"** with the other enabled languages; the choice is remembered for that source.
+  - otherwise opens **"Translate into:"** with the other enabled languages; the choice is remembered for that source. (With two languages nothing is remembered: the choice is forced.)
 - **The header becomes a target menu** with three or more: "French → German ▾" lists the other enabled languages; choosing one re-runs with the same source and remembers it. With two it stays the Swap button.
 - **When the source is not known** (detection below the floor, or too short), with three or more languages the popup asks **"Which language is this?"** first, then the target (skipped when one is remembered for that source). With two it stays as today: pick the target, the source is the other one.
-- **Detection only considers enabled languages.** French and Italian are easy to confuse on a short text; limiting the recognizer to the enabled languages makes it choose among them. A text in a language that is not enabled is matched to the closest enabled one, and the confidence floor still asks when unsure. The "not one of your languages" message goes away.
+- **Detection chooses among the enabled languages, after a screen.** French and Italian are easy to confuse on a short text, so the guess is made among the enabled languages. But a recognizer limited that way rescales its confidences, so the floor does not catch a language that is not enabled (review finding: with English and German on, Italian came back as German at 0.72). So the open recognizer goes first: a confident guess outside the enabled languages stands and is refused as before ("not one of your languages"; Correct and Explain's "not German"). Only otherwise is the limited guess used.
 - **Re-pitch** already works for any enabled language (`Translator.language(for:)`); it benefits from the constrained detection and needs nothing else.
 - **The golden set** gains fr↔en and it↔en, five synthetic cases per direction (20), and directions become data.
 
@@ -27,7 +27,7 @@
 | Swap with 3+ | The header becomes a target menu | "Swap" means nothing when the text is in neither language |
 | Where choices are remembered | UserDefaults (`targetBySource`: source code → target code), never `config.json` | Picking a target must not rewrite a file the user may be editing; only language codes, never text |
 | Existing configs | Missing shipped languages appended, disabled, written back once | They appear as toggles; nothing changes until switched on |
-| Detection | Constrained to enabled languages' base codes | Accuracy among close languages; the floor still guards |
+| Detection | Open screen first, then constrained to enabled languages' base codes | Accuracy among close languages, without forcing an unenabled language into an enabled one (revised after review) |
 | Golden set | fr↔en and it↔en, 5 each | The user's choice; directions become data so more can be added without code |
 | Glossary columns | Only enabled languages | Four columns would crowd the table; a disabled language's terms are kept untouched |
 
@@ -35,7 +35,7 @@
 
 - `LanguageConfig.french` (`fr`, "French", `AddressForms(formal: "vous", informal: "tu")`, disabled) and `.italian` (`it`, "Italian", `AddressForms(formal: "Lei", informal: "tu")`, disabled). `shippedDefaults` = English, Swiss Standard German, French, Italian. The `addressForms` fill for files without it (base-code lookup in the shipped list) now covers fr and it.
 - `Configuration.addingMissingShippedLanguages() -> Configuration?`: the configuration with every shipped language whose base subtag no configured language has, appended disabled; `nil` when nothing is missing (so the app knows whether to write).
-- `NaturalLanguageRecognizer(constraints: [LanguageCode])`: sets `languageConstraints` to the base subtags (`NLLanguage(rawValue:)`); empty means unconstrained. `LanguageDetector(configuration:)` builds its default recognizer constrained to the enabled languages; an injected recognizer is used as given (tests).
+- `NaturalLanguageRecognizer(constraints: [LanguageCode])`: sets `languageConstraints` to the base subtags (`NLLanguage(rawValue:)`); empty means unconstrained. `ScreenedRecognizer(open:constrained:enabled:floor:)` returns the open hypotheses when one at or above the floor is outside the enabled base codes, else the constrained ones. `LanguageDetector(configuration:)` builds a screened default from the configuration's enabled languages and floor; an injected recognizer is used as given (tests).
 - `TargetLanguageResolver.resolve(_:remembered:)`, with `remembered: [LanguageCode: LanguageCode]` (default empty):
   - one other enabled language: `.resolved` as today;
   - several, and `remembered[source]` is one of them: `.resolved(source, that)`;

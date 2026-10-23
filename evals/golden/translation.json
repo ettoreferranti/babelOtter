@@ -152,7 +152,7 @@
     "text": "Dear Ms Example\n\nThank you for your registration. We will send you the timetable by the end of the month.",
     "direction": "en-fr",
     "profile": "administration",
-    "reference": "Madame Example,\n\nNous vous remercions de votre inscription. Nous vous enverrons l'horaire d'ici la fin du mois."
+    "reference": "Madame Example,\n\nNous vous remercions de votre inscription. Nous vous enverrons l'emploi du temps d'ici la fin du mois."
   },
   {
     "id": "en-fr-repas-samedi",
@@ -196,7 +196,7 @@
   },
   {
     "id": "fr-en-merci-demenagement",
-    "text": "Chère Léa\n\nMerci beaucoup pour ton aide lors du déménagement samedi. Sans toi, nous n'aurions jamais fini à temps.",
+    "text": "Chère Léa,\n\nMerci beaucoup pour ton aide lors du déménagement samedi. Sans toi, nous n'aurions jamais fini à temps.",
     "direction": "fr-en",
     "profile": "informal",
     "reference": "Dear Léa\n\nThank you so much for your help with the move on Saturday. Without you, we would never have finished in time."
@@ -255,7 +255,7 @@
   },
   {
     "id": "it-en-festa-estate",
-    "text": "Cari genitori\n\nVenerdì 14 giugno la scuola festeggia la sua festa d'estate. Siete tutti cordialmente invitati.",
+    "text": "Cari genitori,\n\nVenerdì 14 giugno la scuola festeggia la sua festa d'estate. Siete tutti cordialmente invitati.",
     "direction": "it-en",
     "profile": "administration",
     "reference": "Dear parents\n\nOn Friday, 14 June, the school is holding its summer party. You are all cordially invited."
