@@ -1,6 +1,28 @@
-# Handoff — state as of 2026-10-22
+# Handoff — state as of 2026-10-23
 
 Read this first if you are picking babelOtter up in a new session.
+
+## Start here: v1.0.0 is done; the next step is a decision
+
+**State.** `v1.0.0` is tagged on `main` (`941c7d1`). Milestones M1b, M2 and M3 are closed, and so are all their epics (history #12, configuration #11, onboarding #13). `main` is the only branch. What v1 does, in one line each: Translate, Correct, Explain and Re-pitch from a hotkey or the menu, against a local Ollama only; audience inferred from the text, formality per target language (#110); local SQLite history with search, retention, off and Clear All; a Settings window (General, Models, Audiences, Glossary, Hotkeys); a concept glossary and do-not-translate list; a Privacy panel with the Ollama binding warning; a first-run setup window. 970 tests; mutation score about 82.7% (gate 80%).
+
+**The decision waiting** (M4 "Post-v1", 9 open issues): the last session's recommendation was **#82 Sign, notarize and distribute** first, since no colleague can install lingoSwen without it (Gatekeeper; Accessibility grants are tied to a stable signature) and #103 builds on it. The alternatives: #103 standalone app with a built-in MLX model (no Ollama), #81 French and Italian (its body now lists five two-language assumptions to resolve first: Explain, Correct, picking a source, Swap, the golden set), #84 scratchpad window, #83 popup offered on selection, #80 rich-text formatting, #79 CEFR estimate and drills, #78 recurring mistakes.
+
+**How we work** (the rhythm every feature followed):
+1. Design in conversation: the open questions as multiple choice with a recommendation; then a spec in `docs/superpowers/specs/` (a short "addendum" for follow-ups), committed, and approved by the user.
+2. A short plan in `docs/superpowers/plans/`, then build task by task on a feature branch, each task `swift build` + `swift test` green and its own commit. Kit logic goes in `Sources/BabelOtterKit` with tests (it is under the mutation gate); the app stays thin.
+3. A fresh-context review agent over `git diff main...HEAD`; fix its findings, say plainly which were not fixed and why.
+4. Manual checks for the user in this file (a table at the top of the update), with the risks to their real config spelled out and a way back. The user runs them after `Tools/make-app.sh --run`.
+5. Push and open a PR only after the checks pass; merge only when the user says so, and only once both CI checks pass on the PR's latest commit. Then tick the issue in its epic. The user deletes branches themselves (`! git branch -d …`, `! git push origin --delete …`).
+
+**Pitfalls learned (they cost a CI round each):**
+- **CI is older than this Mac:** Xcode 16.4 / Swift 6.1.2 (mutation in `-c release`) vs local Swift 6.4. A local green build proves little. In SwiftUI views pass closures (`{ f() }`), never method references (`set: f`, `.onSubmit(f)`): 6.1.2 crashed in IRGen (PR #108). Keep `sqlite3_bind_double` calls direct (a helper stored NULL under muter, PR #106).
+- **Mutation gate rules for kit code:** ASCII-only source; no comma-joined conditions in `if`/`guard`/`while`; no ternary whose condition ends in an enum member; no locks; every loop bounded by a constant or a collection, never only a runtime value (muter has no per-mutant timeout; PR #105 hung for 150 minutes).
+- **Repo guards:** the networking test bans substrings such as `send(`, `connect(`, `(contentsOf:` outside `OllamaClient.swift` (name helpers `write()`, not `send()`); `NoIdentifyingReferencesTests` bans naming the author's employer in tracked files, so use invented proper nouns (e.g. "NORDA") — and keep it out of issue and PR text too, which no test checks.
+- **GitHub closing keywords:** write "Closes #70, closes #71"; "Closes #72 and #73" only closes the first.
+- **Swift 6 lazy properties** that refer to each other need explicit types (a "circular reference" error).
+
+**Starting a new session:** "Read docs/HANDOFF.md and let's decide what to do next in M4." Everything above, plus the per-feature updates below, is the context.
 
 ## Update 2026-10-22: a shorter menu
 
