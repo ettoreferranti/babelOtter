@@ -24,6 +24,35 @@ Read this first if you are picking babelOtter up in a new session.
 
 **Starting a new session:** "Read docs/HANDOFF.md and let's decide what to do next in M4." Everything above, plus the per-feature updates below, is the context.
 
+## Update 2026-10-23: French and Italian; Translate with three or more languages (#81, first PR)
+
+On branch `feat/more-languages`, not yet a PR. Spec `docs/superpowers/specs/2026-10-23-more-languages-design.md`, plan `docs/superpowers/plans/2026-10-23-more-languages.md`. Correct and Explain stay German-only; they are the second PR for #81, with its own design.
+
+- **French (`fr`, vous/tu) and Italian (`it`, Lei/tu) ship switched off.** At launch, a clean `config.json` missing a shipped language (by base code, so a hand-written `fr-CH` counts) gains it, switched off, written back once.
+- **Detection only considers enabled languages** (`NLLanguageRecognizer.languageConstraints`).
+- **Three or more enabled:** the target last chosen for the detected source is used (`TargetMemory`, UserDefaults key `targetBySource`, codes only); else "Translate into:". An unknown source asks "Which language is this?" first. The header's Swap becomes a menu of the other languages. With two, nothing changes.
+- **`direction(into:)` is gone**: `direction(from:into:)` takes the detected or named source; the old one took "the first other enabled language", wrong with three.
+- **Golden set:** directions are data (`TranslationDirection(rawValue:)` over shipped codes); 20 synthetic fr↔en / it↔en cases; the eszett check follows the target's locale rules (the score keeps the `esszettAbsent` name).
+- Tests that used `fr`/`it` as "an unconfigured language" now use `nl`/`pt`.
+
+**#82 is parked** on the local branch `feat/sign-notarize` (built and reviewed; its own HANDOFF update is there), waiting for the Developer ID certificate from the team's Account Holder.
+
+**Manual check (yours).** Rebuild first (`Tools/make-app.sh --run`).
+
+| # | Do | Expect |
+|---|---|---|
+| L1 | Launch with your current config | Settings › General lists French and Italian, switched off; `config.json` now has them with `"enabled": false`; everything else unchanged |
+| L2 | Translate English and German texts | Exactly as before, Swap included |
+| L3 | Enable French; translate a French paragraph | "Translate into:" English / Swiss Standard German; pick German; the header reads "French → Swiss Standard German" as a menu |
+| L4 | Translate another French text | Goes straight to German; the header menu switches it to English and re-runs |
+| L5 | Translate a short ambiguous text ("ciao") | "Which language is this?", then the target |
+| L6 | Enable Italian too; Settings › General › Run Setup Guide… to the test step | The sample translates |
+| L7 | Settings › Glossary with French on | A French column; off again, it disappears and its terms stay in `config.json` |
+| L8 | Disable French and Italian again | Back to two languages: Swap button, no pickers |
+| L9 | Skim the 20 new French/Italian cases in `evals/golden/translation.json` | References read naturally (I wrote them) |
+
+**Risk to your setup:** L1 writes `config.json` once (two entries appended). Back it up first if you like (Settings › General › Show config.json in Finder); deleting the two entries brings them back on the next launch, switched off. Remembered targets live in the app's preferences; `defaults delete ch.lingoswen targetBySource` forgets them.
+
 ## Update 2026-10-22: a shorter menu
 
 The menu is now: the status lines, the four actions, Settings…, History…, Privacy…, Quit. **Check Again** is gone (opening the menu already re-checks, and the status lines update in place while it is open). **Open Configuration Folder** and **Setup Guide…** moved to Settings › General, in a last section **Configuration**, as **Show config.json in Finder** and **Run Setup Guide…**; it scrolls with the form, and only the editable sections are disabled while `config.json` is broken, so these buttons always work. Also: the timeout, history-days and audience-name fields are bordered boxes (a plain field in a grouped form read as a label), and the Settings window is titled after its tab instead of "Untitled". When `config.json` has a problem, the menu's problem line still offers "Show config.json in Finder" itself. Older sections below that mention these menu items predate this change.
