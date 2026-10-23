@@ -2,11 +2,13 @@
 
 Read this first if you are picking babelOtter up in a new session.
 
-## Start here: v1.0.0 is done; the next step is a decision
+## Start here: v1.0.1 is released; M4 is under way
 
-**State.** `v1.0.0` is tagged on `main` (`941c7d1`). Milestones M1b, M2 and M3 are closed, and so are all their epics (history #12, configuration #11, onboarding #13). `main` is the only branch. What v1 does, in one line each: Translate, Correct, Explain and Re-pitch from a hotkey or the menu, against a local Ollama only; audience inferred from the text, formality per target language (#110); local SQLite history with search, retention, off and Clear All; a Settings window (General, Models, Audiences, Glossary, Hotkeys); a concept glossary and do-not-translate list; a Privacy panel with the Ollama binding warning; a first-run setup window. 970 tests; mutation score about 82.7% (gate 80%).
+**State.** `v1.0.1` is the first signed and notarized build (#82). It is tagged locally on `main` (`0d734d5`) and handed out privately as a DMG, never through GitHub Releases. Milestones M1b, M2 and M3 are closed. M4 so far: #82 is done (`Tools/release.sh`), and #81 part 1 is merged (French and Italian; Translate with three or more languages, #117). `main` is the only branch. What lingoSwen does, in one line each: Translate, Correct, Explain and Re-pitch from a hotkey or the menu, against a local Ollama only; English, Swiss Standard German, French and Italian (the last two off by default); audience inferred from the text, with formality per target language (#110); local SQLite history with search, retention, off and Clear All; a Settings window (General, Models, Audiences, Glossary, Hotkeys); a concept glossary and a do-not-translate list; a Privacy panel; a first-run setup window. 999 tests; mutation gate 80%.
 
-**The decision waiting** (M4 "Post-v1", 9 open issues): the last session's recommendation was **#82 Sign, notarize and distribute** first, since no colleague can install lingoSwen without it (Gatekeeper; Accessibility grants are tied to a stable signature) and #103 builds on it. The alternatives: #103 standalone app with a built-in MLX model (no Ollama), #81 French and Italian (its body now lists five two-language assumptions to resolve first: Explain, Correct, picking a source, Swap, the golden set), #84 scratchpad window, #83 popup offered on selection, #80 rich-text formatting, #79 CEFR estimate and drills, #78 recurring mistakes.
+**Next:** #81 part 2, Correct and Explain beyond German (they still assume German learners and English explanations). Then the rest of M4: #103 standalone app with a built-in MLX model (signing now works), #84 scratchpad window, #83 popup offered on selection, #80 rich-text formatting, #79 CEFR estimate and drills, #78 recurring mistakes.
+
+**Releasing:** `git tag vX.Y.Z && Tools/release.sh` on a clean `main`; README › *Making a release*. **The Developer ID certificate expires 2027-11-22**; a release after that date needs a new one from the team's Account Holder.
 
 **How we work** (the rhythm every feature followed):
 1. Design in conversation: the open questions as multiple choice with a recommendation; then a spec in `docs/superpowers/specs/` (a short "addendum" for follow-ups), committed, and approved by the user.
@@ -21,12 +23,14 @@ Read this first if you are picking babelOtter up in a new session.
 - **Repo guards:** the networking test bans substrings such as `send(`, `connect(`, `(contentsOf:` outside `OllamaClient.swift` (name helpers `write()`, not `send()`); `NoIdentifyingReferencesTests` bans naming the author's employer in tracked files, so use invented proper nouns (e.g. "NORDA") — and keep it out of issue and PR text too, which no test checks.
 - **GitHub closing keywords:** write "Closes #70, closes #71"; "Closes #72 and #73" only closes the first.
 - **Swift 6 lazy properties** that refer to each other need explicit types (a "circular reference" error).
+- **Bash under `set -o pipefail`:** never pipe a command into `grep -q`. `grep` exits on its first match, the writer dies of SIGPIPE (141), and the pipeline fails although it matched (#119). Capture the output first, then `grep -q <<<"$output"`.
+- **Editing an issue body that contains "—"** with `${body/…/…}` in the shell silently does nothing; write the body to a file, edit it, and pass `--body-file`.
 
 **Starting a new session:** "Read docs/HANDOFF.md and let's decide what to do next in M4." Everything above, plus the per-feature updates below, is the context.
 
-## Update 2026-10-23: sign, notarize and distribute (#82)
+## Update 2026-10-23: sign, notarize and distribute (#82), done
 
-On branch `feat/sign-notarize`. `Tools/release.sh` turns a clean checkout of a `vX.Y.Z` tag into `build/lingoSwen-X.Y.Z.dmg`: version stamped from the tag, hardened runtime, Developer ID signature, notarized, stapled, checked with `spctl`. Spec `docs/superpowers/specs/2026-10-23-sign-notarize-design.md`. The decisions that matter:
+Merged as #118, with a fix in #119. #82 is closed: all the checks below passed and `v1.0.1` was released. `Tools/release.sh` turns a clean checkout of a `vX.Y.Z` tag into `build/lingoSwen-X.Y.Z.dmg`: version stamped from the tag, hardened runtime, Developer ID signature, notarized, stapled, checked with `spctl`. Spec `docs/superpowers/specs/2026-10-23-sign-notarize-design.md`. The decisions that matter:
 
 - **Builds are handed out privately, never as public GitHub Releases.** The user's Apple membership is an organization team, and a team Developer ID carries the team's name in every signature. No identity, team ID or Apple ID is committed; the script finds the identity in the keychain by prefix and uses its hash, and notarytool reads the keychain profile `lingoswen-notary`. `ReleaseSecretsTests` refuses all three shapes in any tracked file (planted-defect checked).
 - **Local only.** CI signing is deferred (the org may not allow exporting the certificate); #82's CI criterion is re-scoped.
@@ -35,12 +39,12 @@ On branch `feat/sign-notarize`. `Tools/release.sh` turns a clean checkout of a `
 
 **The certificate** (Developer ID Application, G2) arrived and is in the user's login keychain; `find-identity -v` lists it (M2). It only became valid once Apple's intermediate *Developer ID Certification Authority (G2)* was installed (`https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer`): Xcode normally installs it, and this project never runs Xcode. **It expires 2027-11-22** (not five years); builds already signed stay valid (secure timestamp, notarized), but a new release after that date needs a new certificate from the Account Holder, made the same way from a signing request. The notary profile is stored and works.
 
-**Manual check (yours).**
+**Manual checks: all passed on 2026-10-23.** The first run of M3 stopped at the hardened-runtime check because of the pipefail bug (#119); after the fix, notarization was accepted. The DMG's SHA-256 is `1e2f342dd13448dff935224f04dec137fd4ac8dcb957f4e04f90f363ffc9baf4`.
 
 | # | Do | Expect |
 |---|---|---|
 | M1 | On the branch, untagged: `Tools/release.sh` | Stops before building: "HEAD is not a vX.Y.Z tag" |
-| M2 | ~~When the `.cer` arrives~~ Done 2026-10-23: `security find-identity -v -p codesigning` | One `Developer ID Application:` identity listed |
+| M2 | When the `.cer` arrives: `security find-identity -v -p codesigning` | One `Developer ID Application:` identity listed |
 | M3 | After merge, `git tag v1.0.1` on `main`; `Tools/release.sh` | Notarization accepted; the Gatekeeper-disabled warning (on this Mac); the DMG path and SHA-256 |
 | M4 | Copy the DMG to a Mac with Gatekeeper on that has never built lingoSwen; open it, drag to Applications, launch | No Gatekeeper block; the setup window opens; Get Info shows 1.0.1 |
 | M5 | On your Mac, quit the dev build and launch the installed one | Accessibility is asked again once (new signature); then Translate works |
