@@ -64,7 +64,7 @@ struct HistoryRecordTests {
     func explanationRecord() {
         let result = ExplanationResult(
             summary: "The meeting moves.",
-            notes: [ExplainNote(phrase: "verschoben", explanationEn: "postponed")],
+            notes: [ExplainNote(phrase: "verschoben", explanation: "postponed")],
             warnings: [])
         let record = HistoryRecord(
             explanation: result, source: UserText("Die Sitzung wird verschoben."),

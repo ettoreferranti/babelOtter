@@ -51,11 +51,11 @@ private func summaries(_ events: [ExplanationEvent]) -> [String] {
 }
 
 private func note(_ phrase: String, _ explanation: String) -> String {
-    "{\"phrase\": \"\(phrase)\", \"explanation_en\": \"\(explanation)\"}"
+    "{\"phrase\": \"\(phrase)\", \"explanation\": \"\(explanation)\"}"
 }
 
 private func reply(_ summary: String, _ notes: [String] = []) -> [String] {
-    ["{\"summary_en\": \"\(summary)\", \"notes\": [\(notes.joined(separator: ", "))]}"]
+    ["{\"summary\": \"\(summary)\", \"notes\": [\(notes.joined(separator: ", "))]}"]
 }
 
 @Suite("The explainer, from German text to an English explanation", .timeLimit(.minutes(1)))
@@ -83,7 +83,7 @@ struct ExplainerTests {
         #expect(events.first == .started)
         let done = try #require(result(events))
         #expect(done.summary == "It is not my business.")
-        #expect(done.notes == [ExplainNote(phrase: "nicht mein Bier", explanationEn: "not my concern")])
+        #expect(done.notes == [ExplainNote(phrase: "nicht mein Bier", explanation: "not my concern")])
         #expect(done.warnings.isEmpty)
     }
 
@@ -130,9 +130,9 @@ struct ExplainerTests {
     @Test("the summary streams as it grows; the notes come only with the result")
     func streamsSummary() async throws {
         let chat = ScriptedChat([[
-            #"{"summary_en": "The meet"#,
+            #"{"summary": "The meet"#,
             #"ing starts"#,
-            #" at ten.", "notes": [{"phrase": "um 10 Uhr", "explanation_en": "at ten"}]}"#,
+            #" at ten.", "notes": [{"phrase": "um 10 Uhr", "explanation": "at ten"}]}"#,
         ]])
         let events = try await collect(explainer(chat).explain(UserText("Die Sitzung beginnt um 10 Uhr.")))
         #expect(summaries(events) == ["The meet", "The meeting starts", "The meeting starts at ten."])
@@ -148,7 +148,7 @@ struct ExplainerTests {
         let events = try await collect(explainer(chat).explain(UserText("Wir treffen uns in Otterbach.")))
         let done = try #require(result(events))
         #expect(done.summary == "A meeting in Otterbach.")
-        #expect(done.notes == [ExplainNote(phrase: "in Otterbach", explanationEn: "Otterbach is a place")])
+        #expect(done.notes == [ExplainNote(phrase: "in Otterbach", explanation: "Otterbach is a place")])
         #expect(summaries(events).last == "A meeting in Otterbach.")
     }
 
@@ -174,14 +174,14 @@ struct ExplainerTests {
         let done = try #require(result(try await collect(
             explainer(chat).explain(UserText("Gru\u{00DF} aus Bern.")))))
         #expect(done.summary == "Gru\u{00DF} is a greeting.")
-        #expect(done.notes == [ExplainNote(phrase: "Gru\u{00DF}", explanationEn: "Gru\u{00DF} means greeting")])
+        #expect(done.notes == [ExplainNote(phrase: "Gru\u{00DF}", explanation: "Gru\u{00DF} means greeting")])
     }
 
     @Test("a note with an empty phrase or explanation is dropped")
     func dropsEmptyNotes() async throws {
         let chat = ScriptedChat([reply("Fine.", [note("", "x"), note("y", "  "), note("z", "w")])])
         let done = try #require(result(try await collect(explainer(chat).explain(UserText(idiom)))))
-        #expect(done.notes == [ExplainNote(phrase: "z", explanationEn: "w")])
+        #expect(done.notes == [ExplainNote(phrase: "z", explanation: "w")])
     }
 
     @Test("an empty summary is an unreadable reply")
@@ -213,7 +213,7 @@ struct ExplainerTests {
         #expect(ExplanationResult(summary: "S", notes: [], warnings: []).copyText == "S")
         let full = ExplanationResult(
             summary: "S",
-            notes: [ExplainNote(phrase: "a", explanationEn: "b"), ExplainNote(phrase: "c", explanationEn: "d")],
+            notes: [ExplainNote(phrase: "a", explanation: "b"), ExplainNote(phrase: "c", explanation: "d")],
             warnings: [])
         #expect(full.copyText == "S\n\n- \"a\": b\n- \"c\": d")
     }

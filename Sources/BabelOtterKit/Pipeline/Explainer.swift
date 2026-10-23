@@ -19,7 +19,7 @@ public struct ExplanationResult: Sendable, Equatable {
     /// What Copy writes: the summary, then one line per note.
     public var copyText: String {
         if notes.isEmpty { return summary }
-        let lines = notes.map { "- \"" + $0.phrase + "\": " + $0.explanationEn }
+        let lines = notes.map { "- \"" + $0.phrase + "\": " + $0.explanation }
         return summary + "\n\n" + lines.joined(separator: "\n")
     }
 }
@@ -130,7 +130,7 @@ public struct Explainer: Sendable {
         let raw = try await ReplyStream.collect(
             chat: chat, model: context.model, prompt: prompt, key: "notes",
             onRaw: { raw in
-                guard let partial = PartialField.prefix(named: "summary_en", in: raw) else { return }
+                guard let partial = PartialField.prefix(named: "summary", in: raw) else { return }
                 if partial == shown { return }
                 shown = partial
                 emit(.summary(context.processor.finish(partial, protected: context.masked).text))
@@ -148,19 +148,19 @@ public struct Explainer: Sendable {
         } catch {
             throw ExplanationFailure.unreadableReply
         }
-        let summary = context.processor.finish(response.summaryEn, protected: context.masked)
+        let summary = context.processor.finish(response.summary, protected: context.masked)
         if isBlank(summary.text) { throw ExplanationFailure.unreadableReply }
         var problems = summary.problems
         var notes: [ExplainNote] = []
         for item in response.notes {
             // The phrase quotes the user's German: terms restored, no rules.
             let phrase = TokenProtector.restore(item.phrase, from: context.masked)
-            let explanation = context.processor.finish(item.explanationEn, protected: context.masked)
+            let explanation = context.processor.finish(item.explanation, protected: context.masked)
             if isBlank(phrase.text) { continue }
             if isBlank(explanation.text) { continue }
             problems += phrase.problems
             problems += explanation.problems
-            notes.append(ExplainNote(phrase: phrase.text, explanationEn: explanation.text))
+            notes.append(ExplainNote(phrase: phrase.text, explanation: explanation.text))
         }
         return ExplanationResult(summary: summary.text, notes: notes, warnings: warnings(problems))
     }

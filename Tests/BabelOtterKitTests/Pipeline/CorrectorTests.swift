@@ -52,7 +52,7 @@ private func reply(_ blocks: [String], _ errors: String = "[]") -> [String] {
 
 private let genderError = """
     [{"original": "der Kollege", "corrected": "dem Kollegen", "category": "case", \
-    "explanation_en": "mit takes the dative", "severity": "error"}]
+    "explanation": "mit takes the dative", "severity": "error"}]
     """
 
 @Suite("The corrector, from German text to a checked correction", .timeLimit(.minutes(1)))
@@ -100,7 +100,7 @@ struct CorrectorTests {
     func suggestionsSeparated() async throws {
         let suggestion = """
             [{"original": "gesprochen", "corrected": "geredet", "category": "register", \
-            "explanation_en": "more casual", "severity": "suggestion"}]
+            "explanation": "more casual", "severity": "suggestion"}]
             """
         let chat = ScriptedChat([reply([long], suggestion)])
         let done = try #require(result(try await collect(
@@ -218,7 +218,7 @@ struct CorrectorTests {
         let text = "Die Stra\u{00DF}e ist alt."
         let ownFix = """
             [{"original": "Stra\u{00DF}e", "corrected": "Strasse", "category": "spelling", \
-            "explanation_en": "Swiss orthography", "severity": "error"}]
+            "explanation": "Swiss orthography", "severity": "error"}]
             """
         let chat = ScriptedChat([reply(["Die Strasse ist alt."], ownFix)])
         let done = try #require(result(try await collect(
@@ -233,7 +233,7 @@ struct CorrectorTests {
         let unrelatedFix = """
             [{"original": "Stra\u{00DF}e ist gut", \
             "corrected": "Stra\u{00DF}e ist besser", "category": "register", \
-            "explanation_en": "more natural wording", "severity": "error"}]
+            "explanation": "more natural wording", "severity": "error"}]
             """
         let chat = ScriptedChat([reply(["Die Stra\u{00DF}e ist besser."], unrelatedFix)])
         let done = try #require(result(try await collect(
@@ -247,7 +247,7 @@ struct CorrectorTests {
         let text = "Die Stra\u{00DF}e ist alt und der Baum ist gro\u{00DF}."
         let ownFix = """
             [{"original": "Stra\u{00DF}e", "corrected": "Strasse", "category": "spelling", \
-            "explanation_en": "Swiss orthography", "severity": "error"}]
+            "explanation": "Swiss orthography", "severity": "error"}]
             """
         let chat = ScriptedChat([reply(
             ["Die Strasse ist alt und der Baum ist gro\u{00DF}."], ownFix)])
@@ -262,7 +262,7 @@ struct CorrectorTests {
         let text = "Der Baum ist gross."
         let errors = """
             [{"original": "gross", "corrected": "gro\u{00DF}", "category": "spelling", \
-            "explanation_en": "adjective form", "severity": "error"}]
+            "explanation": "adjective form", "severity": "error"}]
             """
         let chat = ScriptedChat([reply(["Der Baum ist gross."], errors)])
         let done = try #require(result(try await collect(
@@ -276,7 +276,7 @@ struct CorrectorTests {
         let errors = """
             [{"original": "\u{27E6}DNT0\u{27E7} ist gro", \
             "corrected": "\u{27E6}DNT0\u{27E7} ist gro\u{00DF}", "category": "spelling", \
-            "explanation_en": "adjective ending", "severity": "error"}]
+            "explanation": "adjective ending", "severity": "error"}]
             """
         let chat = ScriptedChat([reply(["\u{27E6}DNT0\u{27E7} ist gro\u{00DF}."], errors)])
         let done = try #require(result(try await collect(
@@ -290,7 +290,7 @@ struct CorrectorTests {
         let text = "Otterbach hat der Kollege gesehen."
         let error = """
             [{"original": "\u{27E6}DNT0\u{27E7} hat der", "corrected": "\u{27E6}DNT0\u{27E7} hat den", \
-            "category": "case", "explanation_en": "accusative", "severity": "error"}]
+            "category": "case", "explanation": "accusative", "severity": "error"}]
             """
         let chat = ScriptedChat([reply(["\u{27E6}DNT0\u{27E7} hat den Kollegen gesehen."], error)])
         let done = try #require(result(try await collect(
@@ -312,7 +312,7 @@ struct CorrectorTests {
         let error = """
             [{"original": "\u{27E6}DNT0\u{27E7} besucht", \
             "corrected": "\u{27E6}DNT0\u{27E7} gut besucht", "category": "other", \
-            "explanation_en": "clarity", "severity": "error"}]
+            "explanation": "clarity", "severity": "error"}]
             """
         let chat = ScriptedChat([reply(
             ["Ich habe gestern mit dem Kollegen gesprochen.", "Ich habe Otterbach gut besucht."],

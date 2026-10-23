@@ -14,6 +14,9 @@ public struct PromptRequest: Sendable {
     public let doNotTranslate: [String]
     public let styleNote: String?
     public let blocks: [String]
+    /// My language (#81): Correct's explanations are written in it, and its
+    /// false friends are judged against it. Explain writes into `target`.
+    public let mine: LanguageConfig
 
     public init(
         action: Action,
@@ -24,7 +27,8 @@ public struct PromptRequest: Sendable {
         glossary: [GlossaryEntry] = [],
         doNotTranslate: [String] = [],
         styleNote: String? = nil,
-        blocks: [String]
+        blocks: [String],
+        mine: LanguageConfig = .english
     ) {
         self.action = action
         self.source = source
@@ -35,6 +39,7 @@ public struct PromptRequest: Sendable {
         self.doNotTranslate = doNotTranslate
         self.styleNote = styleNote
         self.blocks = blocks
+        self.mine = mine
     }
 }
 
@@ -62,6 +67,7 @@ public struct PromptBuilder: Sendable {
         // exceptions by call shape is one a real violation could hide behind,
         // so it is cheaper to avoid the spelling than to weaken the check.
         sections += [
+            correctionNotes(request),
             orthography(request),
             audience(request),
             glossarySection(request),
@@ -88,35 +94,29 @@ public struct PromptBuilder: Sendable {
                 language, do not rewrite the message. Fix each error with the \
                 smallest change that keeps the author's meaning. Resolve agreement \
                 and case errors by changing articles, pronouns and endings, not by \
-                exchanging the noun: "mit der Lehrer" becomes "mit dem Lehrer", not \
-                "mit der Lehrerin". Never change a person's gender, the number of \
+                exchanging the noun. Never change a person's gender, the number of \
                 people or things, the tense, who the text is about, or any fact. \
-                The author is learning German and often thinks in English, so \
-                check what each word means in context, not only its grammar. \
-                A German word used with the meaning of a similar English word, \
-                so that the sentence does not say what the author means, is an \
-                error: replace it with the German word for the intended meaning. \
+                \(author(request)) \
                 Quote each original fragment exactly as the author wrote it, \
                 character for character, even where it breaks the orthography \
                 rules; those rules apply to corrected_blocks and corrected only. \
-                Each explanation_en names the specific rule that was broken and the \
-                words it connects, for example: "Leiterin refers to Anna, a woman, \
-                so the noun takes its feminine form" or "mit takes the dative, so der \
-                becomes dem". Personal pronouns such as du, ich and wir have no \
-                grammatical gender; never give a pronoun's gender as the reason. \
-                If there are no errors, return \
+                Write each explanation in \(request.mine.displayName). Each \
+                explanation names the specific rule that was broken and the words \
+                it connects. If there are no errors, return \
                 the text unchanged and an empty error list. corrected_blocks applies \
                 only changes whose severity is "error". List stylistic suggestions in \
                 errors with severity "suggestion", and do not apply them to \
                 corrected_blocks.
                 """
         case .explain:
+            let source = request.source.displayName
+            let mine = request.target.displayName
             return """
-                You are a language teacher. Explain the German text below in plain English \
-                for a reader who does not fully follow it. In summary_en, say what the text \
+                You are a language teacher. Explain the \(source) text below in plain \(mine) \
+                for a reader who does not fully follow it. In summary, say what the text \
                 means as a whole. In notes, add one item for each idiom, unusual construction \
                 or tricky phrase: quote the phrase exactly as it is written in the text, and \
-                explain in English what it means and how it works. Do not add notes for plain \
+                explain in \(mine) what it means and how it works. Do not add notes for plain \
                 words. If nothing is tricky, notes is [].
                 """
         case .repitch:
@@ -142,6 +142,30 @@ public struct PromptBuilder: Sendable {
         return
             "Source language: \(request.source.displayName). "
             + "Target language: \(request.target.displayName)."
+    }
+
+    /// Who wrote the text Correct reads (#81): a learner who thinks in my
+    /// language, whose false friends are errors; or, in my own language, a
+    /// native speaker, whose regional usage is not an error.
+    private func author(_ request: PromptRequest) -> String {
+        let text = request.source.displayName
+        let mine = request.mine.displayName
+        guard request.source.code != request.mine.code else {
+            return "The author is a native speaker of \(text): correct slips and errors, "
+                + "and do not treat regional usage as an error."
+        }
+        return "The author is learning \(text) and often thinks in \(mine), so check what each "
+            + "word means in context, not only its grammar. A \(text) word used with the meaning "
+            + "of a similar \(mine) word, so that the sentence does not say what the author means, "
+            + "is an error: replace it with the \(text) word for the intended meaning."
+    }
+
+    /// The text's language's own notes for Correct (#81), from its
+    /// configuration; nothing for another action or a language without notes.
+    private func correctionNotes(_ request: PromptRequest) -> String? {
+        guard request.action == .correct else { return nil }
+        guard let notes = request.source.correctionNotes else { return nil }
+        return "Notes on \(request.source.displayName):\n\(notes)"
     }
 
     /// Derived from the target's locale rules rather than from its code, so a
@@ -280,7 +304,7 @@ public struct PromptBuilder: Sendable {
             // notation into its answers (measured 2026-09-30).
             shape = """
                 {"corrected_blocks": ["..."], "errors": [{"original": "...", "corrected": "...", \
-                "category": "...", "explanation_en": "...", "severity": "..."}]}
+                "category": "...", "explanation": "...", "severity": "..."}]}
                 category is exactly one of: case, word order, gender, agreement, false friend, \
                 spelling, register, preposition, other. severity is exactly one of: error, \
                 suggestion. One item per error: if a sentence has two errors, list two items. \
@@ -288,7 +312,7 @@ public struct PromptBuilder: Sendable {
                 Never add empty items; if there are no errors, errors is [].
                 """
         case .explain:
-            shape = #"{"summary_en": "...", "notes": [{"phrase": "...", "explanation_en": "..."}]}"#
+            shape = #"{"summary": "...", "notes": [{"phrase": "...", "explanation": "..."}]}"#
         }
         return """
             Reply with one JSON object and nothing else, in exactly this shape:

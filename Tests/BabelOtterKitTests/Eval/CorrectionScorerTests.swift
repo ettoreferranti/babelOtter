@@ -17,7 +17,7 @@ private func testCase(
 
 private func item(_ original: String, _ category: ErrorCategory) -> CorrectionError {
     CorrectionError(
-        original: original, corrected: "x", category: category, explanationEn: "because",
+        original: original, corrected: "x", category: category, explanation: "because",
         severity: .error)
 }
 

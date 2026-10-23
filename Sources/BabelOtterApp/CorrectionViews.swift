@@ -65,7 +65,7 @@ struct CorrectionRow: View {
                         .help("Copy the suggested wording")
                 }
             }
-            Text(item.explanationEn).font(.caption).foregroundStyle(.secondary)
+            Text(item.explanation).font(.caption).foregroundStyle(.secondary)
         }
         .opacity(dimmed ? 0.6 : 1)
     }

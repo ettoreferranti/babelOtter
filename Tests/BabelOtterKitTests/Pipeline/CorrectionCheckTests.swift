@@ -5,7 +5,7 @@ import Testing
 private func item(_ original: String, _ corrected: String, _ severity: Severity) -> CorrectionError {
     CorrectionError(
         original: original, corrected: corrected, category: .gender,
-        explanationEn: "because", severity: severity)
+        explanation: "because", severity: severity)
 }
 
 private let swiss = LanguageConfig.swissGerman.localeRules

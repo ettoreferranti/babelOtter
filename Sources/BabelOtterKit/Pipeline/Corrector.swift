@@ -250,7 +250,7 @@ public struct Corrector: Sendable {
             protecting: correctedRestored.ranges)
         let displayed = CorrectionError(
             original: original, corrected: displayCorrected,
-            category: item.category, explanationEn: item.explanationEn,
+            category: item.category, explanation: item.explanation,
             severity: item.severity)
         return RestoredFix(displayed: displayed, correctedUnnormalised: correctedRestored.text)
     }
@@ -304,7 +304,7 @@ public struct Corrector: Sendable {
         }.map { rule in
             CorrectionError(
                 original: rule.replace, corrected: rule.with, category: .spelling,
-                explanationEn: "\(language.displayName) writes \"\(rule.with)\", never \"\(rule.replace)\".",
+                explanation: "\(language.displayName) writes \"\(rule.with)\", never \"\(rule.replace)\".",
                 severity: .error)
         }
     }
