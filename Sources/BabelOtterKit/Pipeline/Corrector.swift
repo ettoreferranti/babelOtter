@@ -23,8 +23,11 @@ public struct CorrectionResult: Sendable, Equatable {
 }
 
 public enum CorrectionFailure: Error, Equatable {
-    /// Detection has a guess, and it is not German. Nothing was sent.
-    case notGerman
+    /// The text is in a language that is not enabled. Nothing was sent.
+    case notEnabled(LanguageCode)
+    /// Detection could not tell, and there is more than one candidate: ask
+    /// which (#81). Nothing was sent.
+    case needsLanguage([LanguageCode])
     /// The reply did not parse. Never shown as a correction (`FR-COR-06`).
     case unreadableReply
     /// The block count was wrong twice. Never stitched together.
@@ -39,10 +42,6 @@ public enum CorrectionFailure: Error, Equatable {
 /// structural failure is an error rather than a joined text, and the result
 /// is checked against itself before the user sees it.
 public struct Corrector: Sendable {
-
-    /// Correct is German-only (spec 2026-09-28). The base subtag, so any
-    /// configured German locale qualifies.
-    static let german = LanguageCode("de")
 
     private let configuration: Configuration
     private let chat: any ChatStreaming
@@ -60,14 +59,19 @@ public struct Corrector: Sendable {
 
     /// Lazy for the same reason `OllamaClient.chat` is: building the value
     /// must not transmit the user's text (NFR-P1).
+    ///
+    /// `language` is the text's language when the caller already knows it
+    /// ("Which language is this?"); nil resolves it as `language(for:)`
+    /// does, and fails with what that could not settle.
     public func correct(
-        _ text: UserText, profile: AudienceProfile, styleNote: String? = nil
+        _ text: UserText, in language: LanguageCode? = nil, profile: AudienceProfile,
+        styleNote: String? = nil
     ) -> LazyStream<CorrectionEvent> {
         LazyStream { [self] in
             AsyncThrowingStream { continuation in
                 let task = Task {
                     do {
-                        try await run(text, profile: profile, styleNote: styleNote) {
+                        try await run(text, in: language, profile: profile, styleNote: styleNote) {
                             continuation.yield($0)
                         }
                         continuation.finish()
@@ -91,18 +95,38 @@ public struct Corrector: Sendable {
         let processor: PostProcessor
     }
 
-    /// The configured German language, so its locale rules (ss for de-CH)
-    /// apply. Falls back to Swiss German, the shipped default.
-    private var germanLanguage: LanguageConfig {
-        configuration.germanLanguage
+    /// The language this text would be corrected in (#81): any enabled
+    /// language, my own included; see `TextLanguage`.
+    public func language(for text: UserText) -> TextLanguageResolution {
+        TextLanguage.resolve(detector.detect(text.value), configuration: configuration, excludingMine: false)
+    }
+
+    /// The configured language to correct in, so its locale rules (ss for
+    /// de-CH) and notes apply.
+    private func textLanguage(_ text: UserText, given: LanguageCode?) throws -> LanguageConfig {
+        var code: LanguageCode
+        if let given {
+            code = given
+        } else {
+            switch language(for: text) {
+            case .known(let known): code = known
+            case .mine(let mine): code = mine
+            case .notEnabled(let other): throw CorrectionFailure.notEnabled(other)
+            case .ask(let candidates): throw CorrectionFailure.needsLanguage(candidates)
+            }
+        }
+        guard let language = configuration.language(for: code) else {
+            throw CorrectionFailure.notEnabled(code)
+        }
+        guard language.enabled else { throw CorrectionFailure.notEnabled(code) }
+        return language
     }
 
     private func run(
-        _ text: UserText, profile: AudienceProfile, styleNote: String?,
+        _ text: UserText, in given: LanguageCode?, profile: AudienceProfile, styleNote: String?,
         emit: (CorrectionEvent) -> Void
     ) async throws {
-        try gate(text)
-        let language = germanLanguage
+        let language = try textLanguage(text, given: given)
         let context = Context(
             language: language, profile: profile, styleNote: styleNote,
             terms: configuration.doNotTranslate,
@@ -134,14 +158,6 @@ public struct Corrector: Sendable {
         }
     }
 
-    /// Refuses any guess that is not German, confident or below the floor.
-    /// "Can't tell" -- too short to judge, or no hypothesis at all -- goes
-    /// through: short German fragments are common.
-    private func gate(_ text: UserText) throws {
-        guard let guess = detector.detect(text.value).languageCode else { return }
-        guard guess.baseSubtag == Self.german else { throw CorrectionFailure.notGerman }
-    }
-
     private func retryWholeText(
         _ text: UserText, _ context: Context, _ emit: (CorrectionEvent) -> Void
     ) async throws {
@@ -159,7 +175,7 @@ public struct Corrector: Sendable {
         let prompt = PromptBuilder().build(PromptRequest(
             action: .correct, source: context.language, target: context.language,
             profile: context.profile, doNotTranslate: context.terms,
-            styleNote: context.styleNote, blocks: blocks.map(\.text)))
+            styleNote: context.styleNote, blocks: blocks.map(\.text), mine: configuration.mine))
         let raw = try await ReplyStream.collect(
             chat: chat, model: context.model, prompt: prompt, key: "corrected_blocks",
             onDelta: { emit(.progress) },

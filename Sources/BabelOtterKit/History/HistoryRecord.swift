@@ -77,14 +77,15 @@ extension HistoryRecord {
             sourceAppName: application?.name, source: result.original, result: result.corrected)
     }
 
-    /// The result is what Copy writes: the summary and the notes.
+    /// The result is what Copy writes: the summary and the notes. Explained
+    /// from the text's language into my language (#81).
     public init(
         explanation result: ExplanationResult, source: UserText, language: LanguageCode,
-        model: String, application: SourceApplication?, date: Date
+        explainedIn: LanguageCode, model: String, application: SourceApplication?, date: Date
     ) {
         self.init(
             date: date, action: .explain, sourceLanguage: language,
-            targetLanguage: LanguageCode("en"), profileID: nil,
+            targetLanguage: explainedIn, profileID: nil,
             model: model, sourceBundleID: application?.bundleIdentifier,
             sourceAppName: application?.name, source: source,
             result: UserText(result.copyText))

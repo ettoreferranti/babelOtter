@@ -68,7 +68,7 @@ struct HistoryRecordTests {
             warnings: [])
         let record = HistoryRecord(
             explanation: result, source: UserText("Die Sitzung wird verschoben."),
-            language: de, model: "m", application: mail, date: date)
+            language: de, explainedIn: en, model: "m", application: mail, date: date)
         #expect(record.action == .explain)
         #expect(record.sourceLanguage == de)
         #expect(record.targetLanguage == en)

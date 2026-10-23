@@ -131,7 +131,7 @@ public struct LanguageConfig: Sendable, Equatable, Codable {
 
     /// `addressForms` absent -- a file from before #110 -- takes the shipped
     /// language's forms for the same code, else for the same base code
-    /// ("de" or "de-at" take de-ch's, as `Configuration.germanLanguage`
+    /// ("de" or "de-at" take de-ch's, as detection
     /// matches German), so no German loses Sie/du and no language is named
     /// in logic; `null` means none.
     public init(from decoder: any Decoder) throws {

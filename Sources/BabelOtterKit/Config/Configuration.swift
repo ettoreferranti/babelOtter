@@ -191,15 +191,4 @@ extension Configuration {
     public func model(for action: Action) -> String {
         models[action] ?? Configuration.defaultModel
     }
-
-    /// The enabled German language, whatever its region, so its locale rules
-    /// (ss for de-CH) apply; Swiss Standard German, the shipped default,
-    /// when none is enabled. Correct and Explain read German.
-    public var germanLanguage: LanguageConfig {
-        enabledLanguages.first(where: Self.isGerman) ?? .swissGerman
-    }
-
-    private static func isGerman(_ language: LanguageConfig) -> Bool {
-        language.code.baseSubtag == LanguageCode("de")
-    }
 }

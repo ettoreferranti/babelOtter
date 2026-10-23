@@ -25,25 +25,26 @@ public struct ExplanationResult: Sendable, Equatable {
 }
 
 public enum ExplanationFailure: Error, Equatable {
-    /// Detection has a guess, and it is not German. Nothing was sent.
-    case notGerman
+    /// The text is already in my language (#81). Nothing was sent.
+    case alreadyMine(LanguageCode)
+    /// The text is in a language that is not enabled. Nothing was sent.
+    case notEnabled(LanguageCode)
+    /// Detection could not tell, and there is more than one candidate: ask
+    /// which. Nothing was sent.
+    case needsLanguage([LanguageCode])
     /// The reply did not parse, or had no summary. Never shown as an explanation.
     case unreadableReply
     case emptyResponse
 }
 
-/// German text in, an English explanation out (`FR-EXP-01`, #65).
+/// A text in an enabled language in, an explanation in my language out
+/// (`FR-EXP-01`, #65, #81).
 ///
 /// Shaped like `Corrector`, with two differences: the text goes to the model
 /// as one block, since a summary has no paragraph layout to keep, and only
 /// placeholder debris warns, since an explanation need not repeat a
 /// protected term.
 public struct Explainer: Sendable {
-
-    /// Explain reads German (spec 2026-10-15). The base subtag, so any
-    /// configured German locale qualifies.
-    static let german = LanguageCode("de")
-    static let english = LanguageCode("en")
 
     private let configuration: Configuration
     private let chat: any ChatStreaming
@@ -61,12 +62,17 @@ public struct Explainer: Sendable {
 
     /// Lazy for the same reason `OllamaClient.chat` is: building the value
     /// must not transmit the user's text (NFR-P1).
-    public func explain(_ text: UserText, styleNote: String? = nil) -> LazyStream<ExplanationEvent> {
+    ///
+    /// `language` is the text's language when the caller already knows it;
+    /// nil resolves it as `language(for:)` does.
+    public func explain(
+        _ text: UserText, in language: LanguageCode? = nil, styleNote: String? = nil
+    ) -> LazyStream<ExplanationEvent> {
         LazyStream { [self] in
             AsyncThrowingStream { continuation in
                 let task = Task {
                     do {
-                        try await run(text, styleNote: styleNote) { continuation.yield($0) }
+                        try await run(text, in: language, styleNote: styleNote) { continuation.yield($0) }
                         continuation.finish()
                     } catch {
                         continuation.finish(throwing: error)
@@ -80,8 +86,8 @@ public struct Explainer: Sendable {
     // MARK: - The pipeline
 
     private struct Context {
-        let german: LanguageConfig
-        let english: LanguageConfig
+        let source: LanguageConfig
+        let mine: LanguageConfig
         let styleNote: String?
         let model: String
         let masked: ProtectedText
@@ -89,41 +95,52 @@ public struct Explainer: Sendable {
     }
 
     private func run(
-        _ text: UserText, styleNote: String?, emit: (ExplanationEvent) -> Void
+        _ text: UserText, in given: LanguageCode?, styleNote: String?, emit: (ExplanationEvent) -> Void
     ) async throws {
-        try gate(text)
-        let english = language(Self.english, or: .english)
+        let source = try textLanguage(text, given: given)
+        let mine = configuration.mine
         let context = Context(
-            german: configuration.germanLanguage, english: english,
+            source: source, mine: mine,
             styleNote: styleNote,
             model: configuration.model(for: .explain),
             masked: TokenProtector.mask(text.value, terms: configuration.doNotTranslate),
-            processor: PostProcessor(target: english))
+            processor: PostProcessor(target: mine))
         emit(.started)
         let raw = try await generate(context, emit)
         emit(.finished(try result(raw, context)))
     }
 
-    /// The configured language with this base subtag, so its display name
-    /// and locale rules apply; the shipped default otherwise.
-    private func language(_ code: LanguageCode, or fallback: LanguageConfig) -> LanguageConfig {
-        configuration.enabledLanguages.first { $0.code.baseSubtag == code } ?? fallback
+    /// The language this text would be explained from (#81): any enabled
+    /// language but mine; see `TextLanguage`.
+    public func language(for text: UserText) -> TextLanguageResolution {
+        TextLanguage.resolve(detector.detect(text.value), configuration: configuration, excludingMine: true)
     }
 
-    /// Refuses only a confident guess that is not German. Anything less goes
-    /// through: unlike Correct, Explain is for German the user does not
-    /// follow, and dialect or German mixed with English is exactly what
-    /// the recognizer is unsure of (spec 2026-10-15, final review).
-    private func gate(_ text: UserText) throws {
-        guard case .confident(let guess, _) = detector.detect(text.value) else { return }
-        guard guess.baseSubtag == Self.german else { throw ExplanationFailure.notGerman }
+    private func textLanguage(_ text: UserText, given: LanguageCode?) throws -> LanguageConfig {
+        var code: LanguageCode
+        if let given {
+            code = given
+        } else {
+            switch language(for: text) {
+            case .known(let known): code = known
+            case .mine(let mine): throw ExplanationFailure.alreadyMine(mine)
+            case .notEnabled(let other): throw ExplanationFailure.notEnabled(other)
+            case .ask(let candidates): throw ExplanationFailure.needsLanguage(candidates)
+            }
+        }
+        guard let language = configuration.language(for: code) else {
+            throw ExplanationFailure.notEnabled(code)
+        }
+        guard language.enabled else { throw ExplanationFailure.notEnabled(code) }
+        guard code != configuration.myLanguageCode else { throw ExplanationFailure.alreadyMine(code) }
+        return language
     }
 
     private func generate(
         _ context: Context, _ emit: (ExplanationEvent) -> Void
     ) async throws -> String {
         let prompt = PromptBuilder().build(PromptRequest(
-            action: .explain, source: context.german, target: context.english,
+            action: .explain, source: context.source, target: context.mine,
             profile: .colleagues, doNotTranslate: configuration.doNotTranslate,
             styleNote: context.styleNote, blocks: [context.masked.text]))
         var shown = ""
@@ -153,7 +170,7 @@ public struct Explainer: Sendable {
         var problems = summary.problems
         var notes: [ExplainNote] = []
         for item in response.notes {
-            // The phrase quotes the user's German: terms restored, no rules.
+            // The phrase quotes the user's text: terms restored, no rules.
             let phrase = TokenProtector.restore(item.phrase, from: context.masked)
             let explanation = context.processor.finish(item.explanation, protected: context.masked)
             if isBlank(phrase.text) { continue }

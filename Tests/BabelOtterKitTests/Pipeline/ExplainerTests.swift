@@ -87,12 +87,52 @@ struct ExplainerTests {
         #expect(done.warnings.isEmpty)
     }
 
-    @Test("text detected as another language is refused, and nothing is sent")
-    func refusesNonGerman() async throws {
+    @Test("text in my language is refused, and nothing is sent (#81)")
+    func refusesMine() async throws {
         let chat = ScriptedChat([reply("x")])
-        await #expect(throws: ExplanationFailure.notGerman) {
+        await #expect(throws: ExplanationFailure.alreadyMine(LanguageCode("en"))) {
             _ = try await collect(explainer(chat, language: "en").explain(UserText("This is English.")))
         }
+        // Named explicitly, my language is refused all the same.
+        await #expect(throws: ExplanationFailure.alreadyMine(LanguageCode("en"))) {
+            _ = try await collect(explainer(chat).explain(UserText("Hallo zusammen."), in: LanguageCode("en")))
+        }
+        #expect(chat.prompts.isEmpty)
+    }
+
+    @Test("a language that is not enabled is refused, and nothing is sent")
+    func refusesNotEnabled() async throws {
+        let chat = ScriptedChat([reply("x")])
+        await #expect(throws: ExplanationFailure.notEnabled(LanguageCode("it"))) {
+            _ = try await collect(explainer(chat, language: "it").explain(UserText("Questo è italiano.")))
+        }
+        await #expect(throws: ExplanationFailure.notEnabled(LanguageCode("fr"))) {
+            _ = try await collect(explainer(chat).explain(UserText("Bonjour."), in: LanguageCode("fr")))
+        }
+        #expect(chat.prompts.isEmpty)
+    }
+
+    @Test("a French text is explained from French into my language")
+    func explainsFrench() async throws {
+        let chat = ScriptedChat([reply("It is about a meeting.")])
+        let subject = explainer(chat, language: "fr") { configuration in
+            configuration.languages[2].enabled = true
+            configuration.languages[3].enabled = true
+            configuration.myLanguage = LanguageCode("it")
+        }
+        _ = try await collect(subject.explain(UserText("La réunion est reportée à jeudi.")))
+        let prompt = try #require(chat.prompts.first)
+        #expect(prompt.contains("Explain the French text below in plain Italian"))
+    }
+
+    @Test("unsure with several candidates asks which, and nothing is sent")
+    func asksWhenSeveral() async throws {
+        let chat = ScriptedChat([reply("x")])
+        let subject = explainer(chat, language: nil) { $0.languages[2].enabled = true }
+        await #expect(throws: ExplanationFailure.needsLanguage([LanguageCode("de-ch"), LanguageCode("fr")])) {
+            _ = try await collect(subject.explain(UserText("Ok")))
+        }
+        #expect(subject.language(for: UserText("Ok")) == .ask([LanguageCode("de-ch"), LanguageCode("fr")]))
         #expect(chat.prompts.isEmpty)
     }
 

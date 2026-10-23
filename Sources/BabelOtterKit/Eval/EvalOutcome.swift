@@ -5,13 +5,28 @@ import Foundation
 public enum EvalFailure: String, Sendable, Equatable, Codable {
     case unreadableReply
     case structureLost
-    case notGerman
+    /// The case's text was not taken for its language (#81; was notGerman).
+    case wrongLanguage
     case emptyResponse
     case timeout
     /// No response at all: nothing listening, or a timeout before the
     /// response headers (the transport reports both alike).
     case unreachable
     case other
+
+    /// Reads the name used before #81 too, so earlier reports still load.
+    public init(from decoder: any Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        if raw == "notGerman" {
+            self = .wrongLanguage
+            return
+        }
+        guard let known = EvalFailure(rawValue: raw) else {
+            throw DecodingError.dataCorrupted(DecodingError.Context(
+                codingPath: decoder.codingPath, debugDescription: "unknown failure \(raw)"))
+        }
+        self = known
+    }
 
     public init(_ error: any Error) {
         if let failure = error as? CorrectionFailure {
@@ -31,7 +46,7 @@ public enum EvalFailure: String, Sendable, Equatable, Codable {
         switch failure {
         case .unreadableReply: return .unreadableReply
         case .structureLost: return .structureLost
-        case .notGerman: return .notGerman
+        case .notEnabled, .needsLanguage: return .wrongLanguage
         case .emptyResponse: return .emptyResponse
         }
     }
