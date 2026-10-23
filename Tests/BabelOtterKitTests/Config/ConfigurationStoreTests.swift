@@ -162,7 +162,7 @@ struct ConfigurationStoreTests {
     func languageLookup() {
         #expect(Configuration.default.language(for: LanguageCode("de-ch")) == .swissGerman)
         #expect(Configuration.default.language(for: LanguageCode("en")) == .english)
-        #expect(Configuration.default.language(for: LanguageCode("fr")) == nil)
+        #expect(Configuration.default.language(for: LanguageCode("nl")) == nil)
     }
 
     @Test("profile(id:) finds a configured profile and refuses an unknown one")

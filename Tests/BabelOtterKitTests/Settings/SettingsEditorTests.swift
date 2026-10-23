@@ -45,8 +45,8 @@ struct SettingsEditorTests {
         expectRefusal(.tooFewLanguages) { try editor.setLanguage(LanguageCode("en"), enabled: false) }
         expectRefusal(.tooFewLanguages) { try editor.setLanguage(LanguageCode("de-CH"), enabled: false) }
         #expect(editor.configuration == .default)
-        expectRefusal(.unknownLanguage(LanguageCode("it"))) {
-            try editor.setLanguage(LanguageCode("it"), enabled: true)
+        expectRefusal(.unknownLanguage(LanguageCode("nl"))) {
+            try editor.setLanguage(LanguageCode("nl"), enabled: true)
         }
         #expect(SettingsRefusal.tooFewLanguages.message == "At least two languages stay on.")
         #expect(SettingsRefusal.unknownLanguage(LanguageCode("it")).message == "it is not a configured language.")

@@ -193,6 +193,25 @@ extension LanguageConfig {
         addressForms: AddressForms(formal: "Sie", informal: "du")
     )
 
-    /// What a fresh install gets: English and de-CH, both enabled (`FR-LNG-03`).
-    public static let shippedDefaults: [LanguageConfig] = [.english, .swissGerman]
+    /// French, shipped switched off (#81). No orthography rules.
+    public static let french = LanguageConfig(
+        code: LanguageCode("fr"),
+        displayName: "French",
+        localeRules: [],
+        enabled: false,
+        addressForms: AddressForms(formal: "vous", informal: "tu")
+    )
+
+    /// Italian, shipped switched off (#81). No orthography rules.
+    public static let italian = LanguageConfig(
+        code: LanguageCode("it"),
+        displayName: "Italian",
+        localeRules: [],
+        enabled: false,
+        addressForms: AddressForms(formal: "Lei", informal: "tu")
+    )
+
+    /// What a fresh install gets: English and de-CH enabled (`FR-LNG-03`);
+    /// French and Italian listed but switched off (#81).
+    public static let shippedDefaults: [LanguageConfig] = [.english, .swissGerman, .french, .italian]
 }

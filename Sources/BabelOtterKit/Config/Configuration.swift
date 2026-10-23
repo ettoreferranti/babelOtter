@@ -91,6 +91,25 @@ public struct Configuration: Sendable, Equatable, Codable {
     public func profile(id: String) -> AudienceProfile? {
         profiles.first { $0.id == id }
     }
+
+    /// This configuration with every shipped language it lacks appended,
+    /// switched off, so an existing file gains French and Italian as toggles
+    /// (#81); nil when none is missing, so the caller knows not to write.
+    /// A language counts as present when any configured language shares its
+    /// base subtag: a user's own `fr-CH` keeps `fr` out.
+    public func addingMissingShippedLanguages() -> Configuration? {
+        var added = self
+        for shipped in LanguageConfig.shippedDefaults {
+            let present = languages.contains { $0.code.baseSubtag == shipped.code.baseSubtag }
+            if !present {
+                var language = shipped
+                language.enabled = false
+                added.languages.append(language)
+            }
+        }
+        if added.languages.count == languages.count { return nil }
+        return added
+    }
 }
 
 extension Configuration {

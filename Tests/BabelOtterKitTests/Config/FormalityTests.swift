@@ -74,8 +74,13 @@ struct AddressFormsTests {
     func explicit() throws {
         let noForms = #"{"code": "de-ch", "displayName": "D", "localeRules": [], "enabled": true, "addressForms": null}"#
         #expect(try language(noForms).addressForms == nil)
+        let dutch = #"{"code": "nl", "displayName": "Dutch", "localeRules": [], "enabled": true}"#
+        #expect(try language(dutch).addressForms == nil)
+        // Italian and French are shipped (#81), so a file without the key takes their forms.
         let italian = #"{"code": "it", "displayName": "Italian", "localeRules": [], "enabled": true}"#
-        #expect(try language(italian).addressForms == nil)
+        #expect(try language(italian).addressForms == AddressForms(formal: "Lei", informal: "tu"))
+        let swissFrench = #"{"code": "fr-CH", "displayName": "French", "localeRules": [], "enabled": true}"#
+        #expect(try language(swissFrench).addressForms == AddressForms(formal: "vous", informal: "tu"))
         let withForms = #"{"code": "it", "displayName": "Italian", "localeRules": [], "enabled": true, "addressForms": {"formal": " Lei ", "informal": "tu"}}"#
         #expect(try language(withForms).addressForms == AddressForms(formal: "Lei", informal: "tu"))
     }

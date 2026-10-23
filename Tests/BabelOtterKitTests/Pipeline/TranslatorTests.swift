@@ -385,11 +385,11 @@ struct TranslatorTests {
     @Test("a language that is not configured is refused before anything is sent")
     func unconfiguredLanguage() async {
         let chat = ScriptedChat([])
-        let french = LanguageCode("fr")
-        await #expect(throws: TranslationError.languageNotConfigured(french)) {
+        let dutch = LanguageCode("nl")
+        await #expect(throws: TranslationError.languageNotConfigured(dutch)) {
             _ = try await collect(translator(chat).translate(
-                UserText("Bonjour"),
-                direction: Direction(source: french, target: english), profile: .colleagues))
+                UserText("Goedemorgen"),
+                direction: Direction(source: dutch, target: english), profile: .colleagues))
         }
         #expect(chat.prompts.isEmpty)
     }
@@ -506,7 +506,7 @@ struct TranslatorTests {
         let subject = translator(ScriptedChat([]))
         #expect(subject.direction(into: english) == Direction(source: german, target: english))
         #expect(subject.direction(into: german) == Direction(source: english, target: german))
-        #expect(subject.direction(into: LanguageCode("fr")) == nil)
+        #expect(subject.direction(into: LanguageCode("nl")) == nil)
     }
 
     @Test("swapping reverses the direction")
