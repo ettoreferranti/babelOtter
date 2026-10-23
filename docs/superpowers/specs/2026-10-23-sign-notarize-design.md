@@ -49,7 +49,13 @@ The script is bash and outside the mutation gate; it is verified by running it (
 
 ## 6. Prerequisites and manual checks (yours)
 
-Prerequisites: a Developer ID Application certificate with its private key in your login keychain (on an organization team, only the Account Holder may be allowed to create one); an app-specific password for your Apple ID, stored with `xcrun notarytool store-credentials lingoswen-notary --apple-id … --team-id …`.
+Prerequisites:
+
+1. **A Developer ID Application certificate with its private key in your login keychain.** On the team, only the Account Holder can create one (the portal says so for an Admin), so the key is made here and only a request travels:
+   1. Keychain Access › Certificate Assistant › *Request a Certificate From a Certificate Authority…*, your Apple ID's address, *Saved to disk*. This creates the private key in your login keychain.
+   2. Send the `.certSigningRequest` to the Account Holder, who creates the **Developer ID Application** certificate from it (Certificates › + › Developer ID Application, profile type G2 Sub-CA) and sends back the `.cer`.
+   3. Double-click the `.cer`. `security find-identity -v -p codesigning` now lists one `Developer ID Application:` identity. It is valid for five years; no `.p12` is ever exported.
+2. **Notarization credentials.** As an Admin you can notarize. Create an app-specific password for your Apple ID at account.apple.com, then `xcrun notarytool store-credentials lingoswen-notary --apple-id … --team-id …`; the password lives in the keychain only.
 
 | # | Do | Expect |
 |---|---|---|
