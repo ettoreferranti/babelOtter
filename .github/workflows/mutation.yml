@@ -206,6 +206,7 @@ jobs:
           Sources/BabelOtterKit/Text/StructureExtractor.swift
           Sources/BabelOtterKit/Text/TargetChoice.swift
           Sources/BabelOtterKit/Text/TargetLanguageResolver.swift
+          Sources/BabelOtterKit/Text/TextLanguage.swift
           Sources/BabelOtterKit/Text/TokenProtector.swift
           Sources/BabelOtterKit/Eval/TextSearch.swift
           Sources/BabelOtterKit/Eval/GoldenSet.swift
