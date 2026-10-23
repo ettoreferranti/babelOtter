@@ -216,7 +216,7 @@ final class PopupModel {
                 switch translator.direction(for: snapshot.text) {
                 case .success(let direction):
                     run(direction)
-                case .failure(.directionUnknown(let candidates)):
+                case .failure(.directionUnknown(_, let candidates)):
                     phase = .choosingDirection(candidates)
                 case .failure(.languageNotConfigured(let code)):
                     phase = .failed("This looks like \(code), which is not one of your languages.")
@@ -234,7 +234,7 @@ final class PopupModel {
             phase = .choosingAudience
             return
         }
-        guard let direction = translator.direction(into: target) else { return }
+        guard let direction = translator.direction(from: nil, into: target) else { return }
         run(direction)
     }
 
@@ -506,7 +506,7 @@ final class PopupModel {
         case .success(let code):
             language = code
             phase = .choosingAudience
-        case .failure(.directionUnknown(let candidates)):
+        case .failure(.directionUnknown(_, let candidates)):
             phase = .choosingDirection(candidates)
         case .failure(.languageNotConfigured(let code)):
             phase = .failed("This looks like \(code), which is not one of your languages.")
@@ -647,7 +647,7 @@ final class PopupModel {
             case .directionUnknown:
                 // Not reachable from here: `run(_:)` always calls in with an
                 // already-resolved direction, and `direction(for:)` /
-                // `direction(into:)` are what raise this, before a
+                // `direction(from:)` are what raise this, before a
                 // translation ever starts.
                 return "Could not tell which language this is."
             }

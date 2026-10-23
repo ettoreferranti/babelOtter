@@ -90,9 +90,9 @@ struct RepitchTests {
     func languageUndecided() {
         let configuration = Configuration.default
         #expect(translator(ScriptedChat([]), detected: nil).language(for: draft)
-            == .failure(.directionUnknown(candidates: configuration.enabledLanguages.map(\.code))))
+            == .failure(.directionUnknown(source: nil, candidates: configuration.enabledLanguages.map(\.code))))
         #expect(translator(ScriptedChat([]), detected: "en", confidence: 0.3).language(for: draft)
-            == .failure(.directionUnknown(candidates: configuration.enabledLanguages.map(\.code))))
+            == .failure(.directionUnknown(source: nil, candidates: configuration.enabledLanguages.map(\.code))))
     }
 
     @Test("the prompt is Re-pitch's, for the fixed audience, to the Re-pitch model, without the glossary")

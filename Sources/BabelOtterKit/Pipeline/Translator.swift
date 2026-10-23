@@ -47,8 +47,10 @@ public struct TranslationResult: Sendable, Equatable {
 }
 
 public enum TranslationError: Error, Equatable {
-    /// Detection could not decide; ask, offering these.
-    case directionUnknown(candidates: [LanguageCode])
+    /// Detection could not decide; ask, offering these. `source` is the
+    /// detected language when only the target is open, nil when the source
+    /// is unknown too (#81).
+    case directionUnknown(source: LanguageCode?, candidates: [LanguageCode])
     case languageNotConfigured(LanguageCode)
     case emptyResponse
 }
@@ -73,31 +75,57 @@ public struct Translator: Sendable {
         self.detector = LanguageDetector(configuration: configuration, recognizer: recognizer)
     }
 
-    public func direction(for text: UserText) -> Result<Direction, TranslationError> {
+    /// `remembered` is the target last chosen per source (#81).
+    public func direction(
+        for text: UserText, remembered: [LanguageCode: LanguageCode] = [:]
+    ) -> Result<Direction, TranslationError> {
+        resolved(detector.detect(text.value), remembered: remembered)
+    }
+
+    /// The direction from a source the user named ("Which language is
+    /// this?"): settled when one target is possible or one is remembered,
+    /// else the targets to offer.
+    public func direction(
+        from source: LanguageCode, remembered: [LanguageCode: LanguageCode] = [:]
+    ) -> Result<Direction, TranslationError> {
+        resolved(.confident(source, confidence: 1), remembered: remembered)
+    }
+
+    private func resolved(
+        _ detection: Detection, remembered: [LanguageCode: LanguageCode]
+    ) -> Result<Direction, TranslationError> {
         let resolution = TargetLanguageResolver(configuration: configuration)
-            .resolve(detector.detect(text.value))
+            .resolve(detection, remembered: remembered)
         switch resolution {
         case .resolved(let source, let target):
             return .success(Direction(source: source, target: target))
         case .notEnabled(let code):
             return .failure(.languageNotConfigured(code))
-        case .ambiguousPairing(let candidates):
+        case .ambiguousPairing(let source, let candidates):
             if candidates.isEmpty {
-                return .failure(.directionUnknown(candidates: enabledCodes))
+                return .failure(.directionUnknown(source: nil, candidates: enabledCodes))
             }
-            return .failure(.directionUnknown(candidates: candidates))
+            return .failure(.directionUnknown(source: source, candidates: candidates))
         case .needsUserChoice:
-            return .failure(.directionUnknown(candidates: enabledCodes))
+            return .failure(.directionUnknown(source: nil, candidates: enabledCodes))
         }
     }
 
-    /// The direction for a target the user picked: from the first other
-    /// enabled language.
-    public func direction(into target: LanguageCode) -> Direction? {
-        guard configuration.language(for: target) != nil else { return nil }
-        guard let source = configuration.enabledLanguages.first(where: { $0.code != target })
-        else { return nil }
-        return Direction(source: source.code, target: target)
+    /// The direction for a target the user picked (#81): from `source`, the
+    /// detected or named language; without one, from the other enabled
+    /// language when exactly two are enabled. Nil when either end is not
+    /// enabled, they are the same, or the source cannot be known.
+    public func direction(from source: LanguageCode?, into target: LanguageCode) -> Direction? {
+        let enabled = enabledCodes
+        guard enabled.contains(target) else { return nil }
+        if let source {
+            guard enabled.contains(source) else { return nil }
+            guard source != target else { return nil }
+            return Direction(source: source, target: target)
+        }
+        let others = enabled.filter { $0 != target }
+        guard others.count == 1 else { return nil }
+        return Direction(source: others[0], target: target)
     }
 
     /// The enabled language a text is written in (#66): Re-pitch keeps it.
@@ -105,7 +133,7 @@ public struct Translator: Sendable {
     /// there is more than one language to translate into.
     public func language(for text: UserText) -> Result<LanguageCode, TranslationError> {
         guard case .confident(let detected, _) = detector.detect(text.value) else {
-            return .failure(.directionUnknown(candidates: enabledCodes))
+            return .failure(.directionUnknown(source: nil, candidates: enabledCodes))
         }
         for language in configuration.enabledLanguages {
             if language.code == detected { return .success(language.code) }

@@ -498,15 +498,61 @@ struct TranslatorTests {
     @Test("a selection too short to judge asks, offering every enabled language")
     func directionTooShort() {
         #expect(translator(ScriptedChat([])).direction(for: UserText("Hallo"))
-            == .failure(.directionUnknown(candidates: [english, german])))
+            == .failure(.directionUnknown(source: nil, candidates: [english, german])))
     }
 
-    @Test("choosing a target picks the other enabled language as the source")
+    @Test("with two languages, a target picked without a source comes from the other one")
     func directionInto() {
         let subject = translator(ScriptedChat([]))
-        #expect(subject.direction(into: english) == Direction(source: german, target: english))
-        #expect(subject.direction(into: german) == Direction(source: english, target: german))
-        #expect(subject.direction(into: LanguageCode("nl")) == nil)
+        #expect(subject.direction(from: nil, into: english) == Direction(source: german, target: english))
+        #expect(subject.direction(from: nil, into: german) == Direction(source: english, target: german))
+        #expect(subject.direction(from: nil, into: LanguageCode("nl")) == nil)
+        // French ships switched off: not a target.
+        #expect(subject.direction(from: nil, into: LanguageCode("fr")) == nil)
+    }
+
+    private func allFour(_ configuration: inout Configuration) {
+        for index in configuration.languages.indices {
+            configuration.languages[index].enabled = true
+        }
+    }
+
+    private let french = LanguageCode("fr")
+    private let italian = LanguageCode("it")
+
+    @Test("a picked target is translated from the given source (#81)")
+    func directionFromInto() {
+        let subject = translator(ScriptedChat([]), configure: allFour)
+        #expect(subject.direction(from: french, into: italian) == Direction(source: french, target: italian))
+        #expect(subject.direction(from: french, into: french) == nil)
+        #expect(subject.direction(from: LanguageCode("nl"), into: italian) == nil)
+        // Without a source and with more than two languages, the source cannot be known.
+        #expect(subject.direction(from: nil, into: italian) == nil)
+        let twoOn = translator(ScriptedChat([]))
+        #expect(twoOn.direction(from: french, into: english) == nil, "French is switched off")
+    }
+
+    @Test("a French paragraph with four languages asks for the target, carrying French")
+    func directionFrenchFour() {
+        let text = UserText(
+            "Le comité a décidé de reporter la décision à la prochaine séance, "
+                + "lorsque les chiffres révisés du budget seront enfin disponibles.")
+        let subject = translator(ScriptedChat([]), configure: allFour)
+        #expect(subject.direction(for: text)
+            == .failure(.directionUnknown(source: french, candidates: [english, german, italian])))
+        #expect(subject.direction(for: text, remembered: [french: german])
+            == .success(Direction(source: french, target: german)))
+    }
+
+    @Test("a named source settles the target from memory, or offers the others")
+    func directionFromNamedSource() {
+        let subject = translator(ScriptedChat([]), configure: allFour)
+        #expect(subject.direction(from: italian, remembered: [italian: english])
+            == .success(Direction(source: italian, target: english)))
+        #expect(subject.direction(from: italian)
+            == .failure(.directionUnknown(source: italian, candidates: [english, german, french])))
+        let twoOn = translator(ScriptedChat([]))
+        #expect(twoOn.direction(from: german) == .success(Direction(source: german, target: english)))
     }
 
     @Test("swapping reverses the direction")
