@@ -217,7 +217,10 @@ public struct Corrector: Sendable {
         _ maskedText: String
     ) -> CorrectionResult {
         let rules = context.language.localeRules
-        let fixes = items.map { restore($0, reference, context) }
+        // An item the locale rules turn into a no-op goes: Mistral "fixed"
+        // "ausser" into the eszett spelling, which de-CH shows as "ausser"
+        // -> "ausser".
+        let fixes = items.map { restore($0, reference, context) }.filter { !$0.displayed.isPadding }
         var restored = fixes.map(\.displayed)
         restored += localeRuleErrors(in: maskedText, fixes: fixes, language: context.language)
         let verdict = CorrectionCheck.check(

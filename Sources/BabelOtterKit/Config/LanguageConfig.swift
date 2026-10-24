@@ -227,8 +227,8 @@ extension LanguageConfig {
             "mit der Lehrer" becomes "mit dem Lehrer", not "mit der Lehrerin". \
             Personal pronouns such as du, ich and wir have no grammatical gender; \
             never give a pronoun's gender as the reason. Example explanations: \
-            "mit takes the dative, so der becomes dem"; "Leiterin refers to Anna, \
-            a woman, so the noun takes its feminine form".
+            "mit takes the dative, so der becomes dem"; "Haus is neuter, so der \
+            becomes das".
             """
     )
 

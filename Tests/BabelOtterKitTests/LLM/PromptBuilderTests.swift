@@ -376,18 +376,23 @@ struct PromptBuilderTests {
         let german = builder.build(languageRequest(.correct, text: .swissGerman, into: .swissGerman))
         #expect(german.contains("The author is learning Swiss Standard German and often thinks in English"))
         #expect(german.contains("A Swiss Standard German word used with the meaning of a similar English word"))
-        #expect(german.contains("Notes on Swiss Standard German:\n"))
+        // Inside the instruction, not a section of their own: as a separate
+        // "Notes" section they read as a checklist, and Mistral began
+        // changing "Herr" to "Frau" in a clean letter.
+        #expect(german.contains("it connects. Resolve case errors by changing articles"))
+        #expect(!german.contains("Notes on"))
         #expect(german.contains("\"mit der Lehrer\" becomes \"mit dem Lehrer\""))
         #expect(german.contains("Write each explanation in English."))
         #expect(!german.contains("native speaker"))
 
         let french = builder.build(languageRequest(.correct, text: .french, into: .french, mine: .italian))
         #expect(french.contains("The author is learning French and often thinks in Italian"))
-        #expect(french.contains("Notes on French:\n"))
+        #expect(french.contains("it connects. Check the agreement of past participles"))
         #expect(french.contains("participle"))
         #expect(!french.contains("Lehrer"))
         #expect(french.contains("Write each explanation in Italian."))
-        #expect(french.contains("The examples above are in English; write your explanations in Italian."))
+        #expect(french.contains(
+            "The examples above are in English; write your explanations in Italian. If there are no errors"))
         #expect(!german.contains("The examples above are in English"))
     }
 
@@ -400,15 +405,29 @@ struct PromptBuilderTests {
         #expect(!english.contains("Notes on"))
         let italian = builder.build(languageRequest(.correct, text: .italian, into: .italian, mine: .italian))
         #expect(italian.contains("The author is a native speaker of Italian"))
-        #expect(italian.contains("Notes on Italian:\n"))
+        #expect(italian.contains("it connects. Check articulated prepositions"))
         #expect(italian.contains("Write each explanation in Italian."))
+    }
+
+    @Test("notes from config.json become one tidy sentence in the instruction")
+    func userNotesTidied() {
+        func prompt(_ notes: String?) -> String {
+            let language = LanguageConfig(
+                code: LanguageCode("fr"), displayName: "French", localeRules: [], enabled: true,
+                correctionNotes: notes)
+            return builder.build(languageRequest(.correct, text: language, into: language))
+        }
+        #expect(prompt("Use vous for clients").contains("it connects. Use vous for clients. If there"))
+        #expect(prompt("Use vous!\n\n").contains("it connects. Use vous! If there"))
+        #expect(prompt("  \n").contains("it connects. If there are no errors"))
+        #expect(prompt(nil).contains("it connects. If there are no errors"))
     }
 
     @Test("notes are Correct's only")
     func notesOnlyForCorrect() {
         for action in [Action.translate, .explain, .repitch] {
             let prompt = builder.build(languageRequest(action, text: .swissGerman, into: .english))
-            #expect(!prompt.contains("Notes on"), "\(action)")
+            #expect(!prompt.contains("mit dem Lehrer"), "\(action)")
         }
     }
 

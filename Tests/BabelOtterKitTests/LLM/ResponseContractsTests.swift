@@ -158,6 +158,39 @@ struct ResponseContractsTests {
         #expect(decoded.errors.count == 1)
     }
 
+    @Test("an item correcting a fragment into itself is dropped")
+    func noChangeDropped() throws {
+        let json = """
+            { "corrected_blocks": ["ausser wenn"],
+              "errors": [
+                { "original": "ausser", "corrected": "ausser", "category": "spelling",
+                  "explanation": "spelled with two s", "severity": "error" },
+                { "original": "wenn", "corrected": "wenn", "category": "style",
+                  "explanation": "x", "severity": "suggestion" } ] }
+            """
+        #expect(try decoder.decode(CorrectResponse.self, from: Data(json.utf8)).errors.isEmpty)
+    }
+
+    @Test("an item fixing only a space at its edge is kept")
+    func edgeSpaceFixKept() throws {
+        let json = """
+            { "corrected_blocks": ["Hallo, Welt"],
+              "errors": [{ "original": " ,", "corrected": ",", "category": "spelling",
+                           "explanation": "no space before a comma", "severity": "error" }] }
+            """
+        #expect(try decoder.decode(CorrectResponse.self, from: Data(json.utf8)).errors.count == 1)
+    }
+
+    @Test("an item inserting a word is not padding")
+    func insertionKept() throws {
+        let json = """
+            { "corrected_blocks": ["x"],
+              "errors": [{ "original": "", "corrected": "dass", "category": "other",
+                           "explanation": "a conjunction is missing", "severity": "error" }] }
+            """
+        #expect(try decoder.decode(CorrectResponse.self, from: Data(json.utf8)).errors.count == 1)
+    }
+
     @Test("an item deleting a word is not padding")
     func deletionKept() throws {
         let json = """
