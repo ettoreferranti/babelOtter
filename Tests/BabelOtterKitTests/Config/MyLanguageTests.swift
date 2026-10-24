@@ -98,6 +98,15 @@ struct MyLanguageTests {
         #expect(LanguageConfig.italian.correctionNotes?.contains("nella") == true)
     }
 
+    @Test("German's example explanations never fix a person's gender")
+    func noPersonGenderExample() {
+        // "Leiterin refers to Anna, a woman" made Mistral change "Herr" to
+        // "Frau" in a clean letter: an example reads as something to look for.
+        let notes = LanguageConfig.swissGerman.correctionNotes ?? ""
+        #expect(!notes.contains("woman"))
+        #expect(notes.contains("Haus is neuter, so der becomes das"))
+    }
+
     @Test("absent notes take the shipped ones by code or base code; null is none; own notes are kept")
     func notesDecoding() throws {
         func language(_ json: String) throws -> LanguageConfig {

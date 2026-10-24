@@ -140,9 +140,13 @@ extension CorrectionError {
 
     /// An item with neither an original nor a corrected fragment describes
     /// nothing. A deletion has an original; an insertion has a correction.
+    /// Nor does one that corrects a fragment into itself: Mistral listed
+    /// "ausser" -> "ausser" as a spelling error in a clean text, explained by
+    /// the eszett rule it had just obeyed.
     var isPadding: Bool {
-        original.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && corrected.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let from = original.trimmingCharacters(in: .whitespacesAndNewlines)
+        let into = corrected.trimmingCharacters(in: .whitespacesAndNewlines)
+        return from == into
     }
 }
 

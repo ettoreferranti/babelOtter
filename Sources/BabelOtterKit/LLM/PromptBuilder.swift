@@ -67,7 +67,6 @@ public struct PromptBuilder: Sendable {
         // exceptions by call shape is one a real violation could hide behind,
         // so it is cheaper to avoid the spelling than to weaken the check.
         sections += [
-            correctionNotes(request),
             orthography(request),
             audience(request),
             glossarySection(request),
@@ -102,7 +101,7 @@ public struct PromptBuilder: Sendable {
                 rules; those rules apply to corrected_blocks and corrected only. \
                 Write each explanation in \(request.mine.displayName). Each \
                 explanation names the specific rule that was broken and the words \
-                it connects. If there are no errors, return \
+                it connects. \(correctionNotes(request) ?? "")If there are no errors, return \
                 the text unchanged and an empty error list. corrected_blocks applies \
                 only changes whose severity is "error". List stylistic suggestions in \
                 errors with severity "suggestion", and do not apply them to \
@@ -162,15 +161,18 @@ public struct PromptBuilder: Sendable {
 
     /// The text's language's own notes for Correct (#81), from its
     /// configuration; nothing for another action or a language without notes.
+    /// Spliced into the instruction, not given a section of their own: as a
+    /// separate "Notes" section they read as a checklist, and Mistral changed
+    /// "Herr" to "Frau" in a clean letter in every run (a #120 regression).
     private func correctionNotes(_ request: PromptRequest) -> String? {
         guard request.action == .correct else { return nil }
         guard let notes = request.source.correctionNotes else { return nil }
-        let heading = "Notes on \(request.source.displayName):\n\(notes)"
+        let heading = notes + " "
         // The shipped notes' example explanations are English; say so, or a
         // small model follows them rather than the explanation language.
         guard request.mine.code.baseSubtag != LanguageConfig.english.code else { return heading }
-        return heading + "\nThe examples above are in English; write your explanations in "
-            + "\(request.mine.displayName)."
+        return heading + "The examples above are in English; write your explanations in "
+            + "\(request.mine.displayName). "
     }
 
     /// Derived from the target's locale rules rather than from its code, so a

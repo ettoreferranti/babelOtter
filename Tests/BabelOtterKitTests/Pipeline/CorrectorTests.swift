@@ -140,7 +140,7 @@ struct CorrectorTests {
         _ = try await collect(subject.correct(UserText("Elle est parti."), profile: .colleagues))
         let prompt = try #require(chat.prompts.first)
         #expect(prompt.contains("The author is learning French and often thinks in English"))
-        #expect(prompt.contains("Notes on French:"))
+        #expect(prompt.contains("past participles"))
         #expect(prompt.contains("Write each explanation in English."))
         #expect(!prompt.contains("Lehrer"))
     }
@@ -307,6 +307,23 @@ struct CorrectorTests {
         let done = try #require(result(try await collect(
             corrector(chat).correct(UserText(text), profile: .colleagues))))
         #expect(!done.errors.contains { $0.corrected.contains("\u{00DF}") })
+        // Shown as "gross" -> "gross" it corrects nothing, so it goes, and
+        // the clean text stays clean.
+        #expect(done.errors.isEmpty)
+        #expect(done.hasNoErrors)
+    }
+
+    @Test("a fix the locale rules leave changing something is kept")
+    func localeRuleKeepsRealFix() async throws {
+        let text = "Der Baum ist grosse."
+        let errors = """
+            [{"original": "grosse", "corrected": "gro\u{00DF}", "category": "spelling", \
+            "explanation": "adjective form", "severity": "error"}]
+            """
+        let chat = ScriptedChat([reply(["Der Baum ist gross."], errors)])
+        let done = try #require(result(try await collect(
+            corrector(chat).correct(UserText(text), profile: .colleagues))))
+        #expect(done.errors.map(\.corrected) == ["gross"])
     }
 
     @Test("a listed fix's corrected fragment keeps a protected term as written")
