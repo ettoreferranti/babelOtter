@@ -409,6 +409,20 @@ struct PromptBuilderTests {
         #expect(italian.contains("Write each explanation in Italian."))
     }
 
+    @Test("notes from config.json become one tidy sentence in the instruction")
+    func userNotesTidied() {
+        func prompt(_ notes: String?) -> String {
+            let language = LanguageConfig(
+                code: LanguageCode("fr"), displayName: "French", localeRules: [], enabled: true,
+                correctionNotes: notes)
+            return builder.build(languageRequest(.correct, text: language, into: language))
+        }
+        #expect(prompt("Use vous for clients").contains("it connects. Use vous for clients. If there"))
+        #expect(prompt("Use vous!\n\n").contains("it connects. Use vous! If there"))
+        #expect(prompt("  \n").contains("it connects. If there are no errors"))
+        #expect(prompt(nil).contains("it connects. If there are no errors"))
+    }
+
     @Test("notes are Correct's only")
     func notesOnlyForCorrect() {
         for action in [Action.translate, .explain, .repitch] {

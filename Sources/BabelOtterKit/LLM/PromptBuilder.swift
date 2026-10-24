@@ -166,8 +166,15 @@ public struct PromptBuilder: Sendable {
     /// "Herr" to "Frau" in a clean letter in every run (a #120 regression).
     private func correctionNotes(_ request: PromptRequest) -> String? {
         guard request.action == .correct else { return nil }
-        guard let notes = request.source.correctionNotes else { return nil }
-        let heading = notes + " "
+        guard let written = request.source.correctionNotes else { return nil }
+        // Notes from config.json are any text: inside a sentence they need
+        // no stray line breaks, and an end, or they run into the next one.
+        let notes = written.trimmingCharacters(in: .whitespacesAndNewlines)
+        if notes.isEmpty { return nil }
+        var heading = notes + " "
+        if let last = notes.last {
+            if !".!?\"".contains(last) { heading = notes + ". " }
+        }
         // The shipped notes' example explanations are English; say so, or a
         // small model follows them rather than the explanation language.
         guard request.mine.code.baseSubtag != LanguageConfig.english.code else { return heading }

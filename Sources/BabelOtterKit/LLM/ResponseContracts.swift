@@ -142,11 +142,12 @@ extension CorrectionError {
     /// nothing. A deletion has an original; an insertion has a correction.
     /// Nor does one that corrects a fragment into itself: Mistral listed
     /// "ausser" -> "ausser" as a spelling error in a clean text, explained by
-    /// the eszett rule it had just obeyed.
+    /// the eszett rule it had just obeyed. Compared exactly, not trimmed:
+    /// " ," -> "," is a real fix of a space.
     var isPadding: Bool {
-        let from = original.trimmingCharacters(in: .whitespacesAndNewlines)
-        let into = corrected.trimmingCharacters(in: .whitespacesAndNewlines)
-        return from == into
+        if original == corrected { return true }
+        return original.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && corrected.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 }
 
