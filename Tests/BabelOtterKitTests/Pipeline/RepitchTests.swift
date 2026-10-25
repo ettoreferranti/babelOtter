@@ -107,7 +107,7 @@ struct RepitchTests {
             draft, language: german, audience: .administration, styleNote: "shorter"))
         #expect(chat.models == ["repitch-model"])
         let prompt = try #require(chat.prompts.first)
-        #expect(prompt.contains("Rewrite the numbered blocks below"))
+        #expect(prompt.contains("Rewrite the blocks below"))
         #expect(prompt.contains("Language: Swiss Standard German."))
         #expect(prompt.contains("Audience: Administration."))
         #expect(!prompt.contains("degree programme"))
@@ -154,7 +154,7 @@ struct RepitchTests {
         let done = try #require(result(try await collect(translator(chat).repitch(
             UserText("Hallo\n\nTsch\u{00FC}ss"), language: german, audience: .administration))))
         #expect(chat.prompts.count == 2)
-        #expect(chat.prompts[1].contains("Rewrite the numbered blocks below"))
+        #expect(chat.prompts[1].contains("Rewrite the blocks below"))
         #expect(done.text == UserText("Guten Tag\n\nBis bald"))
     }
 

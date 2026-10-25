@@ -86,10 +86,10 @@ public struct PromptBuilder: Sendable {
     private func instruction(for request: PromptRequest) -> String {
         switch request.action {
         case .translate:
-            return "You are a precise translator. Translate the numbered blocks below."
+            return "You are a precise translator. Translate the blocks below."
         case .correct:
             return """
-                You are a patient language tutor. Correct the numbered blocks below, \
+                You are a patient language tutor. Correct the blocks below, \
                 preserving the author's intent, structure and voice. Correct the \
                 language, do not rewrite the message. Fix each error with the \
                 smallest change that keeps the author's meaning. Resolve agreement \
@@ -121,7 +121,7 @@ public struct PromptBuilder: Sendable {
                 """
         case .repitch:
             return """
-                You are an editor. Rewrite the numbered blocks below for the audience described, \
+                You are an editor. Rewrite the blocks below for the audience described, \
                 in the same language. Change the form of address, the register and the tone to \
                 suit that audience. Keep every fact: names, dates, times, numbers, places, links \
                 and requests. Do not add or remove information. Do not translate.
@@ -225,34 +225,20 @@ public struct PromptBuilder: Sendable {
         }
         // Correct writes in the text's own language, its target: that
         // language's forms, or none. #122: only a text less formal than its
-        // audience is wrong; a more formal one is polite, at most a suggestion.
+        // audience is wrong; a more formal one is polite. The informal form
+        // is never named: told "who can be addressed as tu", Mistral turned
+        // a clean "Le rispondo" into "Ti rispondo" and called it an error.
+        if profile.register == .informal {
+            return "The text is addressed to \(profile.name). Both formal and informal address "
+                + "suit them: neither is an error, so keep the author's choice exactly as written. "
+                + "Mixing formal and informal address in one text is a register error."
+        }
         guard let forms = request.target.addressForms else {
-            switch profile.register {
-            case .formal:
-                return "The text is addressed to \(profile.name), and should be written in "
-                    + "\(profile.register.phrase). Writing informally is a register error."
-            case .informal:
-                return "The text is addressed to \(profile.name), and can be written in "
-                    + "\(profile.register.phrase). " + Self.tooFormalIsFine("A more formal text")
-            }
+            return "The text is addressed to \(profile.name), and should be written in "
+                + "\(profile.register.phrase). Writing informally is a register error."
         }
-        switch profile.register {
-        case .formal:
-            return #"The text is addressed to \#(profile.name), who should be addressed as "\#(forms.formal)". "#
-                + #"Addressing them as "\#(forms.informal)" is a register error."#
-        case .informal:
-            return #"The text is addressed to \#(profile.name), who can be addressed as "\#(forms.informal)". "#
-                + Self.tooFormalIsFine(#"Addressing them as "\#(forms.formal)""#)
-        }
-    }
-
-    /// Measured for #122: told "a mismatch is a register error", Mistral
-    /// turned a clean "Je vous reponds" to colleagues into "Je te reponds".
-    /// Mixing both forms in one text is still an error.
-    private static func tooFormalIsFine(_ subject: String) -> String {
-        subject + " is not an error: list it as a register suggestion at most, "
-            + "and leave it unchanged in corrected_blocks. Mixing formal and informal "
-            + "address in one text is a register error."
+        return #"The text is addressed to \#(profile.name), who should be addressed as "\#(forms.formal)". "#
+            + #"Addressing them as "\#(forms.informal)" is a register error."#
     }
 
     /// The language's own form of address (#110), or, for a language
@@ -365,16 +351,23 @@ public struct PromptBuilder: Sendable {
             """
     }
 
-    /// Numbered, with the count stated, so the model can be held to it and
-    /// ``BlockCountPolicy`` has something to check.
+    /// A JSON array, one block per line, with the count stated, so the model
+    /// can be held to it and ``BlockCountPolicy`` has something to check.
+    /// Not numbered: Gemma 4 copied "1. " into its reply blocks (#103,
+    /// round 3), and an array is the shape the reply uses anyway.
     private func blocks(_ request: PromptRequest) -> String {
-        let numbered = request.blocks.enumerated()
-            .map { "\($0.offset + 1). \($0.element)" }
-            .joined(separator: "\n")
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.withoutEscapingSlashes]
+        let items = request.blocks.map { block in
+            String(decoding: (try? encoder.encode(block)) ?? Data(#""""#.utf8), as: UTF8.self)
+        }
         return """
             Return exactly \(request.blocks.count) block(s), in the same order.
 
-            \(numbered)
+            The text, as a JSON array with one string per block:
+            [
+            \(items.joined(separator: ",\n"))
+            ]
             """
     }
 }

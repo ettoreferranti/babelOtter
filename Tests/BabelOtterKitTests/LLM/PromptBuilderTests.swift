@@ -173,12 +173,16 @@ struct PromptBuilderTests {
         #expect(!builder.build(request()).contains("⟦DNT0⟧"))
     }
 
-    @Test("blocks are numbered and the count is stated")
-    func numbersTheBlocks() {
-        let prompt = builder.build(request(blocks: ["one", "two"]))
-        #expect(prompt.contains("exactly 2 block"))
-        #expect(prompt.contains("1. one"))
-        #expect(prompt.contains("2. two"))
+    @Test("blocks are a JSON array, never numbered, and the count is stated (#103)")
+    func blocksAsArray() throws {
+        let prompt = builder.build(request(blocks: ["one", #"say "hi"/bye"#, "Gr\u{00FC}sse"]))
+        #expect(prompt.contains("exactly 3 block"))
+        #expect(prompt.hasSuffix("[\n\"one\",\n\"say \\\"hi\\\"/bye\",\n\"Gr\u{00FC}sse\"\n]"))
+        #expect(!prompt.contains("1. one"))
+        #expect(!prompt.contains("numbered"))
+        let array = try #require(prompt.range(of: "[\n", options: .backwards))
+        let decoded = try JSONDecoder().decode([String].self, from: Data(prompt[array.lowerBound...].utf8))
+        #expect(decoded == ["one", #"say "hi"/bye"#, "Gr\u{00FC}sse"])
     }
 
     @Test("each action states its own schema")
@@ -254,8 +258,8 @@ struct PromptBuilderTests {
         let prompt = builder.build(request(action: .correct, target: noForms, profile: .administration))
         #expect(prompt.contains("The text is addressed to Administration, and should be written in a formal register."))
         let casual = builder.build(request(action: .correct, target: noForms, profile: .informal))
-        #expect(casual.contains("and can be written in an informal register."))
-        #expect(casual.contains("A more formal text is not an error"))
+        #expect(casual.contains("Both formal and informal address suit them"))
+        #expect(!casual.contains("informal register"))
         #expect(prompt.contains("Writing informally is a register error."))
     }
 
@@ -265,12 +269,13 @@ struct PromptBuilderTests {
         #expect(formal.contains(#"Addressing them as "du" is a register error."#))
         #expect(!formal.contains("not an error"))
         let casual = builder.build(request(action: .correct, profile: .colleagues))
-        #expect(casual.contains(#"The text is addressed to Colleagues, who can be addressed as "du"."#))
         #expect(casual.contains(
-            #"Addressing them as "Sie" is not an error: list it as a register suggestion at most, "#
-                + "and leave it unchanged in corrected_blocks."))
+            "The text is addressed to Colleagues. Both formal and informal address suit them: "
+                + "neither is an error, so keep the author's choice exactly as written."))
         #expect(casual.contains("Mixing formal and informal address in one text is a register error."))
-        #expect(!casual.contains(#""Sie" is a register error"#))
+        // Naming the informal form pulled Mistral to it ("Le" became "Ti").
+        #expect(!casual.contains(#""du""#))
+        #expect(!casual.contains(#""Sie""#))
         #expect(!casual.contains("A mismatch"))
     }
 
@@ -503,7 +508,7 @@ struct PromptBuilderTests {
     func repitchInstruction() {
         let prompt = repitch()
         #expect(prompt.contains(
-            "Rewrite the numbered blocks below for the audience described, in the same language."))
+            "Rewrite the blocks below for the audience described, in the same language."))
         #expect(prompt.contains("Keep every fact: names, dates, times, numbers, places, links and requests."))
         #expect(prompt.contains("Do not translate."))
     }

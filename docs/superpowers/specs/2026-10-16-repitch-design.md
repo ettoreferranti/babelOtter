@@ -29,9 +29,9 @@
 
 Instruction:
 
-> You are an editor. Rewrite the numbered blocks below for the audience described, in the same language. Change the form of address, the register and the tone to suit that audience. Keep every fact: names, dates, times, numbers, places, links and requests. Do not add or remove information. Do not translate.
+> You are an editor. Rewrite the blocks below for the audience described, in the same language. Change the form of address, the register and the tone to suit that audience. Keep every fact: names, dates, times, numbers, places, links and requests. Do not add or remove information. Do not translate.
 
-Then, as for the other actions: `Language: <display name>.`; the orthography section of that language's locale rules (for Swiss Standard German: never `ß`, always `ss`); the fixed audience section (`Audience:`, `Address the reader as`, `Tone:`, preferred terms); the protected-terms section when DNT terms exist; the style note; the schema `{"blocks": ["..."]}`; the numbered blocks with their count.
+Then, as for the other actions: `Language: <display name>.`; the orthography section of that language's locale rules (for Swiss Standard German: never `ß`, always `ss`); the fixed audience section (`Audience:`, `Address the reader as`, `Tone:`, preferred terms); the protected-terms section when DNT terms exist; the style note; the schema `{"blocks": ["..."]}`; the blocks with their count, as a JSON array (numbered before #103's round 3, until Gemma 4 copied the numbers into its reply).
 
 ## 4. The kit
 
