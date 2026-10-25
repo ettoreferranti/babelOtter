@@ -67,6 +67,7 @@ public struct PromptBuilder: Sendable {
         // exceptions by call shape is one a real violation could hide behind,
         // so it is cheaper to avoid the spelling than to weaken the check.
         sections += [
+            writingNotes(request),
             orthography(request),
             audience(request),
             glossarySection(request),
@@ -182,6 +183,15 @@ public struct PromptBuilder: Sendable {
             + "\(request.mine.displayName). "
     }
 
+    /// The written language's own notes (#123), for every action: told only
+    /// "Swiss Standard German", Mistral wrote a casual text in dialect.
+    private func writingNotes(_ request: PromptRequest) -> String? {
+        guard let notes = request.target.writingNotes?.trimmingCharacters(in: .whitespacesAndNewlines)
+        else { return nil }
+        if notes.isEmpty { return nil }
+        return notes
+    }
+
     /// Derived from the target's locale rules rather than from its code, so a
     /// language added by configuration gets the same treatment (`FR-LNG-01`).
     private func orthography(_ request: PromptRequest) -> String? {
@@ -214,14 +224,35 @@ public struct PromptBuilder: Sendable {
             return lines.joined(separator: "\n")
         }
         // Correct writes in the text's own language, its target: that
-        // language's forms, or none.
+        // language's forms, or none. #122: only a text less formal than its
+        // audience is wrong; a more formal one is polite, at most a suggestion.
         guard let forms = request.target.addressForms else {
-            return "The text is addressed to \(profile.name), and should be written in "
-                + "\(profile.register.phrase). A mismatch is a register error."
+            switch profile.register {
+            case .formal:
+                return "The text is addressed to \(profile.name), and should be written in "
+                    + "\(profile.register.phrase). Writing informally is a register error."
+            case .informal:
+                return "The text is addressed to \(profile.name), and can be written in "
+                    + "\(profile.register.phrase). " + Self.tooFormalIsFine("A more formal text")
+            }
         }
-        return
-            #"The text is addressed to \#(profile.name), who should be addressed as "\#(forms.form(for: profile.register))". "#
-            + "A mismatch is a register error."
+        switch profile.register {
+        case .formal:
+            return #"The text is addressed to \#(profile.name), who should be addressed as "\#(forms.formal)". "#
+                + #"Addressing them as "\#(forms.informal)" is a register error."#
+        case .informal:
+            return #"The text is addressed to \#(profile.name), who can be addressed as "\#(forms.informal)". "#
+                + Self.tooFormalIsFine(#"Addressing them as "\#(forms.formal)""#)
+        }
+    }
+
+    /// Measured for #122: told "a mismatch is a register error", Mistral
+    /// turned a clean "Je vous reponds" to colleagues into "Je te reponds".
+    /// Mixing both forms in one text is still an error.
+    private static func tooFormalIsFine(_ subject: String) -> String {
+        subject + " is not an error: list it as a register suggestion at most, "
+            + "and leave it unchanged in corrected_blocks. Mixing formal and informal "
+            + "address in one text is a register error."
     }
 
     /// The language's own form of address (#110), or, for a language

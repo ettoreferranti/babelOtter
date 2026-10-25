@@ -128,5 +128,13 @@ struct EvalReportTests {
             caseID: "t", failure: .other, esszettAbsent: false, missingTerms: ["Otterbach"],
             sentinelDebris: false, structureKept: false, chrF: 0)
         #expect(EvalReport.translationMisses(model: "m", testCase: theCase, score: failed) == ["m  t: failed (other)"])
+        let dialect = TranslationScore(
+            caseID: "t", failure: nil, esszettAbsent: true, missingTerms: [],
+            sentinelDebris: false, structureKept: true, chrF: 90, dialectWords: ["isch", "gsi"])
+        #expect(EvalReport.translationMisses(model: "m", testCase: theCase, score: dialect) == ["m  t: dialect: isch, gsi"])
+        let noDialect = TranslationScore(
+            caseID: "t", failure: nil, esszettAbsent: true, missingTerms: [],
+            sentinelDebris: false, structureKept: true, chrF: 90, dialectWords: [])
+        #expect(EvalReport.translationMisses(model: "m", testCase: theCase, score: noDialect).isEmpty)
     }
 }

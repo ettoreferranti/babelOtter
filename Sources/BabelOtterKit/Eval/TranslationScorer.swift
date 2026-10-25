@@ -15,6 +15,9 @@ public struct TranslationScore: Sendable, Equatable, Codable {
     public let sentinelDebris: Bool
     public let structureKept: Bool
     public let chrF: Double
+    /// Dialect words found in the output (#123); nil for a target with no
+    /// list, and in result files from before the check.
+    public var dialectWords: [String]? = nil
 
     public var termsKept: Bool { failure == nil && missingTerms.isEmpty && !sentinelDebris }
 }
@@ -38,7 +41,27 @@ public enum TranslationScorer {
                 missingTerms: testCase.terms.filter { !output.contains($0) },
                 sentinelDebris: sentinelBrackets.contains { output.contains($0) },
                 structureKept: sameStructure(testCase.text, output),
-                chrF: ChrF.score(hypothesis: output, reference: testCase.reference))
+                chrF: ChrF.score(hypothesis: output, reference: testCase.reference),
+                dialectWords: dialectCheck(testCase, output: output))
+        }
+    }
+
+    /// Common Swiss German dialect words that standard German never uses
+    /// (#123: Mistral wrote "essen mer am Samschtig drausse" for de-CH).
+    /// Eval data, not app logic: the app tells the model through the
+    /// language's writing notes. Umlauts as escapes for the ASCII-only rule.
+    static let dialectWords: [LanguageCode: [String]] = [
+        LanguageCode("de-CH"): [
+            "isch", "gsi", "h\u{00FC}t", "mer", "n\u{00F6}d", "n\u{00FC}t", "\u{00F6}ppis", "ch\u{00F6}nd",
+            "h\u{00E4}nd", "gseh", "uf", "drausse", "Samschtig", "M\u{00E4}ntig", "Schuel", "dini", "\u{00E4}ssed",
+        ],
+    ]
+
+    private static func dialectCheck(_ testCase: TranslationCase, output: String) -> [String]? {
+        guard let words = dialectWords[testCase.direction.direction.target] else { return nil }
+        // Also capitalised, as at the start of a sentence.
+        return words.filter { word in
+            TextSearch.contains(word, in: output) || TextSearch.contains(word.capitalized, in: output)
         }
     }
 

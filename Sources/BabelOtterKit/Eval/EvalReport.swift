@@ -107,6 +107,9 @@ public enum EvalReport {
         lines += score.missingTerms.map { prefix + "term \"\($0)\" not kept" }
         if score.sentinelDebris { lines.append(prefix + "a placeholder was left in the output") }
         if !score.structureKept { lines.append(prefix + "structure changed") }
+        if let dialect = score.dialectWords {
+            if !dialect.isEmpty { lines.append(prefix + "dialect: " + dialect.joined(separator: ", ")) }
+        }
         return lines
     }
 }
