@@ -142,6 +142,42 @@ struct MyLanguageTests {
         }
     }
 
+    @Test("only de-CH ships writing notes, and they rule out dialect (#123)")
+    func shippedWritingNotes() {
+        #expect(LanguageConfig.swissGerman.writingNotes?.contains("Never write Swiss German dialect") == true)
+        for language in [LanguageConfig.english, .french, .italian] {
+            #expect(language.writingNotes == nil)
+        }
+    }
+
+    @Test("writing notes: absent takes the shipped ones, null is none, own ones round-trip")
+    func writingNotesCoding() throws {
+        func language(_ json: String) throws -> LanguageConfig {
+            try JSONDecoder().decode(LanguageConfig.self, from: Data(json.utf8))
+        }
+        let absent = #"{"code": "de-ch", "displayName": "G", "localeRules": [], "enabled": true}"#
+        #expect(try language(absent).writingNotes == LanguageConfig.swissGerman.writingNotes)
+        // A region, not a language: de-AT is not written in Swiss spelling.
+        let austrian = #"{"code": "de-AT", "displayName": "A", "localeRules": [], "enabled": true}"#
+        #expect(try language(austrian).writingNotes == nil)
+        let austrianJSON = String(decoding: try JSONEncoder().encode(try language(austrian)), as: UTF8.self)
+        #expect(!austrianJSON.contains("writingNotes"))
+        let none = #"{"code": "de-CH", "displayName": "G", "localeRules": [], "enabled": true, "writingNotes": null}"#
+        #expect(try language(none).writingNotes == nil)
+        #expect(try language(#"{"code": "nl", "displayName": "N", "localeRules": [], "enabled": true}"#).writingNotes == nil)
+        let shipped = String(decoding: try JSONEncoder().encode(LanguageConfig.swissGerman), as: UTF8.self)
+        #expect(!shipped.contains("writingNotes"))
+        let own = LanguageConfig(
+            code: LanguageCode("fr"), displayName: "French", localeRules: [], enabled: true, writingNotes: "Mine.")
+        let ownJSON = String(decoding: try JSONEncoder().encode(own), as: UTF8.self)
+        #expect(ownJSON.contains(#""writingNotes":"Mine.""#))
+        #expect(try language(ownJSON) == own)
+        let removed = LanguageConfig(code: LanguageCode("de-CH"), displayName: "G", localeRules: [], enabled: true)
+        let removedJSON = String(decoding: try JSONEncoder().encode(removed), as: UTF8.self)
+        #expect(removedJSON.contains(#""writingNotes":null"#))
+        #expect(try language(removedJSON) == removed)
+    }
+
     @Test("the editor sets an enabled language as mine and refuses the rest")
     func editorSetsMine() throws {
         var editor = SettingsEditor(configuration: .default)

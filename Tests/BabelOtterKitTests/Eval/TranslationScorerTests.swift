@@ -33,6 +33,23 @@ struct TranslationScorerTests {
         #expect(TranslationScorer.score(fromFrench, outcome: .translated("Strasse.")).esszettAbsent == true)
     }
 
+    @Test("a de-CH translation is checked for dialect words, as whole words (#123)")
+    func dialect() throws {
+        let german = translationCase("If it stays dry, we'll eat outside on Saturday.")
+        let dialect = TranslationScorer.score(
+            german, outcome: .translated("Wenns trocken bleibt, essen mer am Samschtig drausse."))
+        #expect(dialect.dialectWords == ["mer", "drausse", "Samschtig"])
+        let standard = TranslationScorer.score(
+            german, outcome: .translated("Wenn es trocken bleibt, essen wir am Samstag draussen auf dem Meer."))
+        #expect(standard.dialectWords == [])
+        let capitalised = TranslationScorer.score(german, outcome: .translated("Isch guet. Uf wiederluege."))
+        #expect(capitalised.dialectWords == ["isch", "uf"])
+        let english = translationCase("Uf.", .swissGermanToEnglish)
+        #expect(TranslationScorer.score(english, outcome: .translated("isch uf")).dialectWords == nil)
+        let fromFrench = translationCase("Rue.", try #require(TranslationDirection(rawValue: "fr-de-ch")))
+        #expect(TranslationScorer.score(fromFrench, outcome: .translated("Das isch gut.")).dialectWords == ["isch"])
+    }
+
     @Test("every term must come back verbatim")
     func terms() {
         let theCase = translationCase("Meet Otterbach at Riverside.", terms: ["Otterbach", "Riverside"],

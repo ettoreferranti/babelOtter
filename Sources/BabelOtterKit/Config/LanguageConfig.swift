@@ -112,10 +112,13 @@ public struct LanguageConfig: Sendable, Equatable, Codable {
     /// What Correct's prompt says about this language in particular (#81):
     /// the errors to look for and an example explanation. Nil for none.
     public let correctionNotes: String?
+    /// What every prompt that writes this language says about it (#123):
+    /// Swiss Standard German is not Swiss German dialect. Nil for none.
+    public let writingNotes: String?
 
     public init(
         code: LanguageCode, displayName: String, localeRules: [LocaleRule], enabled: Bool,
-        addressForms: AddressForms? = nil, correctionNotes: String? = nil
+        addressForms: AddressForms? = nil, correctionNotes: String? = nil, writingNotes: String? = nil
     ) {
         self.code = code
         self.displayName = displayName
@@ -123,10 +126,11 @@ public struct LanguageConfig: Sendable, Equatable, Codable {
         self.enabled = enabled
         self.addressForms = addressForms
         self.correctionNotes = correctionNotes
+        self.writingNotes = writingNotes
     }
 
     private enum CodingKeys: String, CodingKey {
-        case code, displayName, localeRules, enabled, addressForms, correctionNotes
+        case code, displayName, localeRules, enabled, addressForms, correctionNotes, writingNotes
     }
 
     /// `addressForms` absent -- a file from before #110 -- takes the shipped
@@ -150,31 +154,44 @@ public struct LanguageConfig: Sendable, Equatable, Codable {
         } else {
             notes = Self.shippedNotes(for: code)
         }
+        var writing: String?
+        if container.contains(.writingNotes) {
+            writing = try container.decodeIfPresent(String.self, forKey: .writingNotes)
+        } else {
+            writing = Self.shippedWritingNotes(for: code)
+        }
         self.init(
             code: code,
             displayName: try container.decode(String.self, forKey: .displayName),
             localeRules: try container.decode([LocaleRule].self, forKey: .localeRules),
             enabled: try container.decode(Bool.self, forKey: .enabled),
             addressForms: forms,
-            correctionNotes: notes)
+            correctionNotes: notes,
+            writingNotes: writing)
     }
 
     static func shippedNotes(for code: LanguageCode) -> String? {
-        for shipped in shippedDefaults where shipped.code == code {
-            return shipped.correctionNotes
-        }
-        for shipped in shippedDefaults where shipped.code.baseSubtag == code.baseSubtag {
-            return shipped.correctionNotes
-        }
-        return nil
+        shipped(\.correctionNotes, for: code)
     }
 
     static func shippedForms(for code: LanguageCode) -> AddressForms? {
-        for shipped in shippedDefaults where shipped.code == code {
-            return shipped.addressForms
+        shipped(\.addressForms, for: code)
+    }
+
+    /// Exact code only: unlike forms and correction notes, which describe
+    /// the language, writing notes describe a region, and de-AT is not Swiss.
+    static func shippedWritingNotes(for code: LanguageCode) -> String? {
+        shippedDefaults.first { $0.code == code }?.writingNotes
+    }
+
+    /// The shipped language's value for the same code, else for the same
+    /// base code.
+    static func shipped<Value>(_ value: KeyPath<LanguageConfig, Value?>, for code: LanguageCode) -> Value? {
+        for language in shippedDefaults where language.code == code {
+            return language[keyPath: value]
         }
-        for shipped in shippedDefaults where shipped.code.baseSubtag == code.baseSubtag {
-            return shipped.addressForms
+        for language in shippedDefaults where language.code.baseSubtag == code.baseSubtag {
+            return language[keyPath: value]
         }
         return nil
     }
@@ -198,6 +215,13 @@ public struct LanguageConfig: Sendable, Equatable, Codable {
                 try container.encode(correctionNotes, forKey: .correctionNotes)
             } else {
                 try container.encodeNil(forKey: .correctionNotes)
+            }
+        }
+        if writingNotes != Self.shippedWritingNotes(for: code) {
+            if let writingNotes {
+                try container.encode(writingNotes, forKey: .writingNotes)
+            } else {
+                try container.encodeNil(forKey: .writingNotes)
             }
         }
     }
@@ -229,6 +253,11 @@ extension LanguageConfig {
             never give a pronoun's gender as the reason. Example explanations: \
             "mit takes the dative, so der becomes dem"; "Haus is neuter, so der \
             becomes das".
+            """,
+        writingNotes: """
+            Swiss Standard German is written standard German with Swiss spelling, \
+            and words that are standard in Switzerland are correct. Never write \
+            Swiss German dialect, whatever the register or tone.
             """
     )
 

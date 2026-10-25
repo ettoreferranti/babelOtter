@@ -254,8 +254,37 @@ struct PromptBuilderTests {
         let prompt = builder.build(request(action: .correct, target: noForms, profile: .administration))
         #expect(prompt.contains("The text is addressed to Administration, and should be written in a formal register."))
         let casual = builder.build(request(action: .correct, target: noForms, profile: .informal))
-        #expect(casual.contains("and should be written in an informal register."))
-        #expect(prompt.contains("A mismatch is a register error."))
+        #expect(casual.contains("and can be written in an informal register."))
+        #expect(casual.contains("A more formal text is not an error"))
+        #expect(prompt.contains("Writing informally is a register error."))
+    }
+
+    @Test("Correct: too informal is an error, too formal at most a suggestion (#122)")
+    func registerOneWay() {
+        let formal = builder.build(request(action: .correct, profile: .administration))
+        #expect(formal.contains(#"Addressing them as "du" is a register error."#))
+        #expect(!formal.contains("not an error"))
+        let casual = builder.build(request(action: .correct, profile: .colleagues))
+        #expect(casual.contains(#"The text is addressed to Colleagues, who can be addressed as "du"."#))
+        #expect(casual.contains(
+            #"Addressing them as "Sie" is not an error: list it as a register suggestion at most, "#
+                + "and leave it unchanged in corrected_blocks."))
+        #expect(casual.contains("Mixing formal and informal address in one text is a register error."))
+        #expect(!casual.contains(#""Sie" is a register error"#))
+        #expect(!casual.contains("A mismatch"))
+    }
+
+    @Test("the written language's notes reach every action that writes it (#123)")
+    func writingNotes() {
+        let dialect = "Never write Swiss German dialect"
+        #expect(builder.build(request(action: .translate, profile: .informal)).contains(dialect))
+        #expect(builder.build(request(action: .correct, profile: .informal)).contains(dialect))
+        #expect(builder.build(request(action: .repitch, profile: .informal)).contains(dialect))
+        #expect(!builder.build(request(action: .translate, target: .english)).contains(dialect))
+        let blank = LanguageConfig(
+            code: LanguageCode("xx"), displayName: "X", localeRules: [], enabled: true, writingNotes: " \n")
+        let plain = LanguageConfig(code: LanguageCode("xx"), displayName: "X", localeRules: [], enabled: true)
+        #expect(builder.build(request(target: blank)) == builder.build(request(target: plain)))
     }
 
     @Test("Correct's audience section is the register only")
@@ -263,7 +292,7 @@ struct PromptBuilderTests {
         let prompt = builder.build(request(action: .correct, profile: .administration))
         #expect(prompt.contains(
             #"The text is addressed to Administration, who should be addressed as "Sie"."#))
-        #expect(prompt.contains("A mismatch is a register error."))
+        #expect(prompt.contains("is a register error."))
         #expect(!prompt.contains("Tone:"))
     }
 
