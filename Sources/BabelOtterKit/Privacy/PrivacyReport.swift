@@ -65,7 +65,7 @@ public enum PrivacyReport {
     }
 
     static func listeningLine(_ listening: ListeningExposure, server: ModelServer = .own) -> PrivacyLine {
-        if server == .builtIn { return builtInListeningLine(listening) }
+        if case .builtIn = server { return builtInListeningLine(listening) }
         let title = "Ollama listens on"
         let risk = " Other devices on your network can use your Ollama and see what is sent to it."
         switch listening {

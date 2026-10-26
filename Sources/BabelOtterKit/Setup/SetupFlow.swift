@@ -65,7 +65,7 @@ public enum SetupFlow {
             if facts.accessibilityGranted { return nil }
             return "Grant Accessibility to continue."
         case .model:
-            if facts.server == .builtIn { return builtInBlocker(facts) }
+            if case .builtIn = facts.server { return builtInBlocker(facts) }
             guard let daemon = facts.daemon else { return "Checking Ollama\u{2026}" }
             guard case .reachable(let models) = daemon else { return "Ollama isn't running." }
             if models.contains(facts.chosenModel) { return nil }

@@ -88,7 +88,7 @@ public struct BuiltInServerPolicy: Sendable, Equatable {
     /// The server never answered in time: it is stopped, and stays failed
     /// with the reason until Restart.
     public mutating func timedOut(after seconds: Int) -> BuiltInServerEffect {
-        guard state == .starting else { return .none }
+        guard case .starting = state else { return .none }
         restarting = false
         stopping = true
         state = .failed("it didn't answer within \(seconds) seconds.")
@@ -108,7 +108,7 @@ public struct BuiltInServerPolicy: Sendable, Equatable {
 
     /// The server answered on its port.
     public mutating func reachable() {
-        if state == .starting { state = .running }
+        if case .starting = state { state = .running }
     }
 
     /// The process ended. `lastLogLine` is the last non-empty line it wrote.
