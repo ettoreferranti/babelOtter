@@ -15,6 +15,7 @@ struct BuiltInServerLaunchTests {
         #expect(files.models.path(percentEncoded: false) == support.path(percentEncoded: false) + "ollama/models/")
         #expect(files.pidFile.path(percentEncoded: false) == support.path(percentEncoded: false) + "ollama/server.pid")
         #expect(files.log.path(percentEncoded: false) == support.path(percentEncoded: false) + "ollama/server.log")
+        #expect(files.home.path(percentEncoded: false) == support.path(percentEncoded: false) + "ollama/home/")
     }
 
     @Test("the bundled binary serves on 47434, loopback only, with its own models and no cloud")
@@ -26,7 +27,7 @@ struct BuiltInServerLaunchTests {
         #expect(launch.executable.path(percentEncoded: false) == "/Applications/lingoSwen.app/Contents/Resources/ollama/ollama")
         #expect(launch.arguments == ["serve"])
         #expect(launch.environment == [
-            "HOME": "/Users/u",
+            "HOME": files.home.path(percentEncoded: false),
             "PATH": "/usr/bin:/bin",
             "OLLAMA_HOST": "127.0.0.1:47434",
             "OLLAMA_MODELS": files.models.path(percentEncoded: false),
@@ -47,8 +48,9 @@ struct BuiltInServerLaunchTests {
         #expect(launch.environment["OLLAMA_DEBUG"] == nil)
         #expect(launch.environment["OLLAMA_KEEP_ALIVE"] == "30m")
         #expect(launch.environment["DYLD_INSERT_LIBRARIES"] == nil)
-        #expect(launch.environment["HOME"] == nil)
-        #expect(launch.environment.count == 4)
+        #expect(launch.environment["HOME"] == support.path(percentEncoded: false) + "ollama/home/")
+        #expect(launch.environment["PATH"] == nil)
+        #expect(launch.environment.count == 5)
     }
 
     @Test("the built-in model is the default model")

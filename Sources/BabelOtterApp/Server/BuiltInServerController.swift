@@ -87,6 +87,7 @@ final class BuiltInServerController {
         let log: FileHandle
         do {
             try FileManager.default.createDirectory(at: files.models, withIntermediateDirectories: true)
+            try FileManager.default.createDirectory(at: files.home, withIntermediateDirectories: true)
             // Emptied at each start.
             try Data().write(to: files.log)
             log = try FileHandle(forWritingTo: files.log)
@@ -121,13 +122,22 @@ final class BuiltInServerController {
     }
 
     /// Asks the server whether it answers until it does, or until this
-    /// process is no longer the current one.
+    /// process is no longer the current one. An answer counts only when the
+    /// process listening on the port is this child: another program that
+    /// took 47434 first must never be taken for the built-in server, nor be
+    /// sent any text.
     private func watchUntilReachable(generation current: Int) {
         watch?.cancel()
         let client = OllamaClient.loopback(.builtIn, timeout: 2)
+        guard let child = process?.processIdentifier else { return }
         watch = Task { [weak self] in
             while !Task.isCancelled {
                 if case .reachable = await client.probe() {
+                    let owners = await ListeningProbeRunner.owners(port: OllamaEndpoint.builtInPort)
+                    guard owners.contains(child) else {
+                        try? await Task.sleep(for: Self.probeInterval)
+                        continue
+                    }
                     guard let self, current == self.generation else { return }
                     if self.policy.state == .starting {
                         self.policy.reachable()

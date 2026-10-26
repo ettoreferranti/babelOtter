@@ -15,10 +15,23 @@ enum ListeningProbeRunner {
         await Task.detached { measure(port: port) }.value
     }
 
+    /// The processes listening on `port`; empty when lsof cannot say (#126).
+    static func owners(port: Int) async -> Set<Int32> {
+        await Task.detached {
+            ListeningProbe.owners(output(ListeningProbe.ownerArguments(port: port)) ?? "")
+        }.value
+    }
+
     private static func measure(port: Int) -> ListeningExposure {
+        guard let text = output(ListeningProbe.arguments(port: port)) else { return .unknown }
+        return ListeningProbe.parse(text)
+    }
+
+    /// lsof's output, nil when it is missing, fails or takes too long.
+    private static func output(_ arguments: [String]) -> String? {
         let process = Process()
         process.executableURL = lsof
-        process.arguments = ListeningProbe.arguments(port: port)
+        process.arguments = arguments
         process.environment = ["PATH": "/usr/bin:/bin:/usr/sbin"]
         let output = Pipe()
         process.standardOutput = output
@@ -26,7 +39,7 @@ enum ListeningProbeRunner {
         do {
             try process.run()
         } catch {
-            return .unknown
+            return nil
         }
         let deadline = DispatchTime.now() + timeLimit
         DispatchQueue.global().asyncAfter(deadline: deadline) {
@@ -34,7 +47,7 @@ enum ListeningProbeRunner {
         }
         let data = output.fileHandleForReading.readDataToEndOfFile()
         process.waitUntilExit()
-        if process.terminationReason == .uncaughtSignal { return .unknown }
-        return ListeningProbe.parse(String(decoding: data, as: UTF8.self))
+        if process.terminationReason == .uncaughtSignal { return nil }
+        return String(decoding: data, as: UTF8.self)
     }
 }

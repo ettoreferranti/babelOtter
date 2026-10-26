@@ -68,7 +68,17 @@ plist="$app/Contents/Info.plist"
 
 # 3. Sign with the hardened runtime and a secure timestamp, both required for
 # notarization. No entitlements: the app is not sandboxed and uses nothing the
-# runtime restricts.
+# runtime restricts. Not --deep: the bundled Ollama (#126) keeps its own
+# Developer ID signatures, which notarization accepts as they are; each is
+# checked first, so a build never ships one that is unsigned or lacks the
+# hardened runtime.
+while IFS= read -r -d '' nested; do
+  if file -b "$nested" | grep -q 'Mach-O'; then
+    nested_signature="$(codesign --display --verbose=1 "$nested" 2>&1 || true)"
+    grep -q 'flags=.*runtime' <<<"$nested_signature" \
+      || fail "$nested is not signed with the hardened runtime; check Tools/ollama.lock."
+  fi
+done < <(find "$app/Contents/Resources/ollama" -type f -print0)
 codesign --force --options runtime --timestamp --sign "$identity" "$app"
 codesign --verify --strict --deep "$app"
 # Captured first: piped straight into grep -q, codesign is cut off by SIGPIPE

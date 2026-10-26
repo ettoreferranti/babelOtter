@@ -494,6 +494,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             showAccessibilityNeeded(for: action)
             return
         }
+        // No text goes to the built-in server's port until lingoSwen has
+        // seen its own server answer there (#126); the setup step says why
+        // and offers Restart or the download.
+        if environment.configuration.server == .builtIn {
+            guard builtInServer.state == .running else {
+                setupWindow.showModelStep()
+                return
+            }
+        }
         guard let front = NSWorkspace.shared.frontmostApplication,
             front.processIdentifier != ProcessInfo.processInfo.processIdentifier
         else { return }

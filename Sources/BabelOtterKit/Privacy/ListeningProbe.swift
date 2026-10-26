@@ -23,6 +23,21 @@ public enum ListeningProbe {
         ["-nP", "-iTCP:\(port)", "-sTCP:LISTEN", "-F", "n"]
     }
 
+    /// The arguments for which processes listen on `port` (#126).
+    public static func ownerArguments(port: Int) -> [String] {
+        ["-nP", "-iTCP:\(port)", "-sTCP:LISTEN", "-F", "p"]
+    }
+
+    /// Each `p` line is a listening process's id.
+    public static func owners(_ output: String) -> Set<Int32> {
+        var pids: Set<Int32> = []
+        for line in output.split(whereSeparator: \.isNewline).prefix(lineLimit) {
+            guard line.first == "p" else { continue }
+            if let pid = Int32(line.dropFirst()) { pids.insert(pid) }
+        }
+        return pids
+    }
+
     /// Each `n` line is a listening address, `host:port`.
     public static func parse(_ output: String) -> ListeningExposure {
         var addresses: [String] = []

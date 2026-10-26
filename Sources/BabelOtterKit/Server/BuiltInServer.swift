@@ -18,8 +18,9 @@ public enum BuiltInServer {
 
     /// Only these are passed on from lingoSwen's own environment; anything
     /// else (an `OLLAMA_HOST` or `OLLAMA_DEBUG` set for the user's own
-    /// Ollama, say) must not reach the bundled one.
-    static let inheritedVariables = ["HOME", "PATH"]
+    /// Ollama, say) must not reach the bundled one. `HOME` is not among
+    /// them: the server gets its own (see `BuiltInServerFiles.home`).
+    static let inheritedVariables = ["PATH"]
 }
 
 /// Where the built-in server's files live, under lingoSwen's Application
@@ -34,6 +35,10 @@ public struct BuiltInServerFiles: Sendable, Equatable {
     /// Never `~/.ollama/models`: two servers writing one store can corrupt
     /// it, and removing lingoSwen's models must not touch the user's.
     public var models: URL { directory.appending(path: "models", directoryHint: .isDirectory) }
+    /// The server's `HOME`. Ollama keeps state under `~/.ollama` (its key,
+    /// among others): the built-in server keeps it here, never in the
+    /// user's own.
+    public var home: URL { directory.appending(path: "home", directoryHint: .isDirectory) }
     public var pidFile: URL { directory.appending(path: "server.pid") }
     /// Emptied at each start.
     public var log: URL { directory.appending(path: "server.log") }
@@ -54,6 +59,7 @@ public struct BuiltInServerLaunch: Sendable, Equatable {
         for name in BuiltInServer.inheritedVariables {
             if let value = inherited[name] { environment[name] = value }
         }
+        environment["HOME"] = files.home.path(percentEncoded: false)
         let endpoint = OllamaEndpoint.builtIn
         environment["OLLAMA_HOST"] = "\(endpoint.host):\(endpoint.port)"
         environment["OLLAMA_MODELS"] = files.models.path(percentEncoded: false)

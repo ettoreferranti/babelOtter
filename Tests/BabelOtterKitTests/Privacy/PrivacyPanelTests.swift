@@ -52,6 +52,15 @@ struct ListeningProbeTests {
             == .exposed(["*"], everywhere: true))
     }
 
+    @Test("the processes listening on a port are read from p lines (#126)")
+    func owners() {
+        #expect(ListeningProbe.ownerArguments(port: 47_434) == ["-nP", "-iTCP:47434", "-sTCP:LISTEN", "-F", "p"])
+        #expect(ListeningProbe.owners("p4242\nf3\np5151\np4242\n") == [4242, 5151])
+        #expect(ListeningProbe.owners("") == [])
+        #expect(ListeningProbe.owners("pabc\nn127.0.0.1:47434") == [])
+        #expect(ListeningProbe.owners(String(repeating: "f1\n", count: 64) + "p7") == [])
+    }
+
     @Test("lsof is asked about Ollama's port only")
     func arguments() {
         #expect(ListeningProbe.arguments() == ["-nP", "-iTCP:11434", "-sTCP:LISTEN", "-F", "n"])

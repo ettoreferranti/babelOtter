@@ -1,0 +1,7 @@
+# The Ollama bundled in lingoSwen (#126): its official macOS build, unchanged.
+# Changing it is a deliberate commit, followed by an eval run against the
+# default model (docs/superpowers/specs/2026-10-25-built-in-server-design.md).
+# 0.40.8 is the version the golden-set runs of October 2026 used.
+version=0.40.8
+url=https://github.com/ollama/ollama/releases/download/v0.40.8/ollama-darwin.tgz
+sha256=29fce20c736f62aa8885b1e83552c5fd8dcc63edc5ffc1b47f2de591a06cde44

@@ -35,12 +35,13 @@ lingoSwen itself opens **no non-loopback connections**. Ever.
 
 | Traffic | Who opens it | Carries user content? |
 |---|---|---|
-| `http://127.0.0.1:11434` — inference, streaming | lingoSwen | Yes — loopback only |
-| `http://127.0.0.1:11434/api/pull` — model download | lingoSwen | **No** — model name only |
-| Actual model bytes from ollama.com | **the Ollama daemon**, not lingoSwen | No |
+| `http://127.0.0.1:11434` (your own Ollama) or `http://127.0.0.1:47434` (the built-in server) — inference, streaming | lingoSwen | Yes — loopback only |
+| `/api/pull` on either — model download | lingoSwen | **No** — model name only |
+| Actual model bytes from ollama.com | **the Ollama server**, not lingoSwen | No |
+| A model-recommendations list from ollama.com, every few hours | **the Ollama server**, not lingoSwen | No |
 | `git push` / CI | you, manually | No — source code only |
 
-Model downloads are delegated: lingoSwen asks the *local* Ollama daemon to
+Model downloads are delegated: lingoSwen asks the *local* Ollama server to
 fetch a model, and Ollama makes the outbound connection. The app's own egress
 stays loopback-only, so the architectural invariant holds without exception.
 Downloads always require explicit confirmation showing model name and size.
@@ -193,6 +194,31 @@ The only way to remove the exposure entirely is to turn Handoff off:
 **If this matters to you today**, disable Handoff:
 `System Settings → General → AirDrop & Handoff → Handoff: off`.
 
+### The built-in model server
+
+lingoSwen ships Ollama's official macOS build inside the app, pinned to one
+version in `Tools/ollama.lock` and checked against its SHA-256 when the app is
+built. While **Settings › Models › Model server** is **Built-in** (the default
+for a new install), lingoSwen runs it as a child process, and stops it when you
+quit or switch to **My own Ollama**.
+
+- **It listens on `127.0.0.1:47434` only.** lingoSwen sets that address itself,
+  and the Privacy panel checks it. lingoSwen counts the server as running only
+  when `lsof` shows its own child process listening there, so another program
+  that took the port first is never sent your text.
+- **Its files** are under `~/Library/Application Support/ch.lingoswen/ollama/`:
+  `models/` (the downloaded model, about 15 GB), `home/` (Ollama's own state,
+  such as its key, instead of `~/.ollama`), and `server.log`, emptied at each
+  start. At Ollama's default log level the log holds no prompt text, and
+  lingoSwen never raises it.
+- **Its outbound connections:** the model download, only when you press
+  Download; and a model-recommendations list Ollama fetches from ollama.com
+  every few hours, which carries no user content. Ollama offers no switch for
+  the second. Cloud features (remote models, web search) are switched off with
+  `OLLAMA_NO_CLOUD=1`.
+- **Removing it:** switch to My own Ollama, then **Remove Built-in Models** in
+  the same tab, or delete the `ollama` folder above.
+
 ### Ollama's network binding is not under lingoSwen's control
 
 Ollama may bind to all interfaces (`*:11434`) rather than loopback, making it
@@ -204,7 +230,8 @@ system level. To restrict it:
 launchctl setenv OLLAMA_HOST 127.0.0.1:11434   # then restart Ollama
 ```
 
-lingoSwen's Privacy panel warns when it detects a non-loopback binding.
+lingoSwen's Privacy panel warns when it detects a non-loopback binding. This
+concerns your own Ollama; the built-in server's binding is lingoSwen's (above).
 
 ### Ollama keeps its own logs
 
