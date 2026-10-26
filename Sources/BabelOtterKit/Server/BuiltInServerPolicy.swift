@@ -68,6 +68,17 @@ public struct BuiltInServerPolicy: Sendable, Equatable {
         }
     }
 
+    /// The process could not be started at all: no restart, which would
+    /// fail the same way.
+    public mutating func launchFailed(_ reason: String) {
+        stopping = false
+        state = .failed(reason)
+    }
+
+    /// The process could not be started because the binary is not in this
+    /// build: a development build made without `Tools/fetch-ollama.sh`.
+    public static let missingBinary = "the bundled Ollama is missing from this build."
+
     /// The server answered on its port.
     public mutating func reachable() {
         if state == .starting { state = .running }

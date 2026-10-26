@@ -137,6 +137,16 @@ struct BuiltInServerPolicyTests {
         #expect(policy.exited(status: 2, lastLogLine: nil, at: start.addingTimeInterval(2)) == .launch)
     }
 
+    @Test("a launch that fails leaves it failed with the reason, and Restart tries again")
+    func launchFailed() {
+        var policy = BuiltInServerPolicy()
+        _ = policy.start()
+        policy.launchFailed(BuiltInServerPolicy.missingBinary)
+        #expect(policy.state == .failed("the bundled Ollama is missing from this build."))
+        #expect(policy.start() == .launch)
+        #expect(policy.state == .starting)
+    }
+
     @Test("a taken port fails at once, without a restart")
     func portTaken() {
         var policy = BuiltInServerPolicy()

@@ -9,15 +9,16 @@ enum ListeningProbeRunner {
     static let lsof = URL(filePath: "/usr/sbin/lsof")
     static let timeLimit: TimeInterval = 2
 
-    /// Unknown when lsof is missing, fails, or takes too long.
-    static func run() async -> ListeningExposure {
-        await Task.detached { measure() }.value
+    /// Unknown when lsof is missing, fails, or takes too long. `port` is
+    /// the model server's in use (#126).
+    static func run(port: Int) async -> ListeningExposure {
+        await Task.detached { measure(port: port) }.value
     }
 
-    private static func measure() -> ListeningExposure {
+    private static func measure(port: Int) -> ListeningExposure {
         let process = Process()
         process.executableURL = lsof
-        process.arguments = ListeningProbe.arguments()
+        process.arguments = ListeningProbe.arguments(port: port)
         process.environment = ["PATH": "/usr/bin:/bin:/usr/sbin"]
         let output = Pipe()
         process.standardOutput = output

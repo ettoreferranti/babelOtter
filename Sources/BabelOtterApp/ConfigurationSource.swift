@@ -39,6 +39,12 @@ final class ConfigurationSource {
                 previous: .default, loaded: loaded, fileExists: loaded.fileFound, isLaunch: true)
             var problems = Self.summaries(result.problems)
             var configuration = result.configuration
+            if loaded.fileFound, !result.problems.isEmpty {
+                // A file that is there but unreadable belongs to someone
+                // already using lingoSwen: the defaults' built-in server would
+                // offer them a 15 GB download (#126).
+                configuration.modelServer = nil
+            }
             if !loaded.fileFound {
                 do {
                     try store.save(result.configuration)
@@ -60,7 +66,10 @@ final class ConfigurationSource {
             self.fileExistedAtLaunch = loaded.fileFound
         } catch {
             self.store = nil
-            self.configuration = .default
+            var fallback = Configuration.default
+            // Not a fresh install either (see fileExistedAtLaunch).
+            fallback.modelServer = nil
+            self.configuration = fallback
             self.problems = ["using defaults - \(Self.describe(error))"]
             self.isFallback = true
             self.fileProblems = self.problems
