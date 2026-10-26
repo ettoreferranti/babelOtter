@@ -2,11 +2,11 @@
 
 Read this first if you are picking babelOtter up in a new session.
 
-## Start here: v1.0.1 is released; M4 is under way
+## Start here: v1.1.0 is released; M4 is under way
 
-**State.** `v1.0.1` is the first signed and notarized build (#82). It is tagged locally on `main` (`0d734d5`) and handed out privately as a DMG, never through GitHub Releases. Milestones M1b, M2 and M3 are closed. M4 so far: #82 is done (`Tools/release.sh`), and #81 part 1 is merged (French and Italian; Translate with three or more languages, #117). `main` is the only branch. What lingoSwen does, in one line each: Translate, Correct, Explain and Re-pitch from a hotkey or the menu, against a local Ollama only; English, Swiss Standard German, French and Italian (the last two off by default); audience inferred from the text, with formality per target language (#110); local SQLite history with search, retention, off and Clear All; a Settings window (General, Models, Audiences, Glossary, Hotkeys); a concept glossary and a do-not-translate list; a Privacy panel; a first-run setup window. 1029 tests; mutation gate 80%.
+**State.** `v1.1.0` (2026-10-26) is the current release: tagged locally on `main` (`3fa8089`), signed, notarized and handed out privately as a DMG, never through GitHub Releases. It is the first with the built-in model server (#126): lingoSwen bundles Ollama, runs it itself and downloads Mistral Small 3.2 on first launch, so colleagues install one app; anyone already running Ollama keeps **My own Ollama**. Notarization accepted Ollama's own signatures inside the app. Gatekeeper is off on the maintainer's Mac, so the release script's final `spctl` check was skipped; the DMG still has to be opened once on a Mac with Gatekeeper on. Milestones M1b, M2 and M3 are closed. M4 so far: #82 (`Tools/release.sh`), #81 (French and Italian, Correct and Explain beyond German, my language), #122 and #123 (register and dialect fixes), #126 (built-in model server, replacing #103 after the small-model spike); `Tools/mutate.sh` runs mutation testing locally (#128). `main` is the only pushed branch; `spike/small-models` is local and holds the spike write-ups. What lingoSwen does, in one line each: Translate, Correct, Explain and Re-pitch from a hotkey or the menu, against a local model only (built-in or your own Ollama); English, Swiss Standard German, French and Italian (the last two off by default); audience inferred from the text, with formality per target language (#110); local SQLite history with search, retention, off and Clear All; a Settings window (General, Models, Audiences, Glossary, Hotkeys); a concept glossary and a do-not-translate list; a Privacy panel; a first-run setup window. 1082 tests; mutation gate 80%.
 
-**Next:** #81 part 2, Correct and Explain beyond German (they still assume German learners and English explanations). Then the rest of M4: #103 standalone app with a built-in MLX model (signing now works), #84 scratchpad window, #83 popup offered on selection, #80 rich-text formatting, #79 CEFR estimate and drills, #78 recurring mistakes.
+**Next:** the rest of M4: #84 scratchpad window, #83 popup offered on selection, #80 rich-text formatting, #79 CEFR estimate and drills, #78 recurring mistakes.
 
 **Releasing:** `git tag vX.Y.Z && Tools/release.sh` on a clean `main`; README › *Making a release*. **The Developer ID certificate expires 2027-11-22**; a release after that date needs a new one from the team's Account Holder.
 
@@ -30,7 +30,7 @@ Read this first if you are picking babelOtter up in a new session.
 
 ## Update 2026-10-26: built-in model server (#126)
 
-On branch `feature/built-in-server`, not yet a PR. Spec `docs/superpowers/specs/2026-10-25-built-in-server-design.md` (section 7: what changed while building). #103 (small bundled models) is closed after four eval rounds; this replaces it.
+Merged in #127 and released in v1.1.0. Spec `docs/superpowers/specs/2026-10-25-built-in-server-design.md` (section 7: what changed while building). #103 (small bundled models) is closed after four eval rounds; this replaces it.
 
 - **Model server** (`Configuration.modelServer`, absent = your own Ollama): **Built-in** runs the Ollama bundled in the app on `127.0.0.1:47434`, with models, `HOME` and log under `~/Library/Application Support/ch.lingoswen/ollama/`; **My own Ollama** is today's `11434`. New installs get Built-in; an existing or unreadable `config.json` stays on your own.
 - **Bundled Ollama 0.40.8**, pinned by SHA-256 in `Tools/ollama.lock`; `Tools/make-app.sh` fetches it once into `build/cache/` (175 MB download, 541 MB unpacked) and copies it into the app with Ollama's own signatures.
