@@ -413,6 +413,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             guard !isCapturing, currentModel?.isReplacing != true else { return }
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(command, forType: .string)
+        case .restartServer, .downloadModel:
+            break
         case .openKeyboardShortcutsSettings:
             KeyboardShortcutsSettings.open()
         case .showConfiguration:

@@ -43,12 +43,78 @@ struct ReadinessPolicyTests {
         hotKeys: [HotKeyFact] = ReadinessPolicyTests.bothRegistered,
         systemShortcuts: [SystemShortcut] = [],
         configurationProblems: [String] = [],
-        historyProblem: String? = nil
+        historyProblem: String? = nil,
+        builtInServer: BuiltInServerState? = nil
     ) -> ReadinessFacts {
         ReadinessFacts(
             accessibilityGranted: accessibility, probe: probe, models: models,
             hotKeys: hotKeys, systemShortcuts: systemShortcuts,
-            configurationProblems: configurationProblems, historyProblem: historyProblem)
+            configurationProblems: configurationProblems, historyProblem: historyProblem,
+            builtInServer: builtInServer)
+    }
+
+    // MARK: - Built-in server (#126)
+
+    @Test("a running built-in server that answers is ready, as the user's own Ollama is")
+    func builtInReady() {
+        let report = policy.report(for: facts(builtInServer: .running))
+        #expect(report.readiness == .ready)
+        #expect(report.causes.isEmpty)
+    }
+
+    @Test("a starting built-in server is one cause, with nothing about its models yet")
+    func builtInStarting() {
+        let report = policy.report(for: facts(probe: .unreachable(detail: "refused"), builtInServer: .starting))
+        #expect(report.causes == [.serverStarting])
+        #expect(report.readiness == .degraded)
+    }
+
+    @Test("a stopped or failed built-in server is one cause, with its reason")
+    func builtInStopped() {
+        #expect(policy.report(for: facts(builtInServer: .stopped)).causes == [.serverStopped(reason: nil)])
+        #expect(policy.report(for: facts(builtInServer: .failed("it exited with status 2."))).causes
+            == [.serverStopped(reason: "it exited with status 2.")])
+    }
+
+    @Test("a running built-in server that doesn't answer is stopped, not 'Ollama isn't running'")
+    func builtInNotAnswering() {
+        let report = policy.report(for: facts(probe: .unreachable(detail: "timed out"), builtInServer: .running))
+        #expect(report.causes == [.serverStopped(reason: "it isn't answering: timed out")])
+    }
+
+    @Test("a model missing from the built-in server is downloaded, not pulled in a terminal")
+    func builtInModelMissing() {
+        let report = policy.report(for: facts(probe: .reachable(models: []), models: [.translate: "m"], builtInServer: .running))
+        #expect(report.causes == [.modelMissing(action: .translate, model: "m", builtIn: true)])
+        #expect(report.causes.first?.remedy == .downloadModel("m"))
+    }
+
+    @Test("built-in causes have their headers, details and remedies")
+    func builtInWording() {
+        #expect(ReadinessCause.serverStarting.header == "Starting the model server\u{2026}")
+        #expect(ReadinessCause.serverStarting.detail == "Starting the built-in server\u{2026}")
+        #expect(ReadinessCause.serverStarting.remedy == nil)
+        #expect(ReadinessCause.serverStarting.readiness == .degraded)
+        #expect(ReadinessCause.serverStopped(reason: nil).header == "The model server stopped")
+        #expect(ReadinessCause.serverStopped(reason: nil).detail == "The built-in server isn't running.")
+        #expect(ReadinessCause.serverStopped(reason: "x.").detail == "The built-in server stopped: x.")
+        #expect(ReadinessCause.serverStopped(reason: nil).remedy == .restartServer)
+        #expect(ReadinessCause.serverStopped(reason: nil).readiness == .degraded)
+        #expect(ReadinessCause.modelMissing(action: .correct, model: "m:1b", builtIn: true).header
+            == "Correct: m:1b isn't installed")
+        #expect(ReadinessRemedy.restartServer.title == "Restart the Model Server")
+        #expect(ReadinessRemedy.downloadModel("m:1b").title == "Download m:1b\u{2026}")
+    }
+
+    @Test("built-in server causes keep their place: after configuration, before hotkeys")
+    func builtInOrder() {
+        let hotKeys = [HotKeyFact(action: .translate, combination: Self.controlOptionT, registered: false)]
+        let report = policy.report(for: facts(
+            accessibility: false, hotKeys: hotKeys, configurationProblems: ["x"], builtInServer: .starting))
+        #expect(report.causes == [
+            .accessibilityMissing, .configurationProblem("x"), .serverStarting,
+            .hotKeyNotRegistered(action: .translate, combination: "Control-Option-T"),
+        ])
     }
 
     @Test("everything in order is ready, with no causes")

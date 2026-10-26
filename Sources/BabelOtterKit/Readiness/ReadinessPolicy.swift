@@ -81,12 +81,16 @@ public struct ReadinessFacts: Sendable, Equatable {
     /// saved - ...", "History: old records not deleted - ..."); nil when
     /// nothing is (#67, #69).
     public let historyProblem: String?
+    /// The built-in server's state when it is the model server in use;
+    /// nil for the user's own Ollama (#126).
+    public let builtInServer: BuiltInServerState?
 
     public init(
         accessibilityGranted: Bool, probe: DaemonProbe, models: [Action: String],
         hotKeys: [HotKeyFact], systemShortcuts: [SystemShortcut],
         configurationProblems: [String] = [],
-        historyProblem: String? = nil
+        historyProblem: String? = nil,
+        builtInServer: BuiltInServerState? = nil
     ) {
         self.accessibilityGranted = accessibilityGranted
         self.probe = probe
@@ -95,6 +99,7 @@ public struct ReadinessFacts: Sendable, Equatable {
         self.systemShortcuts = systemShortcuts
         self.configurationProblems = configurationProblems
         self.historyProblem = historyProblem
+        self.builtInServer = builtInServer
     }
 }
 
@@ -104,7 +109,14 @@ public enum ReadinessCause: Sendable, Equatable {
     case configurationProblem(String)
     case historyProblem(String)
     case ollamaUnreachable(detail: String)
-    case modelMissing(action: Action, model: String)
+    /// The built-in server is on its way up (#126).
+    case serverStarting
+    /// The built-in server is not running, or not answering; nil when it
+    /// simply isn't running.
+    case serverStopped(reason: String?)
+    /// `builtIn`: the model is downloaded through lingoSwen, not with a
+    /// terminal command (#126).
+    case modelMissing(action: Action, model: String, builtIn: Bool = false)
     case hotKeyNotRegistered(action: Action, combination: String)
     case hotKeyClashesWithSystem(action: Action, combination: String)
 
@@ -114,8 +126,8 @@ public enum ReadinessCause: Sendable, Equatable {
         switch self {
         case .accessibilityMissing:
             return .blocked
-        case .configurationProblem, .historyProblem, .ollamaUnreachable, .modelMissing,
-            .hotKeyNotRegistered, .hotKeyClashesWithSystem:
+        case .configurationProblem, .historyProblem, .ollamaUnreachable, .serverStarting,
+            .serverStopped, .modelMissing, .hotKeyNotRegistered, .hotKeyClashesWithSystem:
             return .degraded
         }
     }
@@ -131,7 +143,12 @@ public enum ReadinessCause: Sendable, Equatable {
         case .ollamaUnreachable(let detail):
             // No period of ours: the daemon's text may already end in one.
             return "Ollama is not reachable: \(detail)"
-        case .modelMissing(let action, let model):
+        case .serverStarting:
+            return BuiltInServerState.starting.status
+        case .serverStopped(let reason):
+            guard let reason else { return BuiltInServerState.stopped.status }
+            return BuiltInServerState.failed(reason).status
+        case .modelMissing(let action, let model, _):
             return "\(action.displayName): the model \(model) is not installed."
         case .hotKeyNotRegistered(let action, let combination):
             return "\(combination) couldn't be registered. Use the menu for \(action.displayName)."
@@ -158,7 +175,11 @@ extension ReadinessCause {
             return text
         case .ollamaUnreachable:
             return "Ollama isn't running"
-        case .modelMissing(let action, let model):
+        case .serverStarting:
+            return "Starting the model server\u{2026}"
+        case .serverStopped:
+            return "The model server stopped"
+        case .modelMissing(let action, let model, _):
             return "\(action.displayName): \(model) isn't installed"
         case .hotKeyNotRegistered(_, let combination):
             return "\(combination) is unavailable: use the menu"
@@ -180,7 +201,12 @@ extension ReadinessCause {
             return nil
         case .ollamaUnreachable:
             return .startOllama
-        case .modelMissing(_, let model):
+        case .serverStarting:
+            return nil
+        case .serverStopped:
+            return .restartServer
+        case .modelMissing(_, let model, let builtIn):
+            if builtIn { return .downloadModel(model) }
             return .copyPullCommand("ollama pull \(model)")
         case .hotKeyNotRegistered:
             return nil
@@ -196,6 +222,10 @@ public enum ReadinessRemedy: Sendable, Equatable {
     case startOllama
     /// The command to paste into a terminal.
     case copyPullCommand(String)
+    /// Start the built-in server again (#126).
+    case restartServer
+    /// Download the model through the built-in server (#126).
+    case downloadModel(String)
     case openKeyboardShortcutsSettings
     case showConfiguration
 
@@ -207,6 +237,10 @@ public enum ReadinessRemedy: Sendable, Equatable {
             return "Start Ollama"
         case .copyPullCommand(let command):
             return "Copy \u{201C}\(command)\u{201D}"
+        case .restartServer:
+            return "Restart the Model Server"
+        case .downloadModel(let model):
+            return "Download \(model)\u{2026}"
         case .openKeyboardShortcutsSettings:
             return "Open Keyboard Shortcuts Settings\u{2026}"
         case .showConfiguration:
@@ -267,13 +301,19 @@ public struct ReadinessPolicy: Sendable {
     /// One cause for an unreachable daemon, however many actions are checked:
     /// whether a model is installed cannot be known then.
     private func daemonCauses(_ facts: ReadinessFacts) -> [ReadinessCause] {
+        if let server = facts.builtInServer {
+            if let cause = serverCause(server, probe: facts.probe) { return [cause] }
+        }
+        let builtIn = facts.builtInServer != nil
         switch facts.probe {
         case .unreachable(let detail):
             return [.ollamaUnreachable(detail: detail)]
         case .reachable(let installed):
             var causes: [ReadinessCause] = []
             for action in Action.allCases {
-                if let cause = modelCause(for: action, models: facts.models, installed: installed) {
+                if let cause = modelCause(
+                    for: action, models: facts.models, installed: installed, builtIn: builtIn)
+                {
                     causes += [cause]
                 }
             }
@@ -281,13 +321,29 @@ public struct ReadinessPolicy: Sendable {
         }
     }
 
+    /// The built-in server's own cause, if it has one: until it runs and
+    /// answers, nothing can be said about its models (#126).
+    private func serverCause(_ server: BuiltInServerState, probe: DaemonProbe) -> ReadinessCause? {
+        switch server {
+        case .starting:
+            return .serverStarting
+        case .stopped:
+            return .serverStopped(reason: nil)
+        case .failed(let reason):
+            return .serverStopped(reason: reason)
+        case .running:
+            guard case .unreachable(let detail) = probe else { return nil }
+            return .serverStopped(reason: "it isn't answering: \(detail)")
+        }
+    }
+
     /// Exact match, tag included, as in `DaemonStatusPolicy`.
     private func modelCause(
-        for action: Action, models: [Action: String], installed: [String]
+        for action: Action, models: [Action: String], installed: [String], builtIn: Bool
     ) -> ReadinessCause? {
         guard let model = models[action] else { return nil }
         if installed.contains(model) { return nil }
-        return .modelMissing(action: action, model: model)
+        return .modelMissing(action: action, model: model, builtIn: builtIn)
     }
 
     /// At most one cause per action. An unregistered hotkey cannot clash, so
