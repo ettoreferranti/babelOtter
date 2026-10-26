@@ -55,6 +55,7 @@ struct ListeningProbeTests {
     @Test("lsof is asked about Ollama's port only")
     func arguments() {
         #expect(ListeningProbe.arguments() == ["-nP", "-iTCP:11434", "-sTCP:LISTEN", "-F", "n"])
+        #expect(ListeningProbe.arguments(port: OllamaEndpoint.builtInPort) == ["-nP", "-iTCP:47434", "-sTCP:LISTEN", "-F", "n"])
     }
 }
 
@@ -77,7 +78,7 @@ struct PrivacyReportTests {
         #expect(report.map(\.title) == ["Model connection", "Ollama listens on", "History", "Dependencies", "Telemetry"])
         #expect(report.allSatisfy { $0.mark == .ok })
         #expect(report.allSatisfy { $0.remedy == nil })
-        #expect(report[0].detail == "http://127.0.0.1:11434 - this Mac only (loopback).")
+        #expect(report[0].detail == "My own Ollama: http://127.0.0.1:11434 - this Mac only (loopback).")
         #expect(report[1].detail == "This Mac only (127.0.0.1), for the Ollama running as you. "
             + "One run by another user or as root would not be seen here.")
         #expect(report[2].detail
@@ -85,6 +86,29 @@ struct PrivacyReportTests {
         #expect(report[3].detail == "0 third-party packages; checked against the allowlist on every change.")
         #expect(report[4].detail
             == "No telemetry, analytics or crash reporting. Nothing is sent anywhere but the local model.")
+    }
+
+    @Test("the built-in server: its port, and listening worded as lingoSwen's own (#126)")
+    func builtIn() {
+        func builtInLines(_ listening: ListeningExposure) -> [PrivacyLine] {
+            PrivacyReport.lines(
+                server: .builtIn, endpoint: .builtIn, listening: listening,
+                historyFolder: "h", historyRefusal: nil, history: .keep(.days(90)), packages: 0)
+        }
+        let report = builtInLines(.loopbackOnly(["127.0.0.1"]))
+        #expect(report.map(\.title) == ["Model connection", "Built-in server listens on", "History", "Dependencies", "Telemetry"])
+        #expect(report[0].detail == "Built-in: http://127.0.0.1:47434 - this Mac only (loopback).")
+        #expect(report[1] == PrivacyLine(
+            title: "Built-in server listens on", detail: "This Mac only (127.0.0.1).", mark: .ok, remedy: nil))
+        let exposed = builtInLines(.exposed(["*"], everywhere: true))[1]
+        #expect(exposed.mark == .warning)
+        #expect(exposed.remedy == nil)
+        #expect(exposed.detail == "*, not this Mac only. Quit lingoSwen and report this: "
+            + "the built-in server should never listen there.")
+        let unknown = builtInLines(.unknown)[1]
+        #expect(unknown.mark == .unknown)
+        #expect(unknown.detail == "Unknown: the built-in server is not running, or macOS did not say. "
+            + "This is not a sign that it is safe.")
     }
 
     @Test("an exposed Ollama warns, says who can reach it, and offers the fix")

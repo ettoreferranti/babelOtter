@@ -37,7 +37,10 @@ public enum PrivacyReport {
     /// iCloud), nil when it is accepted. `historyUnavailable` is why the
     /// history store is not saving (it could not be opened), as the history
     /// recorder knows it: the panel says what history really does.
+    ///
+    /// `server` is the model server in use (#126); `endpoint` is its address.
     public static func lines(
+        server: ModelServer = .own,
         endpoint: OllamaEndpoint, listening: ListeningExposure, historyFolder: String,
         historyRefusal: StorageLocationError?, historyUnavailable: String? = nil,
         history: HistoryPolicy, packages: Int = BuildFacts.thirdPartyPackages
@@ -45,9 +48,9 @@ public enum PrivacyReport {
         [
             PrivacyLine(
                 title: "Model connection",
-                detail: "\(endpoint.baseURL.absoluteString) - this Mac only (loopback).",
+                detail: "\(server.displayName): \(endpoint.baseURL.absoluteString) - this Mac only (loopback).",
                 mark: .ok, remedy: nil),
-            listeningLine(listening),
+            listeningLine(listening, server: server),
             historyLine(historyFolder, historyRefusal, historyUnavailable, history),
             PrivacyLine(
                 title: "Dependencies",
@@ -61,7 +64,8 @@ public enum PrivacyReport {
         ]
     }
 
-    static func listeningLine(_ listening: ListeningExposure) -> PrivacyLine {
+    static func listeningLine(_ listening: ListeningExposure, server: ModelServer = .own) -> PrivacyLine {
+        if server == .builtIn { return builtInListeningLine(listening) }
         let title = "Ollama listens on"
         let risk = " Other devices on your network can use your Ollama and see what is sent to it."
         switch listening {
@@ -83,6 +87,30 @@ public enum PrivacyReport {
                 title: title,
                 detail: "Unknown: Ollama is not running, is run by another user or as root, or "
                     + "macOS did not say. This is not a sign that it is safe.",
+                mark: .unknown, remedy: nil)
+        }
+    }
+
+    /// lingoSwen starts the built-in server bound to 127.0.0.1, so anything
+    /// else is a fault to report, not a setting to suggest (#126).
+    static func builtInListeningLine(_ listening: ListeningExposure) -> PrivacyLine {
+        let title = "Built-in server listens on"
+        switch listening {
+        case .loopbackOnly(let hosts):
+            return PrivacyLine(
+                title: title, detail: "This Mac only (\(hosts.joined(separator: ", "))).",
+                mark: .ok, remedy: nil)
+        case .exposed(let hosts, _):
+            return PrivacyLine(
+                title: title,
+                detail: "\(hosts.joined(separator: ", ")), not this Mac only. Quit lingoSwen and "
+                    + "report this: the built-in server should never listen there.",
+                mark: .warning, remedy: nil)
+        case .unknown:
+            return PrivacyLine(
+                title: title,
+                detail: "Unknown: the built-in server is not running, or macOS did not say. "
+                    + "This is not a sign that it is safe.",
                 mark: .unknown, remedy: nil)
         }
     }
