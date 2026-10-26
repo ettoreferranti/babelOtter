@@ -1,6 +1,6 @@
 # Built-in model server — design
 
-**Status:** design questions answered in conversation 2026-10-25, pending review of this document.
+**Status:** approved in conversation 2026-10-26. Section 7 lists what changed while building.
 **Milestone:** M4. **Covers:** #126 (epic #15), in one PR. It replaces #103, closed after the small-model spike (`docs/evals/2026-10-small-models.md` on `spike/small-models`). **Parent spec:** `2026-09-18-babelotter-design.md` section 4.12 (`FR-ONB-01`–`04`), 4.13 (`FR-OLL-01`–`04`) and the privacy NFRs (`NFR-P1`–`P4`); decision 11 (model pulls go through the daemon) still holds.
 
 ## 1. What it does
@@ -125,3 +125,13 @@ The setup window's Ollama and Model steps (#70) become one **Model** step:
 5. Quit lingoSwen: no `ollama` process from the app is left (`pgrep -fl ch.lingoswen`).
 6. Switch back to My own Ollama: the built-in server stops; Remove Built-in Models frees the space.
 7. Privacy panel in each mode: the right port, loopback only.
+
+## 7. Changed while building
+
+- **The server's own `HOME`** (`ollama/home/`): Ollama keeps state under `~/.ollama` (its key, among others), so with the user's `HOME` it would have written there. Only `PATH` is inherited now.
+- **Ollama fetches a model-recommendations list** from ollama.com every few hours, with no switch to turn it off. It carries no user content; PRIVACY.md says so, next to the model download.
+- **Only our own listener is trusted** (security review): the server counts as running only when `lsof` shows the child process listening on 47434, and actions refuse to run (opening the setup Model step instead) until it is running. Another program that took the port first never gets text.
+- **Readiness keeps one cause per action** for a missing model, as for the user's own Ollama; in Built-in mode its remedy is **Download <model>…**, which opens the setup Model step. The section 1.4 header "Mistral Small 3.2 isn't downloaded" was not used.
+- **An unreadable `config.json`** (or a folder that can't be prepared) falls back to My own Ollama, not the defaults' Built-in: it belongs to someone already using lingoSwen, who must not be offered a 15 GB download.
+- **Ollama keeps its own signatures** inside the app. They are Developer ID, hardened runtime and timestamped; `release.sh` checks each nested Mach-O for the hardened runtime before signing the outer bundle without `--deep`. Notarization of this layout is still to be confirmed on the first release.
+- **Pinned version 0.40.8**, the one the October 2026 eval runs used.
