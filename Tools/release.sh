@@ -73,7 +73,10 @@ plist="$app/Contents/Info.plist"
 # checked first, so a build never ships one that is unsigned or lacks the
 # hardened runtime.
 while IFS= read -r -d '' nested; do
-  if file -b "$nested" | grep -q 'Mach-O'; then
+  # Captured first, as below: a universal binary makes file print several
+  # lines, and grep -q stopping early would read as "not Mach-O".
+  kind="$(file -b "$nested")"
+  if grep -q 'Mach-O' <<<"$kind"; then
     nested_signature="$(codesign --display --verbose=1 "$nested" 2>&1 || true)"
     grep -q 'flags=.*runtime' <<<"$nested_signature" \
       || fail "$nested is not signed with the hardened runtime; check Tools/ollama.lock."

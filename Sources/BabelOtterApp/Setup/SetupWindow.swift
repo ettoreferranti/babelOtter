@@ -36,9 +36,6 @@ final class SetupModel: ObservableObject {
     private var probing = false
     /// The user's own Ollama, probed to offer it when it has the model (#126).
     private let ownClient = OllamaClient.loopback(.loopback, timeout: 2)
-    /// A fresh install's server is chosen once, from the first probe of the
-    /// user's own Ollama (#126).
-    private var initialServerChosen = false
 
     init(
         settings: SettingsModel, environment: @escaping () -> AppEnvironment,
@@ -109,13 +106,15 @@ final class SetupModel: ObservableObject {
         chooseInitialServer(own)
     }
 
-    /// On a fresh install, once: the user's own Ollama when it already has
-    /// the model, else the built-in server the defaults name (#126).
+    /// On a fresh install, once, and never after the user chose a server
+    /// themselves: their own Ollama when it already has the model, else the
+    /// built-in server the defaults name (#126). Remembered across launches.
     private func chooseInitialServer(_ own: DaemonProbe) {
-        if initialServerChosen { return }
-        initialServerChosen = true
-        if UserDefaults.standard.bool(forKey: Self.completedKey) { return }
+        let defaults = UserDefaults.standard
+        if defaults.bool(forKey: SettingsModel.serverChosenKey) { return }
+        if defaults.bool(forKey: Self.completedKey) { return }
         let server = SetupFlow.initialServer(ownOllama: own)
+        defaults.set(true, forKey: SettingsModel.serverChosenKey)
         if server != settings.configuration.server { chooseServer(server) }
     }
 

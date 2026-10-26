@@ -149,6 +149,50 @@ struct BuiltInServerPolicyTests {
         #expect(policy.state == .starting)
     }
 
+    @Test("Restart on a live server stops it, and its exit starts the next one")
+    func restartLive() {
+        var policy = BuiltInServerPolicy()
+        _ = policy.start()
+        policy.reachable()
+        #expect(policy.restart() == .terminate)
+        #expect(policy.state == .starting)
+        #expect(policy.exited(status: 15, lastLogLine: nil, at: start) == .launch)
+        #expect(policy.state == .starting)
+        // That exit was asked for: a crash just after still restarts once.
+        #expect(policy.exited(status: 2, lastLogLine: nil, at: start.addingTimeInterval(1)) == .launch)
+    }
+
+    @Test("Restart on a stopped or failed server starts it")
+    func restartStopped() {
+        var policy = BuiltInServerPolicy()
+        #expect(policy.restart() == .launch)
+        policy.launchFailed("x.")
+        #expect(policy.restart() == .launch)
+    }
+
+    @Test("stopping during a restart cancels the relaunch")
+    func stopDuringRestart() {
+        var policy = BuiltInServerPolicy()
+        _ = policy.start()
+        _ = policy.restart()
+        #expect(policy.stop() == .terminate)
+        #expect(policy.exited(status: 15, lastLogLine: nil, at: start) == .none)
+        #expect(policy.state == .stopped)
+    }
+
+    @Test("a server that never answers is stopped, and stays failed with the reason")
+    func timedOut() {
+        var policy = BuiltInServerPolicy()
+        #expect(policy.timedOut(after: 90) == .none)
+        _ = policy.start()
+        #expect(policy.timedOut(after: 90) == .terminate)
+        #expect(policy.state == .failed("it didn't answer within 90 seconds."))
+        #expect(policy.exited(status: 15, lastLogLine: nil, at: start) == .none)
+        #expect(policy.state == .failed("it didn't answer within 90 seconds."))
+        policy.reachable()
+        #expect(policy.timedOut(after: 90) == .none)
+    }
+
     @Test("a taken port fails at once, without a restart")
     func portTaken() {
         var policy = BuiltInServerPolicy()

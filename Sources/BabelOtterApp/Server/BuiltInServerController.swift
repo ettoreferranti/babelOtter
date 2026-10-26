@@ -28,6 +28,9 @@ final class BuiltInServerController {
     private static let probeInterval = Duration.milliseconds(500)
     /// SIGTERM, then this long, then SIGKILL.
     private static let stopGrace: TimeInterval = 3
+    /// A server that hasn't answered as ours by then is stopped and failed,
+    /// so the menu offers Restart instead of "Starting..." for ever.
+    private static let answerDeadline = 90
 
     var state: BuiltInServerState { policy.state }
 
@@ -37,14 +40,27 @@ final class BuiltInServerController {
             resources: resources, files: files, inherited: ProcessInfo.processInfo.environment)
     }
 
-    /// At launch, on switching to Built-in, and for Restart.
+    /// At launch and on switching to Built-in.
     func start() {
         apply(policy.start())
     }
 
-    /// On switching to the user's own Ollama.
+    /// The Restart remedy: a server that runs but doesn't answer is stopped
+    /// and started again.
+    func restart() {
+        apply(policy.restart())
+    }
+
+    /// On switching to the user's own Ollama, and at launch in that mode, so
+    /// a server left by a crash never keeps running.
     func stop() {
         apply(policy.stop())
+        if process == nil { cleanUpLeftover() }
+    }
+
+    /// Stops a server a crashed lingoSwen left running, whatever the mode.
+    func cleanUpLeftover() {
+        terminateLeftover(bundled: launch.executable.path(percentEncoded: false))
     }
 
     /// At quit: the server must not outlive lingoSwen. Blocks for at most
@@ -130,11 +146,19 @@ final class BuiltInServerController {
         watch?.cancel()
         let client = OllamaClient.loopback(.builtIn, timeout: 2)
         guard let child = process?.processIdentifier else { return }
+        let deadline = ContinuousClock.now + .seconds(Self.answerDeadline)
         watch = Task { [weak self] in
             while !Task.isCancelled {
+                if ContinuousClock.now > deadline {
+                    guard let self, current == self.generation else { return }
+                    self.apply(self.policy.timedOut(after: Self.answerDeadline))
+                    return
+                }
                 if case .reachable = await client.probe() {
                     let owners = await ListeningProbeRunner.owners(port: OllamaEndpoint.builtInPort)
-                    guard owners.contains(child) else {
+                    // Exactly our child: a second listener sharing the port
+                    // fails the check too.
+                    guard owners == [child] else {
                         try? await Task.sleep(for: Self.probeInterval)
                         continue
                     }

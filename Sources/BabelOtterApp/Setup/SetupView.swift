@@ -161,7 +161,16 @@ struct SetupView: View {
     @ViewBuilder private func downloadStatus(_ download: ModelDownload) -> some View {
         if let failure = download.failure {
             status(false, "Download failed: \(failure)")
-            Button("Download Again") { model.settings.startDownload(model.facts.chosenModel) }
+            if model.facts.server == .builtIn, let refusal = model.diskRefusal {
+                status(false, refusal)
+            }
+            Button("Download Again") {
+                if model.facts.server == .builtIn {
+                    model.downloadBuiltIn()
+                } else {
+                    model.settings.startDownload(model.facts.chosenModel)
+                }
+            }
         } else if download.running {
             if let fraction = download.fraction { ProgressView(value: fraction) } else { ProgressView() }
             HStack {

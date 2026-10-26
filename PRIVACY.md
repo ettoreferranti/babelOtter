@@ -44,7 +44,9 @@ lingoSwen itself opens **no non-loopback connections**. Ever.
 Model downloads are delegated: lingoSwen asks the *local* Ollama server to
 fetch a model, and Ollama makes the outbound connection. The app's own egress
 stays loopback-only, so the architectural invariant holds without exception.
-Downloads always require explicit confirmation showing model name and size.
+A download always starts from an explicit action that names the model: a
+confirmation in Settings, or the Download button in setup, which also states
+its size.
 
 ---
 
@@ -204,8 +206,12 @@ quit or switch to **My own Ollama**.
 
 - **It listens on `127.0.0.1:47434` only.** lingoSwen sets that address itself,
   and the Privacy panel checks it. lingoSwen counts the server as running only
-  when `lsof` shows its own child process listening there, so another program
-  that took the port first is never sent your text.
+  when `lsof` shows its own child process as the only listener there, and an
+  action starts only while it is running, so another program that took the
+  port first is not sent your text. The check is made when the server starts,
+  not before every request: a program running as you that took the port in
+  the moment between a crash and the restart could still receive a retry from
+  a popup already open. Such a program could read your selection directly.
 - **Its files** are under `~/Library/Application Support/ch.lingoswen/ollama/`:
   `models/` (the downloaded model, about 15 GB), `home/` (Ollama's own state,
   such as its key, instead of `~/.ollama`), and `server.log`, emptied at each

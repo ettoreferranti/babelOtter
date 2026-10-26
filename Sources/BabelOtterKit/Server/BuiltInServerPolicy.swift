@@ -37,6 +37,8 @@ public struct BuiltInServerPolicy: Sendable, Equatable {
     public private(set) var state: BuiltInServerState = .stopped
     /// Set by `stop()`, so the exit that follows is not taken for a crash.
     private var stopping = false
+    /// Set by `restart()` on a live server: its exit starts the next one.
+    private var restarting = false
     private var lastUnexpectedExit: Date?
 
     public init() {}
@@ -57,6 +59,7 @@ public struct BuiltInServerPolicy: Sendable, Equatable {
 
     /// At quit, and on switching to the user's own Ollama.
     public mutating func stop() -> BuiltInServerEffect {
+        restarting = false
         switch state {
         case .stopped, .failed:
             state = .stopped
@@ -66,6 +69,30 @@ public struct BuiltInServerPolicy: Sendable, Equatable {
             state = .stopped
             return .terminate
         }
+    }
+
+    /// The Restart remedy: a live server that doesn't answer is stopped
+    /// and started again; a stopped or failed one is started.
+    public mutating func restart() -> BuiltInServerEffect {
+        switch state {
+        case .stopped, .failed:
+            return start()
+        case .starting, .running:
+            stopping = true
+            restarting = true
+            state = .starting
+            return .terminate
+        }
+    }
+
+    /// The server never answered in time: it is stopped, and stays failed
+    /// with the reason until Restart.
+    public mutating func timedOut(after seconds: Int) -> BuiltInServerEffect {
+        guard state == .starting else { return .none }
+        restarting = false
+        stopping = true
+        state = .failed("it didn't answer within \(seconds) seconds.")
+        return .terminate
     }
 
     /// The process could not be started at all: no restart, which would
@@ -88,6 +115,14 @@ public struct BuiltInServerPolicy: Sendable, Equatable {
     public mutating func exited(status: Int32, lastLogLine: String?, at now: Date) -> BuiltInServerEffect {
         if stopping {
             stopping = false
+            if restarting {
+                restarting = false
+                lastUnexpectedExit = nil
+                state = .starting
+                return .launch
+            }
+            // A server stopped for not answering keeps saying why.
+            if case .failed = state { return .none }
             state = .stopped
             return .none
         }

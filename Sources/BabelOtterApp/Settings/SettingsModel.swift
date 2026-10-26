@@ -301,7 +301,12 @@ final class SettingsModel: ObservableObject {
 
     // MARK: - Model server (#126)
 
+    /// Set once a server has been chosen, by the user or by setup's first
+    /// look at their own Ollama: setup never chooses again after that.
+    static let serverChosenKey = "modelServerChosen"
+
     func setModelServer(_ server: ModelServer) {
+        UserDefaults.standard.set(true, forKey: Self.serverChosenKey)
         edit(.modelServer) { $0.setModelServer(server) }
         measureBuiltInModels()
     }

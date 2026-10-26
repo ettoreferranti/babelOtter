@@ -59,7 +59,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         settings: settingsWindow.settingsModel,
         environment: { [unowned self] in self.environment },
         startOllama: { [unowned self] in self.startOllama() },
-        restartServer: { [unowned self] in self.builtInServer.start() })
+        restartServer: { [unowned self] in self.builtInServer.restart() })
     private lazy var privacyWindow = PrivacyWindowController(
         historyPolicy: { [unowned self] in self.history.policy },
         historyUnavailable: { [unowned self] in self.history.unavailableReason },
@@ -86,6 +86,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         applyHistoryPolicy()
         pushHistoryProblem()
         builtInServer.onChange = { [weak self] state in self?.serverChanged(state) }
+        builtInServer.cleanUpLeftover()
         applyModelServer()
         openSetupIfFresh()
         monitor.onChange = { [weak self] report in self?.render(report) }
@@ -105,7 +106,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// server does nothing.
     private func applyModelServer() {
         if source.configuration.server == .builtIn {
-            builtInServer.start()
+            // Only from stopped: a failed server keeps its reason until
+            // Restart, rather than restarting on any settings edit.
+            if builtInServer.state == .stopped { builtInServer.start() }
         } else {
             builtInServer.stop()
         }
@@ -446,9 +449,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(command, forType: .string)
         case .restartServer:
-            builtInServer.start()
-        case .downloadModel:
-            setupWindow.showModelStep()
+            builtInServer.restart()
+        case .downloadModel(let model):
+            // Setup downloads the model every action shares; one set for
+            // a single action is downloaded from its row in Settings.
+            if model == environment.configuration.model(for: .translate) {
+                setupWindow.showModelStep()
+            } else {
+                settingsWindow.show()
+            }
         case .openKeyboardShortcutsSettings:
             KeyboardShortcutsSettings.open()
         case .showConfiguration:
