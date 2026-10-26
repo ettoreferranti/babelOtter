@@ -140,11 +140,16 @@ read it.
 
 ## Requirements
 
-- macOS 14+ (developed on macOS 27)
+- macOS 14+ (developed on macOS 27), on an Apple silicon Mac with enough
+  memory for the model (Mistral Small 3.2 takes about 19 GB while loaded)
 - Xcode 16+ / Swift 6
-- [Ollama](https://ollama.com) running locally, with at least one instructed model
+- Nothing else: lingoSwen bundles Ollama and downloads its model on first
+  launch (#126). `Tools/make-app.sh` fetches the pinned Ollama build
+  (`Tools/ollama.lock`) into `build/cache/` the first time it runs.
 
-Recommended Ollama configuration — bind to loopback only:
+To use an Ollama you already run instead, choose **My own Ollama** in
+Settings › Models (setup offers it when your Ollama already has the model).
+Recommended configuration for your own Ollama — bind to loopback only:
 
 ```sh
 launchctl setenv OLLAMA_HOST 127.0.0.1:11434   # then restart Ollama
@@ -156,11 +161,11 @@ Release builds are signed with a Developer ID and notarized by Apple, but are
 not published here; they are handed out directly. If you were given
 `lingoSwen-X.Y.Z.dmg`:
 
-1. Install and start [Ollama](https://ollama.com) first (see above).
-2. Open the DMG and drag lingoSwen to Applications. A newer DMG installs over
+1. Open the DMG and drag lingoSwen to Applications. A newer DMG installs over
    the old one; there is no updater, because it would need the network.
-3. Open lingoSwen from Applications. The setup window walks through the
-   Accessibility grant and the models.
+2. Open lingoSwen from Applications. The setup window walks through the
+   Accessibility grant and the model: a 15 GB download, or your own Ollama
+   when it already has the model.
 
 ---
 

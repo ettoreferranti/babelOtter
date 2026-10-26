@@ -19,9 +19,12 @@ final class ReadinessMonitor {
     var configurationProblems: [String] = []
     /// Set by `AppDelegate` whenever history starts or stops saving (#67).
     var historyProblem: String?
+    /// Set by `AppDelegate` on every state change while the built-in server
+    /// is in use; nil for the user's own Ollama (#126).
+    var builtInServer: BuiltInServerState?
     var onChange: (@MainActor (ReadinessReport) -> Void)?
 
-    private let client: OllamaClient
+    private var client: OllamaClient
     private var models: [Action: String]
     private var inFlight: Task<Void, Never>?
     private var loop: Task<Void, Never>?
@@ -34,13 +37,15 @@ final class ReadinessMonitor {
     private static let probeTimeout: TimeInterval = 5
 
     init(configuration: Configuration) {
-        client = OllamaClient.loopback(timeout: Self.probeTimeout)
+        client = OllamaClient.loopback(configuration.endpoint, timeout: Self.probeTimeout)
         models = Self.models(for: configuration)
     }
 
-    /// A reload changes the models checked from the next check on (#26).
+    /// A reload changes the models checked, and the server asked, from the
+    /// next check on (#26, #126).
     func update(configuration: Configuration) {
         models = Self.models(for: configuration)
+        client = OllamaClient.loopback(configuration.endpoint, timeout: Self.probeTimeout)
     }
 
     /// Every action is checked. One without a configured model falls back to
@@ -81,7 +86,8 @@ final class ReadinessMonitor {
         let facts = ReadinessFacts(
             accessibilityGranted: granted, probe: probe, models: models,
             hotKeys: hotKeys, systemShortcuts: Self.systemShortcuts(),
-            configurationProblems: configurationProblems, historyProblem: historyProblem)
+            configurationProblems: configurationProblems, historyProblem: historyProblem,
+            builtInServer: builtInServer)
         let report = ReadinessPolicy().report(for: facts)
         self.report = report
         inFlight = nil

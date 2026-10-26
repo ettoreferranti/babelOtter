@@ -43,7 +43,7 @@ public enum DaemonStatus: Sendable, Equatable {
         case .modelMissing(let model):
             return "Ollama is running, but the model \(model) is not installed."
         case .unreachable(let detail):
-            return "Ollama is not reachable on \(OllamaEndpoint.loopback.baseURL): \(detail)"
+            return "Ollama is not reachable: \(detail)"
         }
     }
 }

@@ -12,13 +12,18 @@ final class PrivacyModel: ObservableObject {
 
     private let historyPolicy: () -> HistoryPolicy
     private let historyUnavailable: () -> String?
+    private let server: () -> ModelServer
     /// Only the latest check's result is shown.
     private var generation = 0
     private var copies = 0
 
-    init(historyPolicy: @escaping () -> HistoryPolicy, historyUnavailable: @escaping () -> String?) {
+    init(
+        historyPolicy: @escaping () -> HistoryPolicy, historyUnavailable: @escaping () -> String?,
+        server: @escaping () -> ModelServer
+    ) {
         self.historyPolicy = historyPolicy
         self.historyUnavailable = historyUnavailable
+        self.server = server
     }
 
     /// The bundled copy, nil when running outside the app bundle.
@@ -33,8 +38,9 @@ final class PrivacyModel: ObservableObject {
         let current = generation
         lines = []
         checking = true
+        let server = server()
         Task {
-            let listening = await ListeningProbeRunner.run()
+            let listening = await ListeningProbeRunner.run(port: server.endpoint.port)
             let locator = AppStorage.locator()
             let folder = locator.applicationSupportDirectory()
             var refusal: StorageLocationError?
@@ -49,7 +55,7 @@ final class PrivacyModel: ObservableObject {
             }
             guard current == generation else { return }
             lines = PrivacyReport.lines(
-                endpoint: .loopback, listening: listening,
+                server: server, endpoint: server.endpoint, listening: listening,
                 historyFolder: Self.abbreviated(folder), historyRefusal: refusal,
                 historyUnavailable: unavailable, history: historyPolicy())
             checking = false
@@ -88,8 +94,11 @@ final class PrivacyWindowController {
     private let model: PrivacyModel
     private var window: AppWindow?
 
-    init(historyPolicy: @escaping () -> HistoryPolicy, historyUnavailable: @escaping () -> String?) {
-        model = PrivacyModel(historyPolicy: historyPolicy, historyUnavailable: historyUnavailable)
+    init(
+        historyPolicy: @escaping () -> HistoryPolicy, historyUnavailable: @escaping () -> String?,
+        server: @escaping () -> ModelServer
+    ) {
+        model = PrivacyModel(historyPolicy: historyPolicy, historyUnavailable: historyUnavailable, server: server)
     }
 
     func show() {

@@ -1,9 +1,10 @@
 import Foundation
 
-/// The setup window's steps, in order (#70, `FR-ONB-01`).
+/// The setup window's steps, in order (#70, `FR-ONB-01`). The Ollama step
+/// is part of Model since #126: with the built-in server there is no Ollama
+/// to install.
 public enum SetupStep: Int, Sendable, CaseIterable, Comparable {
     case accessibility
-    case ollama
     case model
     case hotkeys
     case tryIt
@@ -11,7 +12,6 @@ public enum SetupStep: Int, Sendable, CaseIterable, Comparable {
     public var title: String {
         switch self {
         case .accessibility: return "Accessibility"
-        case .ollama: return "Ollama"
         case .model: return "Model"
         case .hotkeys: return "Hotkeys"
         case .tryIt: return "Try it"
@@ -26,14 +26,27 @@ public enum SetupStep: Int, Sendable, CaseIterable, Comparable {
 /// What the setup window knows right now.
 public struct SetupFacts: Sendable, Equatable {
     public var accessibilityGranted: Bool
-    /// Nil while the first check is under way.
+    /// The model server in use (#126).
+    public var server: ModelServer
+    /// The built-in server's state; nil when the user's own Ollama is in use.
+    public var builtInServer: BuiltInServerState?
+    /// The server in use, as probed. Nil while the first check is under way.
     public var daemon: DaemonProbe?
+    /// The user's own Ollama on its default port, probed whichever server is
+    /// in use, to offer it when it already has the model (#126).
+    public var ownOllama: DaemonProbe?
     public var chosenModel: String
     public var testSucceeded: Bool
 
-    public init(accessibilityGranted: Bool, daemon: DaemonProbe?, chosenModel: String, testSucceeded: Bool) {
+    public init(
+        accessibilityGranted: Bool, server: ModelServer = .own, builtInServer: BuiltInServerState? = nil,
+        daemon: DaemonProbe?, ownOllama: DaemonProbe? = nil, chosenModel: String, testSucceeded: Bool
+    ) {
         self.accessibilityGranted = accessibilityGranted
+        self.server = server
+        self.builtInServer = builtInServer
         self.daemon = daemon
+        self.ownOllama = ownOllama
         self.chosenModel = chosenModel
         self.testSucceeded = testSucceeded
     }
@@ -51,11 +64,8 @@ public enum SetupFlow {
         case .accessibility:
             if facts.accessibilityGranted { return nil }
             return "Grant Accessibility to continue."
-        case .ollama:
-            guard let daemon = facts.daemon else { return "Checking Ollama\u{2026}" }
-            guard case .reachable = daemon else { return "Ollama isn't running." }
-            return nil
         case .model:
+            if case .builtIn = facts.server { return builtInBlocker(facts) }
             guard let daemon = facts.daemon else { return "Checking Ollama\u{2026}" }
             guard case .reachable(let models) = daemon else { return "Ollama isn't running." }
             if models.contains(facts.chosenModel) { return nil }
@@ -66,6 +76,43 @@ public enum SetupFlow {
             if facts.testSucceeded { return nil }
             return "Translate the sentence to finish."
         }
+    }
+
+    /// The Model step on the built-in server: running, answering, and with
+    /// the model downloaded (#126).
+    private static func builtInBlocker(_ facts: SetupFacts) -> String? {
+        switch facts.builtInServer ?? .stopped {
+        case .stopped, .starting:
+            return BuiltInServerState.starting.status
+        case .failed(let reason):
+            return BuiltInServerState.failed(reason).status
+        case .running:
+            break
+        }
+        guard case .reachable(let models)? = facts.daemon else { return BuiltInServerState.starting.status }
+        if models.contains(facts.chosenModel) { return nil }
+        return "Download \(displayName(of: facts.chosenModel)) to continue."
+    }
+
+    /// "Mistral Small 3.2" for the built-in model, the name for any other.
+    public static func displayName(of model: String) -> String {
+        if model == BuiltInServer.model { return BuiltInServer.modelDisplayName }
+        return model
+    }
+
+    /// True when the user's own Ollama already has the built-in model, so
+    /// the Model step offers it instead of a 15 GB download (#126).
+    public static func offersOwnOllama(_ facts: SetupFacts) -> Bool {
+        guard case .reachable(let models)? = facts.ownOllama else { return false }
+        return models.contains(BuiltInServer.model)
+    }
+
+    /// The server a fresh install starts setup with, once its own Ollama has
+    /// been probed: that Ollama when it already has the model, else built-in.
+    public static func initialServer(ownOllama: DaemonProbe) -> ModelServer {
+        guard case .reachable(let models) = ownOllama else { return .builtIn }
+        if models.contains(BuiltInServer.model) { return .own }
+        return .builtIn
     }
 }
 

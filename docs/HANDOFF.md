@@ -1,4 +1,4 @@
-# Handoff — state as of 2026-10-23
+# Handoff — state as of 2026-10-26
 
 Read this first if you are picking babelOtter up in a new session.
 
@@ -19,7 +19,7 @@ Read this first if you are picking babelOtter up in a new session.
 
 **Pitfalls learned (they cost a CI round each):**
 - **CI is older than this Mac:** Xcode 16.4 / Swift 6.1.2 (mutation in `-c release`) vs local Swift 6.4. A local green build proves little. In SwiftUI views pass closures (`{ f() }`), never method references (`set: f`, `.onSubmit(f)`): 6.1.2 crashed in IRGen (PR #108). Keep `sqlite3_bind_double` calls direct (a helper stored NULL under muter, PR #106).
-- **Mutation gate rules for kit code:** ASCII-only source; no comma-joined conditions in `if`/`guard`/`while`; no ternary whose condition ends in an enum member; no locks; every loop bounded by a constant or a collection, never only a runtime value (muter has no per-mutant timeout; PR #105 hung for 150 minutes).
+- **Mutation gate rules for kit code:** ASCII-only source; no comma-joined conditions in `if`/`guard`/`while`; no ternary whose condition ends in an enum member, and no `if`/`guard` condition that compares with an enum member (`if state == .starting {`): write `if case .starting = state` (muter's baseline broke on it, PR #127); no locks; every loop bounded by a constant or a collection, never only a runtime value (muter has no per-mutant timeout; PR #105 hung for 150 minutes).
 - **Repo guards:** the networking test bans substrings such as `send(`, `connect(`, `(contentsOf:` outside `OllamaClient.swift` (name helpers `write()`, not `send()`); `NoIdentifyingReferencesTests` bans naming the author's employer in tracked files, so use invented proper nouns (e.g. "NORDA") — and keep it out of issue and PR text too, which no test checks.
 - **GitHub closing keywords:** write "Closes #70, closes #71"; "Closes #72 and #73" only closes the first.
 - **Swift 6 lazy properties** that refer to each other need explicit types (a "circular reference" error).
@@ -27,6 +27,29 @@ Read this first if you are picking babelOtter up in a new session.
 - **Editing an issue body that contains "—"** with `${body/…/…}` in the shell silently does nothing; write the body to a file, edit it, and pass `--body-file`.
 
 **Starting a new session:** "Read docs/HANDOFF.md and let's decide what to do next in M4." Everything above, plus the per-feature updates below, is the context.
+
+## Update 2026-10-26: built-in model server (#126)
+
+On branch `feature/built-in-server`, not yet a PR. Spec `docs/superpowers/specs/2026-10-25-built-in-server-design.md` (section 7: what changed while building). #103 (small bundled models) is closed after four eval rounds; this replaces it.
+
+- **Model server** (`Configuration.modelServer`, absent = your own Ollama): **Built-in** runs the Ollama bundled in the app on `127.0.0.1:47434`, with models, `HOME` and log under `~/Library/Application Support/ch.lingoswen/ollama/`; **My own Ollama** is today's `11434`. New installs get Built-in; an existing or unreadable `config.json` stays on your own.
+- **Bundled Ollama 0.40.8**, pinned by SHA-256 in `Tools/ollama.lock`; `Tools/make-app.sh` fetches it once into `build/cache/` (175 MB download, 541 MB unpacked) and copies it into the app with Ollama's own signatures.
+- **Trust:** the server counts as running only when `lsof` shows our child as the only listener on 47434; actions wait until then. Restart once on a crash; failed after a second within a minute, or after 90 s without answering; Restart in the menu.
+- **Setup:** one Model step. Your own Ollama with Mistral → offered (and chosen once on a fresh install); else the 15 GB download with a disk check and Cancel.
+- **Not yet proven:** notarization with Ollama's nested signatures (first release will tell); Ollama's periodic model-recommendations fetch from ollama.com (in PRIVACY.md; no switch for it).
+
+**Manual checks** (`Tools/make-app.sh --run`; the first run downloads Ollama, 175 MB). Your `config.json` is not changed unless a check says so; the way back for checks 3–6 is choosing **My own Ollama** in Settings › Models, and **Remove Built-in Models** frees the space.
+
+| # | Do | Expect |
+|---|---|---|
+| 1 | Launch the new build with your normal setup | Nothing new runs (`pgrep -fl Resources/ollama/ollama` prints nothing); Settings › Models shows **Model server: My own Ollama**; actions work as before |
+| 2 | Privacy panel | "Model connection: My own Ollama: http://127.0.0.1:11434"; "Ollama listens on" as before |
+| 3 | Settings › Models › Model server → **Built-in** | Status "Starting the built-in server…", then "Built-in server running" within seconds; the menu shows "Translate: mistral-small3.2:24b isn't installed" with **Download mistral-small3.2:24b…**. (This writes `"modelServer": "builtIn"` to config.json.) |
+| 4 | That remedy → setup Model step → **Download**; press **Cancel** partway, then **Download Again** | Progress; Cancel stops it with "Cancelled…"; Download Again resumes from where it stopped. Needs about 20 GB free and the full 15 GB at the end |
+| 5 | After the download: Translate, Correct, Explain, Re-pitch | All work, through the built-in server. Privacy panel: "Built-in: http://127.0.0.1:47434" and "Built-in server listens on: This Mac only (127.0.0.1)" |
+| 6 | Quit lingoSwen | `pgrep -fl Resources/ollama/ollama` prints nothing |
+| 7 | Relaunch, then switch back to **My own Ollama** | The built-in server stops; **Remove Built-in Models (15.x GB)…** appears; removing it asks first, then the button goes away |
+| 8 | Fresh-install path, optional: quit, move `~/Library/Application Support/ch.lingoswen/config.json` aside, run `defaults delete ch.lingoswen setupCompleted; defaults delete ch.lingoswen modelServerChosen`, launch | Setup opens; at Model, "Ollama is already on this Mac, with Mistral Small 3.2" with **Use My Ollama** selected; nothing downloads. Way back: quit, move your `config.json` back, `defaults write ch.lingoswen setupCompleted -bool true` |
 
 ## Update 2026-10-23: Correct and Explain beyond German (#81, part 2)
 

@@ -21,6 +21,11 @@ cp Tools/app/Info.plist "$app/Contents/Info.plist"
 cp Tools/app/Mascot.png "$app/Contents/Resources/Mascot.png"
 # The Privacy panel opens this build's own copy (#72).
 cp PRIVACY.md "$app/Contents/Resources/PRIVACY.md"
+# The built-in server (#126): Ollama's official macOS build, pinned in
+# Tools/ollama.lock, unchanged. Its binaries keep Ollama's own Developer ID
+# signatures (hardened runtime, timestamped); the app's signature seals them.
+ollama="$(Tools/fetch-ollama.sh)"
+ditto "$ollama" "$app/Contents/Resources/ollama"
 
 # The app icon, from the same picture padded to a square.
 work="$(mktemp -d)"

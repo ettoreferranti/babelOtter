@@ -49,7 +49,6 @@ struct SetupView: View {
     @ViewBuilder private var content: some View {
         switch model.step {
         case .accessibility: accessibility
-        case .ollama: ollama
         case .model: modelStep
         case .hotkeys: HotKeysSettingsView(model: model.settings)
         case .tryIt: tryIt
@@ -70,53 +69,91 @@ struct SetupView: View {
         }
     }
 
-    private var ollama: some View {
+    /// One step for the model server and its model (#126): the built-in
+    /// server and its download, or the user's own Ollama and its models.
+    private var modelStep: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Ollama").font(.title2.weight(.semibold))
-            Text("lingoSwen uses a language model running on this Mac, through Ollama. Nothing you translate leaves the Mac.")
-                .fixedSize(horizontal: false, vertical: true)
-            switch model.facts.daemon {
-            case .none:
-                status(nil, "Checking\u{2026}")
-            case .reachable?:
-                status(true, "Ollama is running.")
-            case .unreachable?:
-                status(false, model.ollamaInstalled ? "Ollama isn't running." : "Ollama isn't installed.")
-                Button(model.ollamaInstalled ? "Start Ollama" : "Get Ollama") { model.openOllama() }
+            Text("Model").font(.title2.weight(.semibold))
+            if SetupFlow.offersOwnOllama(model.facts) {
+                Text("Ollama is already on this Mac, with \(BuiltInServer.modelDisplayName).")
+                    .fixedSize(horizontal: false, vertical: true)
+                Picker("Model server", selection: Binding(
+                    get: { model.facts.server },
+                    set: { server in model.chooseServer(server) })
+                ) {
+                    Text("Use My Ollama").tag(ModelServer.own)
+                    Text("Use Built-in (a separate \(BuiltInServer.downloadSizeText) download)").tag(ModelServer.builtIn)
+                }
+                .pickerStyle(.radioGroup)
+                .labelsHidden()
+                .disabled(model.settings.isReadOnly)
+            }
+            if model.facts.server == .builtIn {
+                builtInModel
+            } else {
+                ownModel
             }
         }
     }
 
-    private var modelStep: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Model").font(.title2.weight(.semibold))
-            Text("The model every action uses. You can choose one per action later, in Settings.")
-                .fixedSize(horizontal: false, vertical: true)
-            if case .reachable(let names) = model.facts.daemon {
-                let choice = ModelChoice(configured: model.facts.chosenModel, installed: names)
-                Picker("Model", selection: Binding(
-                    get: { model.facts.chosenModel },
-                    set: { name in model.chooseModel(name) })
-                ) {
-                    ForEach(choice.options, id: \.self) { name in Text(name).tag(name) }
-                }
-                .fixedSize()
-                .disabled(model.settings.isReadOnly)
-                if let refusal = model.modelRefusal {
-                    Text(refusal).font(.caption).foregroundStyle(.red)
-                }
-                if choice.isInstalled {
-                    status(true, "\(model.facts.chosenModel) is installed.")
+    @ViewBuilder private var builtInModel: some View {
+        let name = SetupFlow.displayName(of: model.facts.chosenModel)
+        Text("lingoSwen sets up its own model: \(name), a \(BuiltInServer.downloadSizeText) download from Ollama's library. Nothing you translate leaves the Mac.")
+            .fixedSize(horizontal: false, vertical: true)
+        switch model.facts.builtInServer ?? .stopped {
+        case .stopped, .starting:
+            status(nil, BuiltInServerState.starting.status)
+        case .failed(let reason):
+            status(false, BuiltInServerState.failed(reason).status)
+            Button("Restart") { model.restart() }
+        case .running:
+            if case .reachable(let names)? = model.facts.daemon {
+                if names.contains(model.facts.chosenModel) {
+                    status(true, "\(name) is downloaded.")
                 } else if let download = model.settings.download {
                     downloadStatus(download)
+                } else if let refusal = model.diskRefusal {
+                    status(false, refusal)
                 } else {
-                    status(false, "\(model.facts.chosenModel) is not installed.")
-                    Button("Download\u{2026}") { model.settings.startDownload(model.facts.chosenModel) }
-                    Text("Ollama downloads it from the internet; a model can be many gigabytes.")
-                        .font(.caption).foregroundStyle(.secondary)
+                    Button("Download") { model.downloadBuiltIn() }
                 }
             } else {
-                status(nil, "Waiting for Ollama\u{2026}")
+                status(nil, BuiltInServerState.starting.status)
+            }
+        }
+    }
+
+    @ViewBuilder private var ownModel: some View {
+        Text("lingoSwen uses your Ollama on this Mac. Nothing you translate leaves the Mac. You can choose a model per action later, in Settings.")
+            .fixedSize(horizontal: false, vertical: true)
+        switch model.facts.daemon {
+        case .none:
+            status(nil, "Checking\u{2026}")
+        case .unreachable?:
+            status(false, model.ollamaInstalled ? "Ollama isn't running." : "Ollama isn't installed.")
+            Button(model.ollamaInstalled ? "Start Ollama" : "Get Ollama") { model.openOllama() }
+        case .reachable(let names)?:
+            let choice = ModelChoice(configured: model.facts.chosenModel, installed: names)
+            Picker("Model", selection: Binding(
+                get: { model.facts.chosenModel },
+                set: { name in model.chooseModel(name) })
+            ) {
+                ForEach(choice.options, id: \.self) { name in Text(name).tag(name) }
+            }
+            .fixedSize()
+            .disabled(model.settings.isReadOnly)
+            if let refusal = model.modelRefusal {
+                Text(refusal).font(.caption).foregroundStyle(.red)
+            }
+            if choice.isInstalled {
+                status(true, "\(model.facts.chosenModel) is installed.")
+            } else if let download = model.settings.download {
+                downloadStatus(download)
+            } else {
+                status(false, "\(model.facts.chosenModel) is not installed.")
+                Button("Download\u{2026}") { model.settings.startDownload(model.facts.chosenModel) }
+                Text("Ollama downloads it from the internet; a model can be many gigabytes.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
         }
     }
@@ -124,10 +161,23 @@ struct SetupView: View {
     @ViewBuilder private func downloadStatus(_ download: ModelDownload) -> some View {
         if let failure = download.failure {
             status(false, "Download failed: \(failure)")
-            Button("Try Again") { model.settings.startDownload(model.facts.chosenModel) }
+            if model.facts.server == .builtIn, let refusal = model.diskRefusal {
+                status(false, refusal)
+            }
+            Button("Download Again") {
+                if model.facts.server == .builtIn {
+                    model.downloadBuiltIn()
+                } else {
+                    model.settings.startDownload(model.facts.chosenModel)
+                }
+            }
         } else if download.running {
             if let fraction = download.fraction { ProgressView(value: fraction) } else { ProgressView() }
-            Text(download.status).font(.caption).foregroundStyle(.secondary)
+            HStack {
+                Text(download.status).font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                Button("Cancel") { model.settings.cancelDownload() }
+            }
         } else {
             status(nil, "Downloaded; checking\u{2026}")
         }

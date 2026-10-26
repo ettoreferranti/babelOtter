@@ -165,6 +165,10 @@ jobs:
           Sources/BabelOtterKit/Config/HotKeyBindings.swift
           Sources/BabelOtterKit/Config/HistoryRetention.swift
           Sources/BabelOtterKit/Config/LanguageConfig.swift
+          Sources/BabelOtterKit/Config/ModelServer.swift
+          Sources/BabelOtterKit/Server/BuiltInServer.swift
+          Sources/BabelOtterKit/Server/BuiltInServerPolicy.swift
+          Sources/BabelOtterKit/Server/DiskSpacePolicy.swift
           Sources/BabelOtterKit/History/HistoryRecord.swift
           Sources/BabelOtterKit/History/HistoryStore.swift
           Sources/BabelOtterKit/History/HistoryProblem.swift

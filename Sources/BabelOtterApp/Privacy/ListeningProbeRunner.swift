@@ -9,15 +9,29 @@ enum ListeningProbeRunner {
     static let lsof = URL(filePath: "/usr/sbin/lsof")
     static let timeLimit: TimeInterval = 2
 
-    /// Unknown when lsof is missing, fails, or takes too long.
-    static func run() async -> ListeningExposure {
-        await Task.detached { measure() }.value
+    /// Unknown when lsof is missing, fails, or takes too long. `port` is
+    /// the model server's in use (#126).
+    static func run(port: Int) async -> ListeningExposure {
+        await Task.detached { measure(port: port) }.value
     }
 
-    private static func measure() -> ListeningExposure {
+    /// The processes listening on `port`; empty when lsof cannot say (#126).
+    static func owners(port: Int) async -> Set<Int32> {
+        await Task.detached {
+            ListeningProbe.owners(output(ListeningProbe.ownerArguments(port: port)) ?? "")
+        }.value
+    }
+
+    private static func measure(port: Int) -> ListeningExposure {
+        guard let text = output(ListeningProbe.arguments(port: port)) else { return .unknown }
+        return ListeningProbe.parse(text)
+    }
+
+    /// lsof's output, nil when it is missing, fails or takes too long.
+    private static func output(_ arguments: [String]) -> String? {
         let process = Process()
         process.executableURL = lsof
-        process.arguments = ListeningProbe.arguments()
+        process.arguments = arguments
         process.environment = ["PATH": "/usr/bin:/bin:/usr/sbin"]
         let output = Pipe()
         process.standardOutput = output
@@ -25,7 +39,7 @@ enum ListeningProbeRunner {
         do {
             try process.run()
         } catch {
-            return .unknown
+            return nil
         }
         let deadline = DispatchTime.now() + timeLimit
         DispatchQueue.global().asyncAfter(deadline: deadline) {
@@ -33,7 +47,7 @@ enum ListeningProbeRunner {
         }
         let data = output.fileHandleForReading.readDataToEndOfFile()
         process.waitUntilExit()
-        if process.terminationReason == .uncaughtSignal { return .unknown }
-        return ListeningProbe.parse(String(decoding: data, as: UTF8.self))
+        if process.terminationReason == .uncaughtSignal { return nil }
+        return String(decoding: data, as: UTF8.self)
     }
 }

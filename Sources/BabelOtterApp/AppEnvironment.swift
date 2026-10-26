@@ -11,6 +11,6 @@ struct AppEnvironment: Sendable {
 
     init(configuration: Configuration) {
         self.configuration = configuration
-        client = OllamaClient.loopback(timeout: configuration.timeoutSeconds)
+        client = OllamaClient.loopback(configuration.endpoint, timeout: configuration.timeoutSeconds)
     }
 }

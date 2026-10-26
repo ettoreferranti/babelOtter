@@ -9,6 +9,7 @@ enum SettingsField: Hashable {
     case timeout
     case clipboard
     case model(Action)
+    case modelServer
     case hotKey(Action)
     /// The list's own buttons: add, delete, restore.
     case audiences
@@ -53,6 +54,18 @@ final class SettingsModel: ObservableObject {
     @Published private(set) var refusals: [SettingsField: String] = [:]
     @Published private(set) var installed: InstalledModels = .loading
     @Published private(set) var download: ModelDownload?
+    /// The built-in server's state while it is the model server; nil for
+    /// the user's own Ollama (#126). Set by `AppDelegate`.
+    @Published var serverState: BuiltInServerState? {
+        didSet { if serverState != oldValue { loadModels() } }
+    }
+    /// What the built-in models take on disk; nil until measured, or when
+    /// there are none (#126).
+    @Published private(set) var builtInModelsBytes: Int64?
+    /// Why removing the built-in models failed, if it did.
+    @Published private(set) var removalFailure: String?
+    private var downloadTask: Task<Void, Never>?
+    let builtInFiles = BuiltInServerFiles(supportDirectory: AppStorage.locator().applicationSupportDirectory())
     /// The audience just added, whose name field takes focus.
     @Published var addedAudience: String?
     /// What Restore did, under the list.
@@ -246,7 +259,7 @@ final class SettingsModel: ObservableObject {
         }
         download = ModelDownload(model: model, status: "Starting\u{2026}", fraction: nil, failure: nil, running: true)
         let stream = client().pull(model: model)
-        Task {
+        downloadTask = Task {
             do {
                 var finished = false
                 for try await progress in stream {
@@ -257,14 +270,81 @@ final class SettingsModel: ObservableObject {
                 download?.running = false
                 // Ollama reports a failure as a line the stream skips; only
                 // its "success" line means the model is there.
-                if !finished { download?.failure = "Ollama stopped before the download finished." }
+                if !finished {
+                    if Task.isCancelled {
+                        download?.failure = Self.cancelled
+                    } else {
+                        download?.failure = "Ollama stopped before the download finished."
+                    }
+                }
             } catch {
                 download?.running = false
-                download?.failure = error.localizedDescription
+                // Cancel is the user's own choice, not a failure.
+                if Task.isCancelled {
+                    download?.failure = Self.cancelled
+                } else {
+                    download?.failure = error.localizedDescription
+                }
             }
             loadModels()
             modelsChanged()
         }
+    }
+
+    static let cancelled = "Cancelled. Download again to continue where it stopped."
+
+    /// Stops the download; Ollama keeps the parts it has, so the next one
+    /// resumes (#126).
+    func cancelDownload() {
+        downloadTask?.cancel()
+    }
+
+    // MARK: - Model server (#126)
+
+    /// Set once a server has been chosen, by the user or by setup's first
+    /// look at their own Ollama: setup never chooses again after that.
+    static let serverChosenKey = "modelServerChosen"
+
+    func setModelServer(_ server: ModelServer) {
+        UserDefaults.standard.set(true, forKey: Self.serverChosenKey)
+        edit(.modelServer) { $0.setModelServer(server) }
+        measureBuiltInModels()
+    }
+
+    /// Off the main thread: the folder holds gigabytes in a few files, but
+    /// walking it is still disk work.
+    func measureBuiltInModels() {
+        let folder = builtInFiles.models
+        Task {
+            let bytes = await Task.detached { Self.size(of: folder) }.value
+            builtInModelsBytes = bytes > 0 ? bytes : nil
+        }
+    }
+
+    /// Only while the user's own Ollama is in use, so the built-in server
+    /// is stopped and nothing is reading these files.
+    func removeBuiltInModels() {
+        guard configuration.server == .own else { return }
+        removalFailure = nil
+        do {
+            if FileManager.default.fileExists(atPath: builtInFiles.models.path(percentEncoded: false)) {
+                try FileManager.default.removeItem(at: builtInFiles.models)
+            }
+        } catch {
+            removalFailure = error.localizedDescription
+        }
+        measureBuiltInModels()
+    }
+
+    private nonisolated static func size(of folder: URL) -> Int64 {
+        let keys: [URLResourceKey] = [.totalFileAllocatedSizeKey, .isRegularFileKey]
+        guard let items = FileManager.default.enumerator(at: folder, includingPropertiesForKeys: keys) else { return 0 }
+        var total: Int64 = 0
+        for case let item as URL in items {
+            guard let values = try? item.resourceValues(forKeys: Set(keys)) else { continue }
+            if values.isRegularFile == true { total += Int64(values.totalFileAllocatedSize ?? 0) }
+        }
+        return total
     }
 
     private static func fraction(_ progress: PullProgress) -> Double? {

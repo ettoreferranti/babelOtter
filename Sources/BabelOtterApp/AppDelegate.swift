@@ -20,6 +20,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         configuration: { [unowned self] in self.environment.configuration })
     private(set) lazy var environment = AppEnvironment(configuration: source.configuration)
     private lazy var monitor = ReadinessMonitor(configuration: source.configuration)
+    /// The Ollama inside the app, run while it is the model server (#126).
+    private lazy var builtInServer = BuiltInServerController(
+        supportDirectory: AppStorage.locator().applicationSupportDirectory(),
+        resources: Bundle.main.resourceURL ?? Bundle.main.bundleURL)
     private lazy var watcher: ConfigurationWatcher? = makeWatcher()
     /// Set once, when the configuration folder cannot be watched.
     private var watchProblems: [String] = []
@@ -54,10 +58,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private lazy var setupWindow: SetupWindowController = SetupWindowController(
         settings: settingsWindow.settingsModel,
         environment: { [unowned self] in self.environment },
-        startOllama: { [unowned self] in self.startOllama() })
+        startOllama: { [unowned self] in self.startOllama() },
+        restartServer: { [unowned self] in self.builtInServer.restart() })
     private lazy var privacyWindow = PrivacyWindowController(
         historyPolicy: { [unowned self] in self.history.policy },
-        historyUnavailable: { [unowned self] in self.history.unavailableReason })
+        historyUnavailable: { [unowned self] in self.history.unavailableReason },
+        server: { [unowned self] in self.source.configuration.server })
     private lazy var settingsWindow: SettingsWindowController = SettingsWindowController(
         source: source,
         layout: { [unowned self] in self.lastLayout },
@@ -79,15 +85,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         history.onRecord = { [weak self] in self?.historyWindow.recorded() }
         applyHistoryPolicy()
         pushHistoryProblem()
+        builtInServer.onChange = { [weak self] state in self?.serverChanged(state) }
+        builtInServer.cleanUpLeftover()
+        applyModelServer()
         openSetupIfFresh()
         monitor.onChange = { [weak self] report in self?.render(report) }
         render(nil)
         monitor.start()
     }
 
-    /// A popup still open when the app quits keeps its result (#67).
+    /// A popup still open when the app quits keeps its result (#67). The
+    /// built-in server never outlives the app (#126).
     func applicationWillTerminate(_ notification: Notification) {
         currentModel?.recordHistory()
+        builtInServer.stopAndWait()
+    }
+
+    /// Runs the built-in server while it is the model server, and only then
+    /// (#126). Called at launch and on every reload; starting a running
+    /// server does nothing.
+    private func applyModelServer() {
+        if source.configuration.server == .builtIn {
+            // Only from stopped: a failed server keeps its reason until
+            // Restart, rather than restarting on any settings edit.
+            if builtInServer.state == .stopped { builtInServer.start() }
+        } else {
+            builtInServer.stop()
+        }
+        serverChanged(builtInServer.state)
+    }
+
+    private func serverChanged(_ state: BuiltInServerState) {
+        var shown: BuiltInServerState?
+        if source.configuration.server == .builtIn { shown = state }
+        monitor.builtInServer = shown
+        settingsWindow.settingsModel.serverState = shown
+        setupWindow.serverChanged(shown)
+        monitor.refresh()
     }
 
     /// Registration stays non-exclusive; a failure reaches the menu as a
@@ -203,6 +237,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         source.reload()
         environment = AppEnvironment(configuration: source.configuration)
         monitor.update(configuration: source.configuration)
+        applyModelServer()
         updateHotKeys()
         pushConfigurationProblems()
         applyHistoryPolicy()
@@ -413,6 +448,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             guard !isCapturing, currentModel?.isReplacing != true else { return }
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(command, forType: .string)
+        case .restartServer:
+            builtInServer.restart()
+        case .downloadModel(let model):
+            // Setup downloads the model every action shares; one set for
+            // a single action is downloaded from its row in Settings.
+            if model == environment.configuration.model(for: .translate) {
+                setupWindow.showModelStep()
+            } else {
+                settingsWindow.show()
+            }
         case .openKeyboardShortcutsSettings:
             KeyboardShortcutsSettings.open()
         case .showConfiguration:
@@ -457,6 +502,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard AXIsProcessTrusted() else {
             showAccessibilityNeeded(for: action)
             return
+        }
+        // No text goes to the built-in server's port until lingoSwen has
+        // seen its own server answer there (#126); the setup step says why
+        // and offers Restart or the download.
+        if environment.configuration.server == .builtIn {
+            guard builtInServer.state == .running else {
+                setupWindow.showModelStep()
+                return
+            }
         }
         guard let front = NSWorkspace.shared.frontmostApplication,
             front.processIdentifier != ProcessInfo.processInfo.processIdentifier

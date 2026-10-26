@@ -30,16 +30,24 @@ final class SetupModel: ObservableObject {
     let settings: SettingsModel
     private let environment: () -> AppEnvironment
     private let startOllama: () -> Void
+    private let restartServer: () -> Void
     private var loop: Task<Void, Never>?
     private var run: Task<Void, Never>?
     private var probing = false
+    /// The user's own Ollama, probed to offer it when it has the model (#126).
+    private let ownClient = OllamaClient.loopback(.loopback, timeout: 2)
 
-    init(settings: SettingsModel, environment: @escaping () -> AppEnvironment, startOllama: @escaping () -> Void) {
+    init(
+        settings: SettingsModel, environment: @escaping () -> AppEnvironment,
+        startOllama: @escaping () -> Void, restartServer: @escaping () -> Void
+    ) {
         self.settings = settings
         self.environment = environment
         self.startOllama = startOllama
+        self.restartServer = restartServer
         facts = SetupFacts(
-            accessibilityGranted: AXIsProcessTrusted(), daemon: nil,
+            accessibilityGranted: AXIsProcessTrusted(), server: settings.configuration.server,
+            builtInServer: settings.serverState, daemon: nil,
             chosenModel: settings.configuration.model(for: .translate), testSucceeded: false)
     }
 
@@ -58,6 +66,7 @@ final class SetupModel: ObservableObject {
                 guard let self else { return }
                 self.facts.accessibilityGranted = AXIsProcessTrusted()
                 self.facts.chosenModel = self.settings.configuration.model(for: .translate)
+                self.facts.server = self.settings.configuration.server
                 if tick % 2 == 0 {
                     if self.needsOllama { self.probeInBackground() }
                 }
@@ -69,7 +78,7 @@ final class SetupModel: ObservableObject {
 
     private var needsOllama: Bool {
         if mode != .full { return false }
-        return step == .ollama || step == .model
+        return step == .model
     }
 
     private func probeInBackground() {
@@ -90,8 +99,54 @@ final class SetupModel: ObservableObject {
     private func probe() async {
         let client = environment().client
         let probe = await client.probe()
+        let own = await ownClient.probe()
         facts.daemon = probe
+        facts.ownOllama = own
         ollamaInstalled = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.electron.ollama") != nil
+        chooseInitialServer(own)
+    }
+
+    /// On a fresh install, once, and never after the user chose a server
+    /// themselves: their own Ollama when it already has the model, else the
+    /// built-in server the defaults name (#126). Remembered across launches.
+    private func chooseInitialServer(_ own: DaemonProbe) {
+        let defaults = UserDefaults.standard
+        if defaults.bool(forKey: SettingsModel.serverChosenKey) { return }
+        if defaults.bool(forKey: Self.completedKey) { return }
+        let server = SetupFlow.initialServer(ownOllama: own)
+        defaults.set(true, forKey: SettingsModel.serverChosenKey)
+        if server != settings.configuration.server { chooseServer(server) }
+    }
+
+    /// The built-in server's state changed, or the model server did.
+    func serverChanged(_ state: BuiltInServerState?) {
+        facts.builtInServer = state
+        facts.server = settings.configuration.server
+    }
+
+    func chooseServer(_ server: ModelServer) {
+        settings.setModelServer(server)
+        facts.server = settings.configuration.server
+        facts.daemon = nil
+        resetTest()
+    }
+
+    func restart() {
+        restartServer()
+    }
+
+    /// Why Download may not start, if it may not: too little free space.
+    var diskRefusal: String? {
+        let folder = settings.builtInFiles.directory.deletingLastPathComponent()
+        let values = try? folder.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
+        guard let available = values?.volumeAvailableCapacityForImportantUsage else { return nil }
+        return DiskSpacePolicy.refusal(availableBytes: available)
+    }
+
+    /// The built-in model's download, after the disk check.
+    func downloadBuiltIn() {
+        if diskRefusal != nil { return }
+        settings.startDownload(facts.chosenModel)
     }
 
     /// A fresh walk-through, or another model: the test is due again.
@@ -187,8 +242,26 @@ final class SetupWindowController: NSObject, NSWindowDelegate {
     private let model: SetupModel
     private var window: AppWindow?
 
-    init(settings: SettingsModel, environment: @escaping () -> AppEnvironment, startOllama: @escaping () -> Void) {
-        model = SetupModel(settings: settings, environment: environment, startOllama: startOllama)
+    init(
+        settings: SettingsModel, environment: @escaping () -> AppEnvironment,
+        startOllama: @escaping () -> Void, restartServer: @escaping () -> Void
+    ) {
+        model = SetupModel(
+            settings: settings, environment: environment, startOllama: startOllama,
+            restartServer: restartServer)
+    }
+
+    func serverChanged(_ state: BuiltInServerState?) {
+        model.serverChanged(state)
+    }
+
+    /// The Model step, for the menu's Download remedy (#126): over a full
+    /// walk-through already open, it moves there.
+    func showModelStep() {
+        if !isOpen { model.resetTest() }
+        model.mode = .full
+        model.step = .model
+        present()
     }
 
     var isOpen: Bool { window?.isVisible ?? false }

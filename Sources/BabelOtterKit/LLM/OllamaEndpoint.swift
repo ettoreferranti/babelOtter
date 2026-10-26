@@ -58,8 +58,15 @@ public struct OllamaEndpoint: Sendable, Equatable, Hashable {
         return value
     }
 
-    /// The endpoint babelOtter always uses.
+    /// The port of the Ollama bundled in the app (#126): fixed, so the
+    /// Privacy panel can check it, and away from a user's own Ollama.
+    public static let builtInPort = 47_434
+
+    /// The user's own Ollama, on its default port.
     public static let loopback = OllamaEndpoint(host: "127.0.0.1")!
+
+    /// The bundled Ollama that lingoSwen runs itself (#126).
+    public static let builtIn = OllamaEndpoint(host: "127.0.0.1", port: builtInPort)!
 
     /// Always returns ``loopback``, whatever the environment says.
     ///

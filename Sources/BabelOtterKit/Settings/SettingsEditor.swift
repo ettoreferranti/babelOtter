@@ -201,6 +201,12 @@ public struct SettingsEditor: Sendable, Equatable {
         configuration.models[action] = name
     }
 
+    /// Which Ollama to talk to (#126). The models stay as they are: the
+    /// other server is asked for the same names.
+    public mutating func setModelServer(_ server: ModelServer) {
+        configuration.modelServer = server
+    }
+
     // MARK: - Audiences
 
     /// Sie, no guidance, no terms; returns the new id.
