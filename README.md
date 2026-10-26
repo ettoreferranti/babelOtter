@@ -198,30 +198,29 @@ swift test                     # pure unit + contract tests, no Ollama needed
 swift run babelotter-eval      # score models against the golden set (needs Ollama)
 ```
 
-Mutation testing runs in **two passes**, never as a bare `muter run`. A muter
-bug mis-parses the comma-conjunction `while` condition in `StorageLocator`, and
-because muter compiles every mutant for a file into one binary, that single
-invalid mutant makes the whole file unmeasurable — so a plain `muter run` fails
-rather than reporting a score. The full writeup is at the top of
-`muter.conf.yml`.
+Mutation testing runs on every pull request that touches the kit (CI's
+*Mutation* job, at least 80% of mutants killed). Run it here first with:
 
 ```sh
-# Pass 1 — every core file except StorageLocator, all operators.
-muter run \
-  --files-to-mutate Sources/BabelOtterKit/LLM/OllamaEndpoint.swift \
-  --files-to-mutate Sources/BabelOtterKit/BabelOtterKit.swift \
-  --files-to-mutate Sources/BabelOtterKit/Privacy/UserText.swift
-
-# Pass 2 — StorageLocator, with the mis-parsing operator excluded.
-muter run \
-  --files-to-mutate Sources/BabelOtterKit/Privacy/StorageLocator.swift \
-  --operators ChangeLogicalConnector RemoveSideEffects SwapTernary
+Tools/mutate.sh              # kit files changed since main
+Tools/mutate.sh <file>...    # those kit files
+Tools/mutate.sh --all        # every kit file, as CI does (long)
+Tools/mutate.sh --check      # only: does the workflow list every kit file?
 ```
 
-`.github/workflows/ci.yml` is the source of truth for which file belongs to
-which pass, and it fails loudly if a new file under `Sources/BabelOtterKit/` is
-not assigned to one — so copy the lists from there rather than from here if the
-two ever disagree.
+The script installs muter once into `build/tools/` (the same pinned tag,
+checksum and patch as CI), checks that `.github/workflows/mutation.yml` lists
+every file under `Sources/BabelOtterKit/` (a new file must be added to its
+`PASS1`), and applies CI's gate. This Mac's Swift is newer than CI's, so a
+local pass does not replace CI.
+
+Mutation testing runs in **two passes**, never as a bare `muter run`: a muter
+bug mis-parses the comma-conjunction `while` condition in `StorageLocator`, and
+because muter compiles every mutant for a file into one binary, that single
+invalid mutant makes the whole file unmeasurable. `StorageLocator` therefore
+runs alone with that operator left out (`PASS2`); the full writeup is at the
+top of `muter.conf.yml`. The workflow is the source of truth for which file
+belongs to which pass, and `Tools/mutate.sh` reads its lists from there.
 
 ### Making a release
 
