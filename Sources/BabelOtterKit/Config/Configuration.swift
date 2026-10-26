@@ -58,6 +58,10 @@ public struct Configuration: Sendable, Equatable, Codable {
     /// Optional so an older file loads unchanged: nil means English. Use
     /// `mine`.
     public var myLanguage: LanguageCode?
+    /// Which Ollama to talk to (#126). Optional so a file from before #126
+    /// loads unchanged, as the user's own Ollama: everyone running lingoSwen
+    /// then keeps what they have. Use `server`.
+    public var modelServer: ModelServer?
 
     public init(
         languages: [LanguageConfig],
@@ -71,7 +75,8 @@ public struct Configuration: Sendable, Equatable, Codable {
         minimumLengthForDetection: Int,
         strictCaptureOnly: Bool = false,
         hotkeys: HotKeyBindings? = nil,
-        myLanguage: LanguageCode? = nil
+        myLanguage: LanguageCode? = nil,
+        modelServer: ModelServer? = nil
     ) {
         self.languages = languages
         self.profiles = profiles
@@ -85,6 +90,17 @@ public struct Configuration: Sendable, Equatable, Codable {
         self.strictCaptureOnly = strictCaptureOnly
         self.hotkeys = hotkeys
         self.myLanguage = myLanguage
+        self.modelServer = modelServer
+    }
+
+    /// The model server in use: the one named, else the user's own Ollama.
+    public var server: ModelServer {
+        modelServer ?? .own
+    }
+
+    /// Where every request goes.
+    public var endpoint: OllamaEndpoint {
+        server.endpoint
     }
 
     public var enabledLanguages: [LanguageConfig] {
@@ -190,7 +206,8 @@ extension Configuration {
         detectionConfidenceFloor: 0.65,
         minimumLengthForDetection: 12,
         strictCaptureOnly: false,
-        hotkeys: HotKeyBindings.defaults
+        hotkeys: HotKeyBindings.defaults,
+        modelServer: .builtIn
     )
 }
 

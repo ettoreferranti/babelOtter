@@ -311,6 +311,11 @@ struct OllamaClientTests {
         #expect(client.endpoint == .loopback)
     }
 
+    @Test("loopback(_:timeout:) targets the endpoint it is given (#126)")
+    func loopbackTargetsGivenEndpoint() {
+        #expect(OllamaClient.loopback(.builtIn, timeout: 5).endpoint == .builtIn)
+    }
+
     @Test("installed models are read from the tags endpoint")
     func installedModels() async throws {
         let transport = FakeTransport(chunks: [

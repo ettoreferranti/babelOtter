@@ -35,8 +35,13 @@ public struct OllamaClient: Sendable {
     /// one directly trips the guard. This factory keeps that construction
     /// here, where it is reviewed and allowlisted, instead of adding a second
     /// allowlist entry for a caller that only ever wants the real transport.
-    public static func loopback(timeout: TimeInterval) -> OllamaClient {
-        OllamaClient(transport: URLSessionTransport(timeout: timeout))
+    ///
+    /// `endpoint` picks which local server (#126): the user's own Ollama by
+    /// default, or the built-in one. Both are loopback by construction.
+    public static func loopback(
+        _ endpoint: OllamaEndpoint = .loopback, timeout: TimeInterval
+    ) -> OllamaClient {
+        OllamaClient(endpoint: endpoint, transport: URLSessionTransport(timeout: timeout))
     }
 
     /// Streams a chat completion as classified events.
