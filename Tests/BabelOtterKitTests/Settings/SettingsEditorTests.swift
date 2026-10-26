@@ -106,4 +106,17 @@ struct SettingsEditorTests {
         #expect(editor.configuration.models[.translate] == Configuration.defaultModel)
         #expect(SettingsRefusal.emptyModel.message == "Choose a model.")
     }
+
+    @Test("the model server is set, and the models stay as they are (#126)")
+    func modelServer() throws {
+        var configuration = Configuration.default
+        configuration.models[.explain] = "qwen3:14b"
+        var editor = SettingsEditor(configuration: configuration)
+        editor.setModelServer(.own)
+        #expect(editor.configuration.server == .own)
+        #expect(editor.configuration.models[.explain] == "qwen3:14b")
+        try expectRoundTrip(editor)
+        editor.setModelServer(.builtIn)
+        #expect(editor.configuration.modelServer == .builtIn)
+    }
 }

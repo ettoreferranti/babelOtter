@@ -49,7 +49,6 @@ struct SetupView: View {
     @ViewBuilder private var content: some View {
         switch model.step {
         case .accessibility: accessibility
-        case .ollama: ollama
         case .model: modelStep
         case .hotkeys: HotKeysSettingsView(model: model.settings)
         case .tryIt: tryIt

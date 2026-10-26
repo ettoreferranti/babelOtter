@@ -69,7 +69,7 @@ final class SetupModel: ObservableObject {
 
     private var needsOllama: Bool {
         if mode != .full { return false }
-        return step == .ollama || step == .model
+        return step == .model
     }
 
     private func probeInBackground() {
