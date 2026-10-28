@@ -32,7 +32,7 @@ Read this first if you are picking babelOtter up in a new session.
 
 On `feature/scratchpad`. Spec `docs/superpowers/specs/2026-10-28-scratchpad-design.md`. A **Scratchpad...** menu item opens a window: type or paste a text, pick Translate, Correct, Explain or Re-pitch with the popup's controls, press **Run** (Cmd-Return), and the result appears beside it. Nothing runs by itself; a changed setting marks the result **Out of date**. Long texts are cut at blank lines into chunks of up to 1,500 characters (`ChunkPlan`) and run one after another (`ChunkedRun`); Translate infers the audience on the first chunk and fixes it for the rest. **Stop**, or a failed chunk, keeps the chunks done and turns Run into **Continue**. Explain is not chunked and is capped at 6,000 characters (`ScratchpadPolicy`). Copy only, no Replace; no Accessibility needed; the built-in server gate applies. Each finished run is one History record with the app "Scratchpad". `Tools/mutate.sh` now also picks up staged and new kit files.
 
-**Manual checks** (`Tools/make-app.sh --run`, with the real model). Nothing changes your `config.json`; the checks add History records, which History's Clear All removes. For S10, switch lingoSwen back on in System Settings › Privacy & Security › Accessibility afterwards.
+**Manual checks: all passed on 2026-10-28.** (`Tools/make-app.sh --run`, with the real model.) Nothing changes your `config.json`; the checks add History records, which History's Clear All removes. For S10, switch lingoSwen back on in System Settings › Privacy & Security › Accessibility afterwards.
 
 | # | Do | Expect |
 |---|---|---|
