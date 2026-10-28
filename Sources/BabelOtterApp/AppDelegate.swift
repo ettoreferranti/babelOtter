@@ -60,6 +60,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         environment: { [unowned self] in self.environment },
         startOllama: { [unowned self] in self.startOllama() },
         restartServer: { [unowned self] in self.builtInServer.restart() })
+    /// Kept for the whole run, so its text survives closing it (#84).
+    private lazy var scratchpadWindow = ScratchpadWindowController(model: ScratchpadModel(
+        environment: { [unowned self] in self.environment },
+        record: { [weak self] record in self?.history.record(record) },
+        openSetup: { [unowned self] in self.setupWindow.showModelStep() }))
     private lazy var privacyWindow = PrivacyWindowController(
         historyPolicy: { [unowned self] in self.history.policy },
         historyUnavailable: { [unowned self] in self.history.unavailableReason },
@@ -121,6 +126,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         monitor.builtInServer = shown
         settingsWindow.settingsModel.serverState = shown
         setupWindow.serverChanged(shown)
+        scratchpadWindow.model.serverState = shown
         monitor.refresh()
     }
 
@@ -297,6 +303,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(correctItem)
         menu.addItem(explainItem)
         menu.addItem(repitchItem)
+        menu.addItem(action("Scratchpad\u{2026}", #selector(showScratchpadAction)))
         menu.addItem(.separator())
         menu.addItem(action("Settings\u{2026}", #selector(showSettingsAction)))
         let historyItem = action("History\u{2026}", #selector(showHistoryAction))
@@ -318,6 +325,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
 
+
+    @objc private func showScratchpadAction() { scratchpadWindow.show() }
 
     @objc private func showHistoryAction() { historyWindow.show() }
 

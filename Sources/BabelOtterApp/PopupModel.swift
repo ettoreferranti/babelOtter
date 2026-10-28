@@ -658,7 +658,7 @@ final class PopupModel {
         }
     }
 
-    private static func describeExplanation(_ error: any Error, _ configuration: Configuration) -> String {
+    static func describeExplanation(_ error: any Error, _ configuration: Configuration) -> String {
         if let failure = error as? ExplanationFailure {
             switch failure {
             case .alreadyMine(let code):
@@ -709,7 +709,7 @@ final class PopupModel {
         }
     }
 
-    private static func describeCorrection(_ error: any Error) -> String {
+    static func describeCorrection(_ error: any Error) -> String {
         if let failure = error as? CorrectionFailure {
             switch failure {
             case .notEnabled(let code): return "This looks like \(code), which is not one of your languages."

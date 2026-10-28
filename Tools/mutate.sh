@@ -6,7 +6,8 @@
 # and log-decoding patch as CI (#94). This Mac's Swift is newer than CI's
 # (6.1.2), so a local pass does not replace CI; it catches the rest early.
 #
-#   Tools/mutate.sh              kit files changed since main
+#   Tools/mutate.sh              kit files changed since main: committed, staged,
+#                                unstaged or new
 #   Tools/mutate.sh <file>...    those kit files
 #   Tools/mutate.sh --all        every kit file, both passes, as CI (long)
 #   Tools/mutate.sh --check      only check that mutation.yml lists every kit file
@@ -69,7 +70,7 @@ case "${1:-}" in
     files="$actual"
     ;;
   "")
-    files="$(git diff --name-only main...HEAD -- Sources/BabelOtterKit; git diff --name-only -- Sources/BabelOtterKit)"
+    files="$(git diff --name-only main...HEAD -- Sources/BabelOtterKit; git diff --name-only HEAD -- Sources/BabelOtterKit; git ls-files --others --exclude-standard -- Sources/BabelOtterKit)"
     files="$(printf '%s\n' "$files" | grep -E '\.swift$' | sort -u || true)"
     # Deleted files have nothing to mutate.
     existing=""
