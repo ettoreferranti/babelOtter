@@ -28,6 +28,25 @@ Read this first if you are picking babelOtter up in a new session.
 
 **Starting a new session:** "Read docs/HANDOFF.md and let's decide what to do next in M4." Everything above, plus the per-feature updates below, is the context.
 
+## Update 2026-10-28: the scratchpad window (#84)
+
+On `feature/scratchpad`. Spec `docs/superpowers/specs/2026-10-28-scratchpad-design.md`. A **Scratchpad...** menu item opens a window: type or paste a text, pick Translate, Correct, Explain or Re-pitch with the popup's controls, press **Run** (Cmd-Return), and the result appears beside it. Nothing runs by itself; a changed setting marks the result **Out of date**. Long texts are cut at blank lines into chunks of up to 1,500 characters (`ChunkPlan`) and run one after another (`ChunkedRun`); Translate infers the audience on the first chunk and fixes it for the rest. **Stop**, or a failed chunk, keeps the chunks done and turns Run into **Continue**. Explain is not chunked and is capped at 6,000 characters (`ScratchpadPolicy`). Copy only, no Replace; no Accessibility needed; the built-in server gate applies. Each finished run is one History record with the app "Scratchpad". `Tools/mutate.sh` now also picks up staged and new kit files.
+
+**Manual checks** (with the real model):
+
+| # | Do | Expect |
+|---|---|---|
+| S1 | Menu > Scratchpad...; paste a one-paragraph English text; Translate; Run | German (or your target) appears on the right; the audience note says where the audience came from |
+| S2 | Same window: switch to Correct, Explain, Re-pitch in turn, Run each | Correct shows the diff and the errors; Explain the summary and notes; Re-pitch the same language rewritten |
+| S3 | Paste a ~5,000-character German text with several paragraphs; Translate into English; Run | "Part 1 of 4..." and so on; parts appear as they finish; the paragraphs and blank lines match the source; one audience throughout |
+| S4 | During S3, press Stop (or Escape) | The parts done stay; the bar says "Stopped after n of m parts."; the button says Continue; Continue finishes the rest |
+| S5 | After a run, change the style note | The result dims and shows "Out of date"; Run (not Continue) runs again from the start |
+| S6 | Explain with a text over 6,000 characters | Run is off; the bar says to shorten the text |
+| S7 | Settings > Models: Restart the built-in server, then open the scratchpad at once | Run is off with "Starting the built-in server..." and Open Setup; it turns on when the server runs |
+| S8 | History... | Each finished run is a record with the app "Scratchpad"; stopped runs are not |
+| S9 | Close the window and reopen it from the menu | The text and the result are still there; after quitting lingoSwen they are gone |
+| S10 | With Accessibility switched off for lingoSwen | The scratchpad still runs |
+
 ## Update 2026-10-26: built-in model server (#126)
 
 Merged in #127 and released in v1.1.0. Spec `docs/superpowers/specs/2026-10-25-built-in-server-design.md` (section 7: what changed while building). #103 (small bundled models) is closed after four eval rounds; this replaces it.

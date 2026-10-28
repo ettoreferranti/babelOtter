@@ -80,3 +80,11 @@ Today a text goes to the model in one request. For the scratchpad, the source is
 
 - Unit tests for `ChunkPlanner` (blank-line splitting, packing, an over-long paragraph, separators round-trip byte for byte, CRLF, leading/trailing blank lines), `ChunkedRun` (audience fixed after chunk 1, Correct merge order, resume from the failed chunk, Stop), `ScratchpadPolicy` (every state × button, the Explain cap, out of date) and the History record.
 - Manual checks, in HANDOFF, with the real model: a one-paragraph text per action; a ~5,000-character German text translated to English (several chunks, one audience, paragraphs kept); Stop mid-run; a Continue after stopping the server mid-run; Run disabled while the built-in server starts; History shows Scratchpad records; the window works with Accessibility off.
+
+## 8. Changed while building
+
+- The Into menu shows only with three or more languages, as in the popup; with two, the direction is detected and Swap reverses it. A Swap holds until the source text changes.
+- A Run that sends nothing ("This is already in English.") says so in the bar and leaves the result on screen as it was.
+- Return in the style note does not run; only Run and Cmd-Return do.
+- Continue reuses the configuration the run started with, so one text never mixes two models, and its History record names that model.
+- Stop pressed after the last chunk is in does nothing: the joined result is already on its way.
