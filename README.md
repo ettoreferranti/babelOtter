@@ -90,8 +90,8 @@ add a free-text style note per invocation ("shorter", "more encouraging").
 
 Languages are pure configuration, not hardcoded. lingoSwen ships with **English**
 and **Swiss Standard German (de-CH)** enabled — which means `ß` is never emitted,
-always `ss` — and **French** and **Italian** switched off; Settings › General
-turns them on. Any other language is a config entry with its own locale rules.
+always `ss` — and **French**, **Italian** and **Spanish** switched off; Settings ›
+General turns them on. Any other language is a config entry with its own locale rules.
 
 With three or more languages on, Translate goes to the target you last chose for
 the detected language (it asks the first time), and the popup's header becomes a
@@ -102,7 +102,7 @@ best. Correct works on any enabled language and explains its changes in my
 language; a text in my own language is proofread as a native speaker's. Explain
 explains a text in any other enabled language, in my language. Each language can
 carry its own notes for Correct (`correctionNotes` in `config.json`); German,
-French and Italian ship with some.
+French, Italian and Spanish ship with some.
 
 ### Terminology control
 

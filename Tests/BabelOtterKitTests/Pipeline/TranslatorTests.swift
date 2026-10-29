@@ -511,9 +511,11 @@ struct TranslatorTests {
         #expect(subject.direction(from: nil, into: LanguageCode("fr")) == nil)
     }
 
+    /// English, de-CH, French and Italian on (#81); Spanish (#132) stays off.
     private func allFour(_ configuration: inout Configuration) {
         for index in configuration.languages.indices {
-            configuration.languages[index].enabled = true
+            let isSpanish = configuration.languages[index].code == LanguageConfig.spanish.code
+            configuration.languages[index].enabled = !isSpanish
         }
     }
 

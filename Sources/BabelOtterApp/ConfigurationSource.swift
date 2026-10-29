@@ -52,8 +52,8 @@ final class ConfigurationSource {
                     problems += ["using defaults - could not write the file (\(error.localizedDescription))"]
                 }
             } else if result.problems.isEmpty, let added = configuration.addingMissingShippedLanguages() {
-                // A file from before French and Italian shipped gains them,
-                // switched off, once (#81). Never written over a file with
+                // A file from before a language shipped gains it, switched
+                // off, once (#81, #132). Never written over a file with
                 // problems; if the write fails they are still offered now.
                 configuration = added
                 try? store.save(added)

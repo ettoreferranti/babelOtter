@@ -150,15 +150,15 @@ public struct Configuration: Sendable, Equatable, Codable {
     }
 
     /// This configuration with every shipped language it lacks appended,
-    /// switched off, so an existing file gains French and Italian as toggles
-    /// (#81); nil when none is missing, so the caller knows not to write.
+    /// switched off, so an existing file gains French, Italian (#81) and
+    /// Spanish (#132) as toggles; nil when none is missing, so the caller
+    /// knows not to write.
     /// A language counts as present when any configured language shares its
     /// base subtag: a user's own `fr-CH` keeps `fr` out.
     public func addingMissingShippedLanguages() -> Configuration? {
         var added = self
         for shipped in LanguageConfig.shippedDefaults {
-            let present = languages.contains { $0.code.baseSubtag == shipped.code.baseSubtag }
-            if !present {
+            if !hasLanguage(sharingBaseWith: shipped.code) {
                 var language = shipped
                 language.enabled = false
                 added.languages.append(language)
@@ -166,6 +166,15 @@ public struct Configuration: Sendable, Equatable, Codable {
         }
         if added.languages.count == languages.count { return nil }
         return added
+    }
+
+    /// A loop, not `contains` with a closure: muter reports mutants inside
+    /// closures as survivors.
+    private func hasLanguage(sharingBaseWith code: LanguageCode) -> Bool {
+        for language in languages where language.code.baseSubtag == code.baseSubtag {
+            return true
+        }
+        return false
     }
 }
 

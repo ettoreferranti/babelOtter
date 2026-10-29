@@ -28,6 +28,24 @@ Read this first if you are picking babelOtter up in a new session.
 
 **Starting a new session:** "Read docs/HANDOFF.md and let's decide what to do next in M4." Everything above, plus the per-feature updates below, is the context.
 
+## Update 2026-10-29: Spanish (#132)
+
+On `feature/spanish`. Spec `docs/superpowers/specs/2026-10-29-spanish-design.md`. Spanish ships as a fifth language, switched off, beside French and Italian: code `es`, *usted*/*tú*, no locale rules, no regional writing note (neutral Spanish; Correct accepts Spain and Latin American usage), and correction notes in the shape of French's and Italian's. A file without Spanish gains it switched off; a file with any `es` code keeps its own. A hand-written `es` entry without `correctionNotes` takes the shipped notes.
+
+**Manual checks: all passed on 2026-10-29.** (`Tools/make-app.sh --run`, with the real model, Spanish switched on in Settings › General.) Your `config.json` already has a Spanish entry from 2026-10-29, which stays as it is; to see a file gain Spanish, remove that entry first, and Settings › General shows Spanish switched off.
+
+| # | Do | Expect |
+|---|---|---|
+| E1 | Settings › General | Spanish listed; switching it on adds it to My language and to the Into menu |
+| E2 | Translate an English text, and a German one, into Spanish; then a Spanish text into English | Spanish results, and English back; the popup asks for or offers the target as with French |
+| E3 | Translate an English text into Spanish for Administration, then for Informal | *usted* forms, then *tú* forms |
+| E4 | Correct "Quiero que vienes manana a la reunion." | *vengas*, *mañana*, *reunión* corrected, with explanations in my language |
+| E5 | Explain a Spanish paragraph (my language English) | An English summary and notes |
+| E6 | Re-pitch a Spanish text for Students | Spanish rewritten, same facts |
+| E7 | Scratchpad: a long Spanish text, Translate into English | Several parts, paragraphs kept |
+| E8 | With French, Italian and Spanish on, select a Spanish paragraph and Translate | Detected as Spanish, not Italian or French |
+| E9 | A short Spanish sentence ("Nos vemos el lunes."), with Spanish on, then off | On: Spanish, or the "Which language?" question; off: refused as not one of your languages, or asked (never silently treated as Italian or French) |
+
 ## Update 2026-10-28: the scratchpad window (#84)
 
 On `feature/scratchpad`. Spec `docs/superpowers/specs/2026-10-28-scratchpad-design.md`. A **Scratchpad...** menu item opens a window: type or paste a text, pick Translate, Correct, Explain or Re-pitch with the popup's controls, press **Run** (Cmd-Return), and the result appears beside it. Nothing runs by itself; a changed setting marks the result **Out of date**. Long texts are cut at blank lines into chunks of up to 1,500 characters (`ChunkPlan`) and run one after another (`ChunkedRun`); Translate infers the audience on the first chunk and fixes it for the rest. **Stop**, or a failed chunk, keeps the chunks done and turns Run into **Continue**. Explain is not chunked and is capped at 6,000 characters (`ScratchpadPolicy`). Copy only, no Replace; no Accessibility needed; the built-in server gate applies. Each finished run is one History record with the app "Scratchpad". `Tools/mutate.sh` now also picks up staged and new kit files.

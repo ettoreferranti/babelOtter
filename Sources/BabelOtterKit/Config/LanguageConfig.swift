@@ -296,7 +296,30 @@ extension LanguageConfig {
             """
     )
 
+    /// Spanish, shipped switched off (#132). Neutral: no regional writing
+    /// note, and Correct accepts the usage of Spain and of Latin America.
+    public static let spanish = LanguageConfig(
+        code: LanguageCode("es"),
+        displayName: "Spanish",
+        localeRules: [],
+        enabled: false,
+        addressForms: AddressForms(formal: "usted", informal: "t\u{00FA}"),
+        // Accented letters as escapes for the ASCII-only source rule.
+        correctionNotes: """
+            Check written accents on stressed syllables and on words they tell \
+            apart: el or \u{00E9}l, tu or t\u{00FA}, si or s\u{00ED}, mas or \
+            m\u{00E1}s; and on question words when they ask or exclaim \
+            (qu\u{00E9}, c\u{00F3}mo, d\u{00F3}nde), never on que as a \
+            conjunction or relative. Check opening question and exclamation marks, gender \
+            and number agreement of articles and adjectives, ser or estar, and \
+            the subjunctive after expressions of wish, doubt or purpose: "quiero \
+            que vienes" becomes "quiero que vengas". Usage of Spain and of Latin \
+            America are both correct. Example explanation: "querer que takes the \
+            subjunctive, so vienes becomes vengas".
+            """
+    )
+
     /// What a fresh install gets: English and de-CH enabled (`FR-LNG-03`);
-    /// French and Italian listed but switched off (#81).
-    public static let shippedDefaults: [LanguageConfig] = [.english, .swissGerman, .french, .italian]
+    /// French and Italian (#81) and Spanish (#132) listed but switched off.
+    public static let shippedDefaults: [LanguageConfig] = [.english, .swissGerman, .french, .italian, .spanish]
 }
