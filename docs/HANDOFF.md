@@ -32,7 +32,7 @@ Read this first if you are picking babelOtter up in a new session.
 
 On `feature/spanish`. Spec `docs/superpowers/specs/2026-10-29-spanish-design.md`. Spanish ships as a fifth language, switched off, beside French and Italian: code `es`, *usted*/*tú*, no locale rules, no regional writing note (neutral Spanish; Correct accepts Spain and Latin American usage), and correction notes in the shape of French's and Italian's. A file without Spanish gains it switched off; a file with any `es` code keeps its own. A hand-written `es` entry without `correctionNotes` takes the shipped notes.
 
-**Manual checks** (`Tools/make-app.sh --run`, with the real model, Spanish switched on in Settings › General). Your `config.json` already has a Spanish entry from 2026-10-29, which stays as it is; to see a file gain Spanish, remove that entry first, and Settings › General shows Spanish switched off.
+**Manual checks: all passed on 2026-10-29.** (`Tools/make-app.sh --run`, with the real model, Spanish switched on in Settings › General.) Your `config.json` already has a Spanish entry from 2026-10-29, which stays as it is; to see a file gain Spanish, remove that entry first, and Settings › General shows Spanish switched off.
 
 | # | Do | Expect |
 |---|---|---|
