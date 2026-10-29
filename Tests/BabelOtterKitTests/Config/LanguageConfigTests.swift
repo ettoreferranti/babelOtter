@@ -42,7 +42,7 @@ struct LanguageConfigTests {
     @Test("French and Italian ship switched off, with their address forms and no rules (#81)")
     func frenchAndItalianShipOff() {
         #expect(LanguageConfig.shippedDefaults.map(\.code)
-            == ["en", "de-ch", "fr", "it"].map(LanguageCode.init))
+            == ["en", "de-ch", "fr", "it", "es"].map(LanguageCode.init))
         #expect(!LanguageConfig.french.enabled)
         #expect(!LanguageConfig.italian.enabled)
         #expect(LanguageConfig.french.addressForms == AddressForms(formal: "vous", informal: "tu"))
@@ -51,15 +51,64 @@ struct LanguageConfigTests {
         #expect(LanguageConfig.italian.localeRules.isEmpty)
     }
 
+    @Test("Spanish ships switched off, with usted and tu and no rules (#132)")
+    func spanishShipsOff() {
+        #expect(!LanguageConfig.spanish.enabled)
+        #expect(LanguageConfig.spanish.code == LanguageCode("es"))
+        #expect(LanguageConfig.spanish.displayName == "Spanish")
+        #expect(LanguageConfig.spanish.addressForms == AddressForms(formal: "usted", informal: "t\u{00FA}"))
+        #expect(LanguageConfig.spanish.localeRules.isEmpty)
+        #expect(LanguageConfig.spanish.writingNotes == nil)
+        #expect(LanguageConfig.spanish.correctionNotes?.contains("quiero que vengas") == true)
+        #expect(LanguageConfig.spanish.correctionNotes?.contains("Latin America") == true)
+    }
+
+    @Test("a file with only Spanish gained is the one-language difference (#132)")
+    func spanishAppendedToFileFromEightyOne() throws {
+        var fourLanguages = Configuration.default
+        fourLanguages.languages = [.english, .swissGerman, .french, .italian]
+        let added = try #require(fourLanguages.addingMissingShippedLanguages())
+        #expect(added.languages.count == 5)
+        #expect(added.languages[4] == .spanish)
+        #expect(added.languages[4].enabled == false)
+    }
+
+    @Test("a Spanish entry under any es code keeps the shipped one out (#132)", arguments: ["es", "es-ES", "es-419"])
+    func ownSpanishKept(_ code: String) {
+        var custom = Configuration.default
+        let own = LanguageConfig(
+            code: LanguageCode(code), displayName: "Mine", localeRules: [], enabled: true)
+        custom.languages = [.english, .swissGerman, .french, .italian, own]
+        #expect(custom.addingMissingShippedLanguages() == nil)
+    }
+
+    @Test("a hand-written Spanish entry without notes takes the shipped ones and keeps its own settings")
+    func handWrittenSpanish() throws {
+        let json = #"""
+            {"code": "es", "displayName": "Espanol", "localeRules": [], "enabled": true,
+             "addressForms": {"formal": "usted", "informal": "tu"}}
+            """#
+        let language = try JSONDecoder().decode(LanguageConfig.self, from: Data(json.utf8))
+        #expect(language.correctionNotes == LanguageConfig.spanish.correctionNotes)
+        #expect(language.enabled)
+        #expect(language.displayName == "Espanol")
+        #expect(language.addressForms == AddressForms(formal: "usted", informal: "tu"))
+        #expect(language.writingNotes == nil)
+        // Saved again, the file keeps its shape: shipped notes are not written.
+        let written = String(decoding: try JSONEncoder().encode(language), as: UTF8.self)
+        #expect(!written.contains("correctionNotes"))
+    }
+
     @Test("a file without French and Italian gains them, switched off, after its own languages")
     func missingShippedLanguagesAppended() throws {
         var twoLanguages = Configuration.default
         twoLanguages.languages = [.english, .swissGerman]
         let added = try #require(twoLanguages.addingMissingShippedLanguages())
-        #expect(added.languages.map(\.code) == ["en", "de-ch", "fr", "it"].map(LanguageCode.init))
+        #expect(added.languages.map(\.code) == ["en", "de-ch", "fr", "it", "es"].map(LanguageCode.init))
         #expect(added.languages.filter(\.enabled).map(\.code) == [LanguageCode("en"), LanguageCode("de-ch")])
         #expect(added.languages[2] == .french)
         #expect(added.languages[3] == .italian)
+        #expect(added.languages[4] == .spanish)
         // Only the languages change.
         var withoutLanguages = added
         withoutLanguages.languages = twoLanguages.languages
@@ -75,7 +124,7 @@ struct LanguageConfigTests {
             code: LanguageCode("de"), displayName: "German", localeRules: [], enabled: true)
         custom.languages = [swissFrench, .english, german]
         let added = try #require(custom.addingMissingShippedLanguages())
-        #expect(added.languages.map(\.code) == ["fr-ch", "en", "de", "it"].map(LanguageCode.init))
+        #expect(added.languages.map(\.code) == ["fr-ch", "en", "de", "it", "es"].map(LanguageCode.init))
         #expect(added.addingMissingShippedLanguages() == nil)
         #expect(Configuration.default.addingMissingShippedLanguages() == nil)
     }

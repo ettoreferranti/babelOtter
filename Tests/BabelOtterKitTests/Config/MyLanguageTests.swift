@@ -96,6 +96,7 @@ struct MyLanguageTests {
         #expect(LanguageConfig.swissGerman.correctionNotes?.contains("mit dem Lehrer") == true)
         #expect(LanguageConfig.french.correctionNotes?.contains("participle") == true)
         #expect(LanguageConfig.italian.correctionNotes?.contains("nella") == true)
+        #expect(LanguageConfig.spanish.correctionNotes?.contains("vengas") == true)
     }
 
     @Test("German's example explanations never fix a person's gender")
@@ -145,7 +146,7 @@ struct MyLanguageTests {
     @Test("only de-CH ships writing notes, and they rule out dialect (#123)")
     func shippedWritingNotes() {
         #expect(LanguageConfig.swissGerman.writingNotes?.contains("Never write Swiss German dialect") == true)
-        for language in [LanguageConfig.english, .french, .italian] {
+        for language in [LanguageConfig.english, .french, .italian, .spanish] {
             #expect(language.writingNotes == nil)
         }
     }

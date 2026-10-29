@@ -106,8 +106,9 @@ public struct LanguageDetector: Sendable {
     }
 }
 
-/// Detection in two passes (#81). French and Italian are easily confused on
-/// a short text, so the guess is made among the enabled languages only. But
+/// Detection in two passes (#81). French, Italian and Spanish are easily
+/// confused on a short text, so the guess is made among the enabled
+/// languages only. But
 /// a recognizer limited that way rescales its confidences: with English and
 /// German enabled, an Italian sentence comes back as German, confidently, and
 /// Correct would correct it as German. So the open recognizer goes first; a

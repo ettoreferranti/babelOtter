@@ -25,7 +25,7 @@ Decided in conversation (2026-10-29): **neutral Spanish**, with no regional writ
 
 **Correction notes**, in the shape of French's and Italian's (what to check, then an English example explanation):
 
-> Check written accents (tildes) on stressed syllables and on words they tell apart: *el* or *él*, *tu* or *tú*, *si* or *sí*, *mas* or *más*; and question words (*qué*, *cómo*, *dónde*). Check opening question and exclamation marks, gender and number agreement of articles and adjectives, *ser* or *estar*, and the subjunctive after expressions of wish, doubt or purpose ("quiero que vienes" becomes "quiero que vengas"). Usage of Spain and of Latin America are both correct. Example explanation: "querer que takes the subjunctive, so vienes becomes vengas".
+> Check written accents on stressed syllables and on words they tell apart: *el* or *él*, *tu* or *tú*, *si* or *sí*, *mas* or *más*; and on question words when they ask or exclaim (*qué*, *cómo*, *dónde*), never on *que* as a conjunction or relative. Check opening question and exclamation marks, gender and number agreement of articles and adjectives, *ser* or *estar*, and the subjunctive after expressions of wish, doubt or purpose ("quiero que vienes" becomes "quiero que vengas"). Usage of Spain and of Latin America are both correct. Example explanation: "querer que takes the subjunctive, so vienes becomes vengas".
 
 ## 3. Existing files
 

@@ -405,6 +405,19 @@ struct PromptBuilderTests {
             action: action, source: text, target: target, profile: .colleagues, blocks: ["x"], mine: mine)
     }
 
+    @Test("Spanish: Correct carries its notes, and a formal audience names usted (#132)")
+    func spanish() {
+        let correct = builder.build(languageRequest(.correct, text: .spanish, into: .spanish))
+        #expect(correct.contains("quiero que vengas"))
+        #expect(correct.contains("Spanish"))
+        let translate = builder.build(PromptRequest(
+            action: .translate, source: .english, target: .spanish, profile: .administration, blocks: ["x"]))
+        #expect(translate.contains("usted"))
+        let informal = builder.build(PromptRequest(
+            action: .translate, source: .english, target: .spanish, profile: .informal, blocks: ["x"]))
+        #expect(informal.contains("t\u{00FA}"))
+    }
+
     @Test("Correct on a learned language: the learner framing, its notes, explanations in my language (#81)")
     func correctLearned() {
         let german = builder.build(languageRequest(.correct, text: .swissGerman, into: .swissGerman))
