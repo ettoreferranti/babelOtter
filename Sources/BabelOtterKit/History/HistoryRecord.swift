@@ -1,5 +1,27 @@
 import Foundation
 
+/// One error Correct found, as History keeps it for Progress (#78). The
+/// fragments are the user's text, so they are `UserText` too.
+public struct Mistake: Sendable, Equatable {
+    public let category: ErrorCategory
+    public let original: UserText
+    public let corrected: UserText
+    public let explanation: UserText
+
+    public init(category: ErrorCategory, original: UserText, corrected: UserText, explanation: UserText) {
+        self.category = category
+        self.original = original
+        self.corrected = corrected
+        self.explanation = explanation
+    }
+
+    public init(_ error: CorrectionError) {
+        self.init(
+            category: error.category, original: UserText(error.original),
+            corrected: UserText(error.corrected), explanation: UserText(error.explanation))
+    }
+}
+
 /// One completed action, as history keeps it (#67, `FR-HIS-01`).
 ///
 /// `source` and `result` are `UserText`, so describing or dumping a record
@@ -21,11 +43,16 @@ public struct HistoryRecord: Sendable, Equatable {
     public let source: UserText
     /// What Replace or Copy would have used.
     public let result: UserText
+    /// Correct only (#78): the words corrected, and the errors found --
+    /// never the suggestions. Nil and empty for the other actions.
+    public let wordCount: Int?
+    public let mistakes: [Mistake]
 
     public init(
         id: Int64? = nil, date: Date, action: Action, sourceLanguage: LanguageCode,
         targetLanguage: LanguageCode?, profileID: String?, model: String,
-        sourceBundleID: String?, sourceAppName: String?, source: UserText, result: UserText
+        sourceBundleID: String?, sourceAppName: String?, source: UserText, result: UserText,
+        wordCount: Int? = nil, mistakes: [Mistake] = []
     ) {
         self.id = id
         self.date = date
@@ -38,6 +65,8 @@ public struct HistoryRecord: Sendable, Equatable {
         self.sourceAppName = sourceAppName
         self.source = source
         self.result = result
+        self.wordCount = wordCount
+        self.mistakes = mistakes
     }
 }
 
@@ -74,7 +103,8 @@ extension HistoryRecord {
             date: date, action: .correct, sourceLanguage: language,
             targetLanguage: nil, profileID: profileID,
             model: model, sourceBundleID: application?.bundleIdentifier,
-            sourceAppName: application?.name, source: result.original, result: result.corrected)
+            sourceAppName: application?.name, source: result.original, result: result.corrected,
+            wordCount: WordCount.of(result.original.value), mistakes: result.errors.map(Mistake.init))
     }
 
     /// The result is what Copy writes: the summary and the notes. Explained

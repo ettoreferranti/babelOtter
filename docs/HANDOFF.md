@@ -28,6 +28,25 @@ Read this first if you are picking babelOtter up in a new session.
 
 **Starting a new session:** "Read docs/HANDOFF.md and let's decide what to do next in M4." Everything above, plus the per-feature updates below, is the context.
 
+## Update 2026-10-30: Progress, recurring mistakes over time (#78)
+
+On `feature/progress`. Spec `docs/superpowers/specs/2026-10-30-progress-design.md`. A **Progress...** menu item opens a window with the kinds of mistakes Correct keeps finding, per language and period (7, 30 or 90 days): errors per 100 words, the trend against the period before (a change of at least 20 % and 0.1), a small chart per day or week, and the most recent examples. History now keeps, for each Correct record, the words corrected and each error with its fragments and explanation (never suggestions): `history.sqlite` schema 2, migrated in place from 1, with a trigger that deletes a record's mistakes with it. Only corrections from this version on count. `ProgressReport` holds every rule; PRIVACY.md and the Privacy panel say what is kept.
+
+**Going back:** v1.1.0 refuses a schema 2 file (its History says the file is from a newer lingoSwen) until this build runs again; nothing is lost.
+
+**Manual checks** (`Tools/make-app.sh --run`, with the real model). Your history file is migrated to schema 2 on the first launch; the checks add History records, which Clear All removes (it removes all of them, your older ones too, so do T7 last or skip it).
+
+| # | Do | Expect |
+|---|---|---|
+| T1 | Menu > Progress... before correcting anything | "No corrections yet", saying older corrections are not counted |
+| T2 | Correct three or four German texts with case and gender mistakes (e.g. "Ich habe mit der Kollege gesprochen. Das Rechnung ist da."), then open Progress | Swiss Standard German, Last 30 days; Case and Gender rows with counts and examples; "Not enough text yet" while under 300 words |
+| T3 | Correct a French or Spanish text; switch the language picker | The other language's own rows; the choice is remembered after closing and reopening |
+| T4 | Switch the period to Last 7 days and Last 90 days | Same rows for recent corrections; 7 days charts per day |
+| T5 | With Progress open, correct another German text | The counts update without reopening |
+| T6 | Privacy... | The History line says corrections also keep the errors found, for Progress |
+| T7 | History... > Clear All, then back to Progress | "No corrections yet" |
+| T8 | Settings: History off (retention off), open Progress | The note that Progress needs History |
+
 ## Update 2026-10-29: Spanish (#132)
 
 On `feature/spanish`. Spec `docs/superpowers/specs/2026-10-29-spanish-design.md`. Spanish ships as a fifth language, switched off, beside French and Italian: code `es`, *usted*/*tú*, no locale rules, no regional writing note (neutral Spanish; Correct accepts Spain and Latin American usage), and correction notes in the shape of French's and Italian's. A file without Spanish gains it switched off; a file with any `es` code keeps its own. A hand-written `es` entry without `correctionNotes` takes the shipped notes.

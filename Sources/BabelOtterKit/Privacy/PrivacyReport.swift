@@ -130,9 +130,13 @@ public enum PrivacyReport {
                 mark: .warning, remedy: nil)
         }
         return PrivacyLine(
-            title: "History", detail: "\(folder), outside iCloud. \(retention(policy))",
+            title: "History",
+            detail: "\(folder), outside iCloud. \(Self.progressNote) \(retention(policy))",
             mark: .ok, remedy: nil)
     }
+
+    /// Progress's data is History's (#78), so the panel says it is kept.
+    static let progressNote = "Corrections also keep the errors found, for Progress."
 
     static func retention(_ policy: HistoryPolicy) -> String {
         switch policy {

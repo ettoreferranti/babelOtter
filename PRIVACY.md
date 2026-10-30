@@ -88,6 +88,12 @@ Everything lives under `~/Library/Application Support/ch.lingoswen/`:
   is recorded; existing records stay until Clear All). If `config.json` cannot
   be read at launch (malformed, or present but unreadable), history records
   and deletes nothing until it can, so a typo never turns recording back on.
+- For **Progress** (#78), a Correct record also keeps the number of words
+  corrected and each error Correct found: its category, the fragment before
+  and after, and the explanation (never the optional suggestions). They are
+  part of the record: retention, History off and Clear All apply to them
+  exactly as to its text, and the Progress window computes everything from
+  this file, on the Mac.
 - **Clear All…** in the History window deletes every record unconditionally.
   A popup still open at that moment does not record its earlier result
   afterwards. `secure_delete` zeroes the deleted text and `VACUUM` rebuilds the file, so

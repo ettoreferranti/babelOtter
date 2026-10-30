@@ -63,6 +63,8 @@ final class HistoryRecorder {
     /// Clear All succeeded.
     func cleared() {
         clearedAt = Date()
+        // Progress shows the cleared mistakes until told (#78).
+        onRecord?()
     }
 
     func record(_ record: HistoryRecord) {

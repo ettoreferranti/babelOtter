@@ -91,7 +91,8 @@ struct PrivacyReportTests {
         #expect(report[1].detail == "This Mac only (127.0.0.1), for the Ollama running as you. "
             + "One run by another user or as root would not be seen here.")
         #expect(report[2].detail
-            == "~/Library/Application Support/ch.lingoswen, outside iCloud. Records are kept for 90 days.")
+            == "~/Library/Application Support/ch.lingoswen, outside iCloud. "
+                + "Corrections also keep the errors found, for Progress. Records are kept for 90 days.")
         #expect(report[3].detail == "0 third-party packages; checked against the allowlist on every change.")
         #expect(report[4].detail
             == "No telemetry, analytics or crash reporting. Nothing is sent anywhere but the local model.")

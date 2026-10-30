@@ -58,6 +58,37 @@ struct HistoryRecordTests {
         #expect(record.profileID == "colleagues")
         #expect(record.source == UserText("Ich gehe morgen nach hause."))
         #expect(record.result == UserText("Ich gehe morgen nach Hause."))
+        #expect(record.wordCount == 5)
+        #expect(record.mistakes.isEmpty)
+    }
+
+    @Test("a correction keeps its errors as mistakes, never its suggestions (#78)")
+    func correctionMistakes() {
+        let error = CorrectionError(
+            original: "nach hause", corrected: "nach Hause", category: .spelling,
+            explanation: "Hause is a noun", severity: .error)
+        let suggestion = CorrectionError(
+            original: "gehe", corrected: "fahre", category: .register,
+            explanation: "more precise", severity: .suggestion)
+        let result = CorrectionResult(
+            original: UserText("Ich gehe morgen nach hause."),
+            corrected: UserText("Ich gehe morgen nach Hause."),
+            errors: [error], suggestions: [suggestion], diff: [], warnings: [], hasNoErrors: false)
+        let record = HistoryRecord(
+            correction: result, language: de, profileID: "colleagues", model: "m",
+            application: mail, date: date)
+        #expect(record.mistakes == [Mistake(error)])
+        #expect(record.mistakes.first?.original == UserText("nach hause"))
+        #expect(record.mistakes.first?.corrected == UserText("nach Hause"))
+        #expect(record.mistakes.first?.explanation == UserText("Hause is a noun"))
+        #expect(record.mistakes.first?.category == .spelling)
+    }
+
+    @Test("other actions keep no word count and no mistakes")
+    func noMistakesElsewhere() {
+        let record = HistoryRecord.sample()
+        #expect(record.wordCount == nil)
+        #expect(record.mistakes.isEmpty)
     }
 
     @Test("an explanation reads German into English, has no audience, and keeps what Copy writes")

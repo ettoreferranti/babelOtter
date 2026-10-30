@@ -18,6 +18,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private lazy var historyWindow = HistoryWindowController(
         recorder: history,
         configuration: { [unowned self] in self.environment.configuration })
+    /// Recurring mistakes, from History's corrections (#78).
+    private lazy var progressWindow = ProgressWindowController(model: ProgressModel(
+        store: history.store, unavailable: history.unavailableReason,
+        policy: { [unowned self] in self.history.policy },
+        configuration: { [unowned self] in self.environment.configuration }))
     private(set) lazy var environment = AppEnvironment(configuration: source.configuration)
     private lazy var monitor = ReadinessMonitor(configuration: source.configuration)
     /// The Ollama inside the app, run while it is the model server (#126).
@@ -87,7 +92,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         layoutReader.start()
         pushConfigurationProblems()
         history.onChange = { [weak self] in self?.pushHistoryProblem() }
-        history.onRecord = { [weak self] in self?.historyWindow.recorded() }
+        history.onRecord = { [weak self] in
+            self?.historyWindow.recorded()
+            self?.progressWindow.recorded()
+        }
         applyHistoryPolicy()
         pushHistoryProblem()
         builtInServer.onChange = { [weak self] state in self?.serverChanged(state) }
@@ -258,6 +266,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             configurationIsFallback: source.isFallback))
         renderHistoryNote()
         historyWindow.policyChanged()
+        progressWindow.recorded()
     }
 
     /// Information, not a readiness cause: the icon stays as it is.
@@ -309,6 +318,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let historyItem = action("History\u{2026}", #selector(showHistoryAction))
         self.historyItem = historyItem
         menu.addItem(historyItem)
+        menu.addItem(action("Progress\u{2026}", #selector(showProgressAction)))
         menu.addItem(action("Privacy\u{2026}", #selector(showPrivacyAction)))
         // Setup Guide and the configuration file are in Settings > General;
         // the status above re-checks each time the menu opens.
@@ -329,6 +339,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func showScratchpadAction() { scratchpadWindow.show() }
 
     @objc private func showHistoryAction() { historyWindow.show() }
+
+    @objc private func showProgressAction() { progressWindow.show() }
 
     @objc private func showSettingsAction() { settingsWindow.show() }
 
