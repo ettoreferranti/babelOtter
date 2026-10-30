@@ -34,7 +34,7 @@ On `feature/progress`. Spec `docs/superpowers/specs/2026-10-30-progress-design.m
 
 **Going back:** v1.1.0 refuses a schema 2 file (its History says the file is from a newer lingoSwen) until this build runs again; nothing is lost.
 
-**Manual checks** (`Tools/make-app.sh --run`, with the real model). Your history file is migrated to schema 2 on the first launch; the checks add History records, which Clear All removes (it removes all of them, your older ones too, so do T7 last or skip it).
+**Manual checks: all passed on 2026-10-30.** (`Tools/make-app.sh --run`, with the real model). Your history file is migrated to schema 2 on the first launch; the checks add History records, which Clear All removes (it removes all of them, your older ones too, so do T7 last or skip it).
 
 | # | Do | Expect |
 |---|---|---|
