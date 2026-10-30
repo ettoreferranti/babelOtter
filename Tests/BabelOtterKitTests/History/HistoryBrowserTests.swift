@@ -35,6 +35,11 @@ final class ScriptedHistoryStore: HistoryStore {
         if failing { throw HistoryStoreError.statementFailed("disk I/O error") }
         return try inner.count()
     }
+
+    func corrections(since date: Date) throws -> [CorrectionStats] {
+        if failing { throw HistoryStoreError.statementFailed("disk I/O error") }
+        return try inner.corrections(since: date)
+    }
 }
 
 /// Gives back records no store has kept: no ids.
@@ -48,6 +53,7 @@ final class IdlessHistoryStore: HistoryStore {
     func deleteOlder(than date: Date) throws -> Int { 0 }
     func deleteAll() throws {}
     func count() throws -> Int { 0 }
+    func corrections(since date: Date) throws -> [CorrectionStats] { [] }
 }
 
 @Suite("The History window's list pages, searches and reloads")

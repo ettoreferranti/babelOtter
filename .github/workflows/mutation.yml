@@ -142,6 +142,8 @@ jobs:
           # are named high-value targets and are worth keeping fully measured.
           PASS2="Sources/BabelOtterKit/Privacy/StorageLocator.swift"
           PASS1="Sources/BabelOtterKit/BabelOtterKit.swift
+          Sources/BabelOtterKit/Text/WordCount.swift
+          Sources/BabelOtterKit/History/ProgressReport.swift
           Sources/BabelOtterKit/Text/ChunkPlan.swift
           Sources/BabelOtterKit/Pipeline/ChunkedRun.swift
           Sources/BabelOtterKit/Scratchpad/ScratchpadPolicy.swift

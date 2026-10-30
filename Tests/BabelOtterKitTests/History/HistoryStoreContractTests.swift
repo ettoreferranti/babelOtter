@@ -199,3 +199,55 @@ struct HistoryStoreContractTests {
         #expect(try store.count() == 0)
     }
 }
+
+@Suite("Every history store gives Progress its corrections the same way (#78)")
+struct HistoryStoreCorrectionsTests {
+
+    private let start = Date(timeIntervalSince1970: 1_790_000_000)
+
+    @Test("corrections come back oldest first, with their words and mistakes, and nothing else", arguments: StoreKind.allCases)
+    func corrections(kind: StoreKind) throws {
+        let store = try kind.make()
+        let second = HistoryRecord.correction(
+            date: start.addingTimeInterval(20), words: 40,
+            mistakes: [.sample(.gender, original: "das Rechnung"), .sample(.spelling)])
+        let first = HistoryRecord.correction(date: start.addingTimeInterval(10), language: LanguageCode("fr"), words: 12)
+        _ = try store.add(second)
+        _ = try store.add(first)
+        _ = try store.add(.sample(date: start.addingTimeInterval(15)))
+        let found = try store.corrections(since: start)
+        #expect(found == [
+            CorrectionStats(date: first.date, language: LanguageCode("fr"), wordCount: 12, mistakes: []),
+            CorrectionStats(
+                date: second.date, language: LanguageCode("de-ch"), wordCount: 40,
+                mistakes: [.sample(.gender, original: "das Rechnung"), .sample(.spelling)]),
+        ])
+    }
+
+    @Test("only corrections from the date on", arguments: StoreKind.allCases)
+    func since(kind: StoreKind) throws {
+        let store = try kind.make()
+        _ = try store.add(.correction(date: start.addingTimeInterval(-1)))
+        _ = try store.add(.correction(date: start))
+        _ = try store.add(.correction(date: start.addingTimeInterval(1)))
+        #expect(try store.corrections(since: start).map(\.date) == [start, start.addingTimeInterval(1)])
+    }
+
+    @Test("a Correct record without a word count, from before #78, is left out", arguments: StoreKind.allCases)
+    func withoutWordCount(kind: StoreKind) throws {
+        let store = try kind.make()
+        _ = try store.add(.sample(date: start, action: .correct))
+        #expect(try store.corrections(since: start).isEmpty)
+    }
+
+    @Test("mistakes go with their records, by retention and by Clear All", arguments: StoreKind.allCases)
+    func deletedWithRecords(kind: StoreKind) throws {
+        let store = try kind.make()
+        _ = try store.add(.correction(date: start, mistakes: [.sample()]))
+        _ = try store.add(.correction(date: start.addingTimeInterval(100), mistakes: [.sample(.gender)]))
+        _ = try store.deleteOlder(than: start.addingTimeInterval(50))
+        #expect(try store.corrections(since: .distantPast).flatMap(\.mistakes) == [.sample(.gender)])
+        try store.deleteAll()
+        #expect(try store.corrections(since: .distantPast).isEmpty)
+    }
+}

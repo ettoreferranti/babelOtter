@@ -22,6 +22,25 @@ public protocol HistoryStore: AnyObject {
     func deleteAll() throws
     /// How many records there are.
     func count() throws -> Int
+    /// Every Correct record dated `date` or later that has a word count,
+    /// oldest first, without its texts (#78).
+    func corrections(since date: Date) throws -> [CorrectionStats]
+}
+
+/// One correction as Progress reads it (#78): when, in which language, how
+/// many words, and the errors found. No source or result text.
+public struct CorrectionStats: Sendable, Equatable {
+    public let date: Date
+    public let language: LanguageCode
+    public let wordCount: Int
+    public let mistakes: [Mistake]
+
+    public init(date: Date, language: LanguageCode, wordCount: Int, mistakes: [Mistake]) {
+        self.date = date
+        self.language = language
+        self.wordCount = wordCount
+        self.mistakes = mistakes
+    }
 }
 
 extension HistoryStore {
@@ -67,7 +86,9 @@ public final class InMemoryHistoryStore: HistoryStore {
 
     public func deleteOlder(than date: Date) throws -> Int {
         let before = records.count
-        records.removeAll { $0.date < date }
+        var kept: [HistoryRecord] = []
+        for record in records where record.date >= date { kept.append(record) }
+        records = kept
         return before - records.count
     }
 
@@ -79,9 +100,32 @@ public final class InMemoryHistoryStore: HistoryStore {
         records.count
     }
 
+    public func corrections(since date: Date) throws -> [CorrectionStats] {
+        var found: [CorrectionStats] = []
+        for record in records.sorted(by: Self.isOlder) {
+            if let stats = Self.stats(record, since: date) { found.append(stats) }
+        }
+        return found
+    }
+
+    static func stats(_ record: HistoryRecord, since date: Date) -> CorrectionStats? {
+        guard case .correct = record.action else { return nil }
+        guard let wordCount = record.wordCount else { return nil }
+        if record.date < date { return nil }
+        return CorrectionStats(
+            date: record.date, language: record.sourceLanguage, wordCount: wordCount,
+            mistakes: record.mistakes)
+    }
+
+    /// Earlier date first; for the same date, the lower id.
+    static func isOlder(_ lhs: HistoryRecord, _ rhs: HistoryRecord) -> Bool {
+        isNewer(rhs, lhs)
+    }
+
     /// Later date first; for the same date, the higher id.
     static func isNewer(_ lhs: HistoryRecord, _ rhs: HistoryRecord) -> Bool {
-        if lhs.date != rhs.date { return lhs.date > rhs.date }
+        if lhs.date > rhs.date { return true }
+        if lhs.date < rhs.date { return false }
         return (lhs.id ?? 0) > (rhs.id ?? 0)
     }
 }

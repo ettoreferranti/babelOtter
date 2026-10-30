@@ -11,7 +11,8 @@ import SQLite3
 public final class SQLiteHistoryStore: HistoryStore {
 
     public static let fileName = "history.sqlite"
-    static let schemaVersion = 1
+    /// 2 adds Progress's word counts and mistakes (#78).
+    static let schemaVersion = 2
     /// Bounded: a write runs on the main actor when a popup closes.
     static let busyTimeoutMilliseconds: Int32 = 500
 
@@ -34,10 +35,54 @@ public final class SQLiteHistoryStore: HistoryStore {
         COMMIT;
         """
 
+    /// Version 1 to 2 (#78), in one transaction. The trigger makes every
+    /// existing `DELETE` on records -- retention, Clear All -- take the
+    /// record's mistakes with it.
+    private static let migrateToTwo = """
+        BEGIN;
+        ALTER TABLE records ADD COLUMN word_count INTEGER;
+        CREATE TABLE mistakes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            record_id INTEGER NOT NULL,
+            category TEXT NOT NULL,
+            original TEXT NOT NULL,
+            corrected TEXT NOT NULL,
+            explanation TEXT NOT NULL
+        );
+        CREATE INDEX mistakes_record ON mistakes (record_id);
+        CREATE TRIGGER records_delete_mistakes AFTER DELETE ON records
+        BEGIN
+            DELETE FROM mistakes WHERE record_id = old.id;
+        END;
+        PRAGMA user_version = 2;
+        COMMIT;
+        """
+
+    private static let insertMistake = """
+        INSERT INTO mistakes (record_id, category, original, corrected, explanation)
+        VALUES (?1, ?2, ?3, ?4, ?5)
+        """
+
+    private static let selectCorrections = """
+        SELECT id, created_at, source_language, word_count FROM records
+        WHERE action = 'correct' AND word_count IS NOT NULL AND created_at >= ?1
+        ORDER BY created_at, id
+        """
+
+    private static let selectMistakes = """
+        SELECT mistakes.record_id, mistakes.category, mistakes.original, mistakes.corrected,
+            mistakes.explanation
+        FROM mistakes JOIN records ON records.id = mistakes.record_id
+        WHERE records.action = 'correct' AND records.word_count IS NOT NULL
+            AND records.created_at >= ?1
+        ORDER BY mistakes.id
+        """
+
     private static let insert = """
         INSERT INTO records (created_at, action, source_language, target_language,
-            profile_id, model, source_bundle_id, source_app_name, source_text, result_text)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+            profile_id, model, source_bundle_id, source_app_name, source_text, result_text,
+            word_count)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
         """
 
     private static let deleteBefore = "DELETE FROM records WHERE created_at < ?1"
@@ -114,7 +159,24 @@ public final class SQLiteHistoryStore: HistoryStore {
         return store
     }
 
+    /// The record and its mistakes in one transaction: never one without
+    /// the other.
     public func add(_ record: HistoryRecord) throws -> Int64 {
+        try execute("BEGIN")
+        do {
+            let id = try insertRecord(record)
+            for mistake in record.mistakes {
+                try insert(mistake, of: id)
+            }
+            try execute("COMMIT")
+            return id
+        } catch {
+            try? execute("ROLLBACK")
+            throw error
+        }
+    }
+
+    private func insertRecord(_ record: HistoryRecord) throws -> Int64 {
         let statement = try prepare(Self.insert)
         defer { sqlite3_finalize(statement) }
         if sqlite3_bind_double(statement, 1, record.date.timeIntervalSince1970) != SQLITE_OK {
@@ -129,8 +191,67 @@ public final class SQLiteHistoryStore: HistoryStore {
         try bind(record.sourceAppName, 8, statement)
         try bind(record.source.value, 9, statement)
         try bind(record.result.value, 10, statement)
+        try bindWordCount(record.wordCount, statement)
         if sqlite3_step(statement) != SQLITE_DONE { throw failure() }
         return sqlite3_last_insert_rowid(connection)
+    }
+
+    private func insert(_ mistake: Mistake, of record: Int64) throws {
+        let statement = try prepare(Self.insertMistake)
+        defer { sqlite3_finalize(statement) }
+        if sqlite3_bind_int64(statement, 1, record) != SQLITE_OK { throw failure() }
+        try bind(mistake.category.rawValue, 2, statement)
+        try bind(mistake.original.value, 3, statement)
+        try bind(mistake.corrected.value, 4, statement)
+        try bind(mistake.explanation.value, 5, statement)
+        if sqlite3_step(statement) != SQLITE_DONE { throw failure() }
+    }
+
+    public func corrections(since date: Date) throws -> [CorrectionStats] {
+        let mistakes = try mistakesByRecord(since: date)
+        let statement = try prepare(Self.selectCorrections)
+        defer { sqlite3_finalize(statement) }
+        if sqlite3_bind_double(statement, 1, date.timeIntervalSince1970) != SQLITE_OK { throw failure() }
+        var found: [CorrectionStats] = []
+        while try step(statement) {
+            let id = sqlite3_column_int64(statement, 0)
+            found.append(CorrectionStats(
+                date: Date(timeIntervalSince1970: sqlite3_column_double(statement, 1)),
+                language: LanguageCode(Self.text(statement, 2) ?? ""),
+                wordCount: Int(sqlite3_column_int64(statement, 3)),
+                mistakes: mistakes[id] ?? []))
+        }
+        return found
+    }
+
+    /// A mistake whose category this build does not know counts as Other.
+    private func mistakesByRecord(since date: Date) throws -> [Int64: [Mistake]] {
+        let statement = try prepare(Self.selectMistakes)
+        defer { sqlite3_finalize(statement) }
+        if sqlite3_bind_double(statement, 1, date.timeIntervalSince1970) != SQLITE_OK { throw failure() }
+        var found: [Int64: [Mistake]] = [:]
+        while try step(statement) {
+            let category = ErrorCategory(rawValue: Self.text(statement, 1) ?? "") ?? .other
+            let mistake = Mistake(
+                category: category,
+                original: UserText(Self.text(statement, 2) ?? ""),
+                corrected: UserText(Self.text(statement, 3) ?? ""),
+                explanation: UserText(Self.text(statement, 4) ?? ""))
+            found[sqlite3_column_int64(statement, 0), default: []].append(mistake)
+        }
+        return found
+    }
+
+    /// One step: true for a row, false when done, else the error. One place
+    /// for the comparisons, so muter measures them: it places no mutant in
+    /// a loop body inside a function that already has one. A mutant here
+    /// cannot hang a `while`: a done statement either ends the loop or, if
+    /// stepped again, restarts and then fails.
+    private func step(_ statement: OpaquePointer) throws -> Bool {
+        let status = sqlite3_step(statement)
+        if status == SQLITE_ROW { return true }
+        if status == SQLITE_DONE { return false }
+        throw failure()
     }
 
     public func page(matching term: String?, before: HistoryCursor?, limit: Int) throws -> [HistoryRecord] {
@@ -153,9 +274,7 @@ public final class SQLiteHistoryStore: HistoryStore {
         // step status alone runs forever once its test is inverted -- which
         // is exactly the mutant muter makes, and it hung CI (PR #105).
         for _ in 0..<limit {
-            let status = sqlite3_step(statement)
-            if status == SQLITE_DONE { return records }
-            if status != SQLITE_ROW { throw failure() }
+            guard try step(statement) else { return records }
             if let record = Self.record(from: statement) {
                 records.append(record)
             }
@@ -228,7 +347,7 @@ public final class SQLiteHistoryStore: HistoryStore {
         }
     }
 
-    /// The version first: anything above 1 is a later version's file,
+    /// The version first: anything above 2 is a later version's file,
     /// refused before any setting can touch it (`journal_mode` rewrites the
     /// header). Then the settings, then the schema for a new file (0).
     private func configure() throws {
@@ -237,6 +356,7 @@ public final class SQLiteHistoryStore: HistoryStore {
         try execute("PRAGMA secure_delete = ON")
         try execute("PRAGMA journal_mode = DELETE")
         if version == 0 { try execute(Self.createSchema) }
+        if version < Self.schemaVersion { try execute(Self.migrateToTwo) }
     }
 
     /// Registers `lingoswen_contains(text, term)`: 1 when `HistorySearch`
@@ -278,6 +398,14 @@ public final class SQLiteHistoryStore: HistoryStore {
 
     /// SQLite copies the bytes (`SQLITE_TRANSIENT`), with an explicit length
     /// so a NUL inside the text is kept.
+    /// Parameter 11 of `insert`; NULL for nil. Its own name, not a
+    /// `bind` overload: an overload stored NULL under CI's mutation
+    /// toolchain (PR #106). A function of its own, so muter measures it.
+    private func bindWordCount(_ value: Int?, _ statement: OpaquePointer) throws {
+        guard let value else { return }
+        if sqlite3_bind_int64(statement, 11, Int64(value)) != SQLITE_OK { throw failure() }
+    }
+
     private func bind(_ value: String?, _ index: Int32, _ statement: OpaquePointer) throws {
         var status = SQLITE_OK
         if let value {
