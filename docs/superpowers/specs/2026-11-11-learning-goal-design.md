@@ -1,7 +1,7 @@
 # Learning goal: a weekly goal, a streak and milestones — design
 
-**Status:** proposed 2026-11-11, awaiting approval.
-**Milestone:** M4. **Covers:** a new story under epic #15 (issue to be opened on approval), in one PR. **Builds on:** Progress (#78), History (#67–#69), my language (#81). Privacy NFRs (`NFR-P1`–`P7`) apply unchanged: everything is computed and kept on the Mac.
+**Status:** approved in conversation 2026-11-11.
+**Milestone:** M4. **Covers:** #136 (epic #15), in one PR. **Builds on:** Progress (#78), History (#67–#69), my language (#81). Privacy NFRs (`NFR-P1`–`P7`) apply unchanged: everything is computed and kept on the Mac.
 
 ## 1. What it does
 

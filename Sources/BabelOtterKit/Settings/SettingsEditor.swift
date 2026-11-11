@@ -147,6 +147,23 @@ public struct SettingsEditor: Sendable, Equatable {
         configuration.strictCaptureOnly = on
     }
 
+    /// The weekly learning goal's switch (#136); the days stay as they are.
+    public mutating func setLearning(enabled: Bool) {
+        var settings = configuration.learningSettings
+        settings.enabled = enabled
+        configuration.learning = settings
+    }
+
+    /// Learning days a week for the goal (#136): 1 to 7.
+    public mutating func setLearningDays(_ days: Int) throws {
+        if !LearningSettings.daysRange.contains(days) {
+            throw SettingsRefusal.outOfRange("Between 1 and 7 days")
+        }
+        var settings = configuration.learningSettings
+        settings.daysPerWeek = days
+        configuration.learning = settings
+    }
+
     /// `.text` is parsed and resolved as the file's would be, and refused
     /// when another action has the same keys -- checked against each other
     /// action directly, so the refusal is about the row being edited.
