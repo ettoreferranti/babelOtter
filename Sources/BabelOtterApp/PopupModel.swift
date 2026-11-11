@@ -44,6 +44,14 @@ final class PopupModel {
     private(set) var text = ""
     private(set) var warnings: [String] = []
     private(set) var message: String?
+    /// One quiet line under a finished result (#136): after Correct or
+    /// Explain what the result did for the week or a milestone, after
+    /// Translate the hint to try one of them. Nil when there is none.
+    private(set) var learningNote: String?
+    /// The translation hint shown in this popup and the direction it was
+    /// for: a re-run in that direction keeps it, though the day's one hint
+    /// is used up.
+    private var hint: (direction: Direction, text: String)?
     /// Set only by Correct, once its stream finishes. Never mutated by
     /// Translate.
     private(set) var correction: CorrectionResult?
@@ -64,6 +72,7 @@ final class PopupModel {
     private let reopen: @MainActor (PopupModel) -> Void
     /// Writes a record to history; the app's `HistoryRecorder` (#67).
     private let record: @MainActor (HistoryRecord) -> Void
+    private let learning: LearningTracker
     /// The last result that finished in this popup. A new run does not clear
     /// it, so closing during a Regenerate still keeps the earlier result.
     private var pendingRecord: HistoryRecord?
@@ -93,6 +102,7 @@ final class PopupModel {
     init(
         action: Action, application: SourceApplication?, environment: AppEnvironment,
         record: @escaping @MainActor (HistoryRecord) -> Void,
+        learning: LearningTracker,
         close: @escaping @MainActor () -> Void,
         reopen: @escaping @MainActor (PopupModel) -> Void
     ) {
@@ -104,6 +114,7 @@ final class PopupModel {
         self.close = close
         self.reopen = reopen
         self.record = record
+        self.learning = learning
         let memory = UserDefaultsAudienceMemory(prefix: action == .repitch ? "repitch." : "")
         self.audience = AudienceSession(
             profiles: environment.configuration.profiles, action: action,
@@ -529,6 +540,7 @@ final class PopupModel {
         text = ""
         warnings = []
         message = nil
+        learningNote = nil
         phase = .translating
         audience.runStarted()
 
@@ -559,8 +571,22 @@ final class PopupModel {
                 keep { HistoryRecord(repitch: result, source: $0, model: model, application: $1, date: Date()) }
             } else {
                 keep { HistoryRecord(translation: result, source: $0, model: model, application: $1, date: Date()) }
+                learningNote = translationHint(for: result.direction)
             }
         }
+    }
+
+    /// The hint for this popup's translation (#136): asked for once per
+    /// direction, so Regenerate keeps it and Swap does not show a hint
+    /// about the other direction.
+    private func translationHint(for direction: Direction) -> String? {
+        if let hint, hint.direction == direction { return hint.text }
+        guard let snapshot else { return nil }
+        guard let text = learning.hint(for: direction, words: WordCount.of(snapshot.text.value)) else {
+            return nil
+        }
+        hint = (direction, text)
+        return text
     }
 
     private func findLanguage(of snapshot: SelectionSnapshot) {
@@ -583,6 +609,7 @@ final class PopupModel {
         text = ""
         warnings = []
         message = nil
+        learningNote = nil
         phase = .translating
         consume(
             translator.repitch(
@@ -629,6 +656,7 @@ final class PopupModel {
         text = ""
         warnings = []
         message = nil
+        learningNote = nil
         phase = .translating
         consume(
             explainer.explain(snapshot.text, in: language, styleNote: styleNote),
@@ -655,6 +683,7 @@ final class PopupModel {
                     explanation: result, source: $0, language: language, explainedIn: mine, model: model,
                     application: $1, date: Date())
             }
+            learningNote = pendingRecord.flatMap { learning.preview($0) }
         }
     }
 
@@ -680,6 +709,7 @@ final class PopupModel {
         text = ""
         warnings = []
         message = nil
+        learningNote = nil
         phase = .translating
         consume(
             corrector.correct(snapshot.text, in: language, profile: audience.audience, styleNote: styleNote),
@@ -706,6 +736,7 @@ final class PopupModel {
                     correction: result, language: language, profileID: profileID,
                     model: model, application: application, date: Date())
             }
+            learningNote = pendingRecord.flatMap { learning.preview($0) }
         }
     }
 

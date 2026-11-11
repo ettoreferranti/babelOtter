@@ -26,6 +26,10 @@ struct PopupView: View {
             if let message = model.message {
                 Text(message).font(.caption).foregroundStyle(.secondary)
             }
+            // The learning goal's one line, or the hint under a translation (#136).
+            if model.phase == .finished, let note = model.learningNote {
+                Text(note).font(.caption).foregroundStyle(.secondary)
+            }
             actions
         }
         .padding(14)

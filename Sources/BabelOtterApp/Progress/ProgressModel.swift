@@ -25,6 +25,11 @@ final class ProgressModel {
         UserDefaults.standard.set(code.rawValue, forKey: Self.languageKey)
     }
 
+    /// The weekly goal, the streak and the milestones (#136).
+    let learning: LearningTracker
+    /// As of the last refresh: the window is rebuilt when the file changes.
+    private(set) var learningSettings = LearningSettings.default
+
     private let store: (any HistoryStore)?
     private let unavailable: String?
     private let policy: @MainActor () -> HistoryPolicy
@@ -33,8 +38,10 @@ final class ProgressModel {
     init(
         store: (any HistoryStore)?, unavailable: String?,
         policy: @escaping @MainActor () -> HistoryPolicy,
-        configuration: @escaping @MainActor () -> Configuration
+        configuration: @escaping @MainActor () -> Configuration,
+        learning: LearningTracker
     ) {
+        self.learning = learning
         self.store = store
         self.unavailable = unavailable
         self.policy = policy
@@ -43,6 +50,7 @@ final class ProgressModel {
 
     /// Two of the longest periods back: the period and the one before it.
     func refresh() {
+        learningSettings = configuration().learningSettings
         guard let store else { return }
         let longest = TimeInterval(ProgressPeriod.quarter.days) * 86_400
         do {
@@ -79,6 +87,10 @@ final class ProgressModel {
     var isEmpty: Bool {
         guard unavailable == nil, loadProblem == nil else { return false }
         return languages.isEmpty
+    }
+
+    func title(_ milestone: Milestone) -> String {
+        milestone.title(languages: configuration().languages)
     }
 
     func displayName(_ code: LanguageCode) -> String {

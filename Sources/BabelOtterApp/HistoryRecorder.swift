@@ -23,6 +23,9 @@ final class HistoryRecorder {
     var problem: String? { saveProblem ?? pruneProblem }
     /// The problem changed: the menu shows it.
     var onChange: (@MainActor () -> Void)?
+    /// A record was saved: the learning goal counts it (#136). Before
+    /// `onRecord`, so Progress reloads with the log already updated.
+    var onSaved: (@MainActor (HistoryRecord) -> Void)?
     /// Records were saved or deleted: an open History window reloads.
     var onRecord: (@MainActor () -> Void)?
 
@@ -81,6 +84,7 @@ final class HistoryRecorder {
                 saveProblem = HistoryProblem.notSaved(HistoryProblem.saving(error))
                 return
             }
+            onSaved?(record)
             onRecord?()
             prune()
         }

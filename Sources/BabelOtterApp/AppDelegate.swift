@@ -22,7 +22,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private lazy var progressWindow = ProgressWindowController(model: ProgressModel(
         store: history.store, unavailable: history.unavailableReason,
         policy: { [unowned self] in self.history.policy },
-        configuration: { [unowned self] in self.environment.configuration }))
+        configuration: { [unowned self] in self.environment.configuration },
+        learning: learning))
+    /// The weekly goal, the streak and the milestones (#136).
+    private lazy var learning: LearningTracker = LearningTracker(
+        store: history.store,
+        policy: { [unowned self] in self.history.policy },
+        configuration: { [unowned self] in self.environment.configuration })
     private(set) lazy var environment = AppEnvironment(configuration: source.configuration)
     private lazy var monitor = ReadinessMonitor(configuration: source.configuration)
     /// The Ollama inside the app, run while it is the model server (#126).
@@ -73,7 +79,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private lazy var privacyWindow = PrivacyWindowController(
         historyPolicy: { [unowned self] in self.history.policy },
         historyUnavailable: { [unowned self] in self.history.unavailableReason },
-        server: { [unowned self] in self.source.configuration.server })
+        server: { [unowned self] in self.source.configuration.server },
+        learning: { [unowned self] in self.source.configuration.learningSettings })
     private lazy var settingsWindow: SettingsWindowController = SettingsWindowController(
         source: source,
         layout: { [unowned self] in self.lastLayout },
@@ -92,6 +99,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         layoutReader.start()
         pushConfigurationProblems()
         history.onChange = { [weak self] in self?.pushHistoryProblem() }
+        history.onSaved = { [weak self] record in self?.learning.saved(record) }
         history.onRecord = { [weak self] in
             self?.historyWindow.recorded()
             self?.progressWindow.recorded()
@@ -548,6 +556,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             application: source,
             environment: environment,
             record: { [weak self] record in self?.history.record(record) },
+            learning: learning,
             close: { [weak self] in self?.panel.dismiss() },
             reopen: { [weak self] model in
                 guard let self else { return }

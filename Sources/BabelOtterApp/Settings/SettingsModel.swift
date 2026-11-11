@@ -8,6 +8,7 @@ enum SettingsField: Hashable {
     case retention
     case timeout
     case clipboard
+    case learning
     case model(Action)
     case modelServer
     case hotKey(Action)
