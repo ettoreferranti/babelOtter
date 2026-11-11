@@ -26,12 +26,12 @@ enum LearningFixtures {
 
     static func correct(
         _ date: Date, words: Int = 20, _ categories: [ErrorCategory] = [.gender],
-        language: LanguageCode = german
+        language: LanguageCode = german, result: String = "x"
     ) -> HistoryRecord {
         HistoryRecord(
             date: date, action: .correct, sourceLanguage: language, targetLanguage: nil,
             profileID: "colleagues", model: "m", sourceBundleID: nil, sourceAppName: nil,
-            source: UserText("x"), result: UserText("y"), wordCount: words,
+            source: UserText("x"), result: UserText(result), wordCount: words,
             mistakes: categories.map { Mistake.sample($0) })
     }
 

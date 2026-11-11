@@ -14,6 +14,9 @@ import Observation
 final class LearningTracker {
 
     private static let key = "learning.log"
+    /// A stored log this build could not read at all, set aside before
+    /// anything is saved over it.
+    private static let unreadableKey = "learning.log.unreadable"
     /// The 30 days "tamed" looks at, the 30 before, and a day to spare.
     private static let lookBack: TimeInterval = 61 * 86_400
 
@@ -111,7 +114,9 @@ final class LearningTracker {
 
     private static func load(from defaults: UserDefaults) -> LearningLog {
         guard let data = defaults.data(forKey: key) else { return LearningLog() }
-        return (try? JSONDecoder().decode(LearningLog.self, from: data)) ?? LearningLog()
+        if let log = try? JSONDecoder().decode(LearningLog.self, from: data) { return log }
+        defaults.set(data, forKey: unreadableKey)
+        return LearningLog()
     }
 
     private func save() {

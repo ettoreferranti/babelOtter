@@ -25,6 +25,18 @@ struct LearningLogTests {
         #expect(Fixtures.day(2027, 12, 31).date(calendar: Fixtures.calendar) == Fixtures.date(2027, 12, 31, hour: 12))
     }
 
+    @Test("a day is Gregorian whatever the Mac's calendar, in its time zone")
+    func gregorianAlways() {
+        var buddhist = Calendar(identifier: .buddhist)
+        buddhist.timeZone = TimeZone(identifier: "UTC") ?? .gmt
+        let date = Fixtures.date(2026, 11, 9)
+        #expect(LearningDay(date, calendar: buddhist).number == 20_261_109)
+        #expect(Fixtures.day(2026, 11, 9).date(calendar: buddhist) == Fixtures.date(2026, 11, 9, hour: 12))
+        var japanese = Calendar(identifier: .japanese)
+        japanese.timeZone = TimeZone(identifier: "Asia/Tokyo") ?? .gmt
+        #expect(LearningDay(Fixtures.date(2026, 11, 9, hour: 16), calendar: japanese).number == 20_261_110)
+    }
+
     @Test("days order by date")
     func ordering() {
         #expect(Fixtures.day(2026, 12, 31) < Fixtures.day(2027, 1, 1))
@@ -96,6 +108,31 @@ struct LearningLogTests {
         let text = String(decoding: data, as: UTF8.self)
         #expect(text.contains("\"days\":[20261109]"))
         #expect(text.contains("\"lastHintDay\":20261108"))
+    }
+
+    @Test("a log from a newer version keeps all this one can read")
+    func newerLog() throws {
+        let json = """
+            {"days":[20261110,20261109,20261110],"wordsCorrected":40,"somethingNew":true,
+             "earned":[{"milestone":{"cleanText":{}},"day":20261109},
+                       {"milestone":{"unheardOf":{"_0":3}},"day":20261109},
+                       {"milestone":{"tamed":{"_0":"aspect","_1":"de"}},"day":20261109},
+                       {"milestone":{"cleanText":{}},"day":20261110},
+                       {"milestone":{"streak":{"_0":4}},"day":20261110}]}
+            """
+        let log = try JSONDecoder().decode(LearningLog.self, from: Data(json.utf8))
+        #expect(log.days == [Fixtures.day(2026, 11, 9), Fixtures.day(2026, 11, 10)])
+        #expect(log.wordsCorrected == 40)
+        #expect(log.explanations == 0)
+        #expect(log.lastHintDay == nil)
+        #expect(log.earned == [
+            EarnedMilestone(milestone: .cleanText, day: Fixtures.day(2026, 11, 9)),
+            EarnedMilestone(milestone: .streak(4), day: Fixtures.day(2026, 11, 10)),
+        ])
+        #expect(try JSONDecoder().decode(LearningLog.self, from: Data("{}".utf8)) == LearningLog())
+        #expect(throws: DecodingError.self) {
+            try JSONDecoder().decode(LearningLog.self, from: Data(#"{"days":"none"}"#.utf8))
+        }
     }
 
     @Test("an empty log round-trips without a hint day")

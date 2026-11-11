@@ -179,10 +179,13 @@ public enum LearningRules {
         return new
     }
 
-    /// A correction of `cleanTextWords` or more in which no error was found.
+    /// A correction of `cleanTextWords` or more in which no error was
+    /// found and the text came back as it was: a text changed with no error
+    /// listed is one the popup warns about, not a clean one.
     static func isClean(_ record: HistoryRecord) -> Bool {
         guard case .correct = record.action else { return false }
         if (record.wordCount ?? 0) < cleanTextWords { return false }
+        if record.result != record.source { return false }
         return record.mistakes.isEmpty
     }
 

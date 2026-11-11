@@ -29,8 +29,8 @@ From the popup and the scratchpad alike. Translate and Re-pitch never count.
 | First steps | the first learning action |
 | 1,000 / 5,000 / 10,000 words | that many words corrected in total (learning actions only) |
 | 10 / 50 explanations | that many Explains |
-| Clean text | a Correct of 100 words or more with no errors |
-| *Category* tamed (*language*) | Progress's 30-day report for the language just corrected shows that category "↓" with its rate at least halved, and it had 5 or more errors in the 30 days before. Once per category and language. |
+| Clean text | a Correct of 100 words or more with no errors, the text returned unchanged |
+| *Category* tamed (*language*) | Progress's 30-day report for the language just corrected shows that category "↓" with its rate at least halved, and it had 5 or more errors in the 30 days before. Once per category and language. A category with no error at all in the last 30 days counts (Progress then shows no row for it). |
 | 4 / 12 weeks in a row | the streak reaches that length |
 
 "Clean text" and "tamed" trust the model: a correction that misses errors can earn them. They are framed as encouragement, not as a certificate (as #79 will have to be).
@@ -40,6 +40,7 @@ From the popup and the scratchpad alike. Translate and Re-pitch never count.
 - from my language into another: "Next time, try writing it in *German* yourself, then press Correct (*hotkey*)."
 - from another language into mine: "Want to see how this text works? Try Explain (*hotkey*)."
 - between two languages that are both not mine: no hint.
+- with History off: no hint (the day of the last hint is part of the log, which only changes while History records).
 
 **The popup line** after a Correct or Explain, only when something moved; one line, the first that applies:
 
@@ -55,7 +56,7 @@ A popup saves its History record when it closes, so the line is a **preview**: t
 
 A small **learning log** in the app's preferences (where the audience and target memories already live), never in `config.json` and not in `history.sqlite`:
 
-- the dates of the learning days (day only, no time; at most the 400 most recent, which caps the streak shown at 57 weeks for a 7-day goal and more for a smaller one),
+- the dates of the learning days (Gregorian, day only, no time; at most the 400 most recent, which caps the streak shown at 57 weeks for a 7-day goal and more for a smaller one),
 - two totals: words corrected and explanations,
 - the milestones earned, each with its date (a "tamed" one names its category and language),
 - the day the last hint was shown.

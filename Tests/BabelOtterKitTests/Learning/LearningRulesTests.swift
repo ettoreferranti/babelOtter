@@ -253,6 +253,8 @@ struct LearningRulesTests {
         #expect(try #require(outcome(Fixtures.correct(monday, words: 100, []), log)).earned == [.cleanText])
         #expect(try #require(outcome(Fixtures.correct(monday, words: 99, []), log)).earned.isEmpty)
         #expect(try #require(outcome(Fixtures.correct(monday, words: 100, [.spelling]), log)).earned.isEmpty)
+        // Changed with no error listed: the popup warns, so not clean.
+        #expect(try #require(outcome(Fixtures.correct(monday, words: 100, [], result: "y"), log)).earned.isEmpty)
         #expect(!LearningRules.isClean(Fixtures.explain(monday)))
         #expect(!LearningRules.isClean(.sample(action: .correct)))
     }
@@ -264,6 +266,34 @@ struct LearningRulesTests {
         let result = try #require(outcome(Fixtures.correct(monday, words: 100, []), log))
         #expect(result.earned.isEmpty)
         #expect(result.log.earned.count == 2)
+    }
+
+    @Test("a tamed category is earned once per language, whatever its region")
+    func tamedOnce() throws {
+        var log = seasoned([Fixtures.day(2026, 11, 9)])
+        log.earn(.tamed(.grammaticalCase, LanguageCode("de")), on: Fixtures.day(2026, 11, 1))
+        let corrections = [stats(daysBefore: 40, words: 400, cases(6)), stats(daysBefore: 2, words: 400, cases(2))]
+        let result = try #require(outcome(Fixtures.correct(monday), log, corrections: corrections))
+        #expect(result.earned.isEmpty)
+        #expect(result.line == nil)
+    }
+
+    @Test("the streak holds across a change of clocks and the year's end, in a real time zone")
+    func streakInZurich() {
+        var zurich = Fixtures.calendar
+        zurich.timeZone = TimeZone(identifier: "Europe/Zurich") ?? .gmt
+        // Mondays from 2026-10-12 to 2027-04-05: both clock changes and New Year.
+        var days: [LearningDay] = []
+        for week in 0..<26 {
+            days.append(LearningDay(
+                Fixtures.date(2026, 10, 12).addingTimeInterval(Double(week) * 7 * 86_400), calendar: zurich))
+        }
+        let week = LearningRules.week(
+            Fixtures.log(days), goal: 1, now: Fixtures.date(2027, 4, 7), calendar: zurich)
+        #expect(week == LearningWeek(days: 1, goal: 1, streak: 26))
+        let sunday = LearningRules.week(
+            Fixtures.log(days), goal: 1, now: Fixtures.date(2027, 1, 3), calendar: zurich)
+        #expect(sunday.streak == 12)
     }
 
     @Test("streak milestones at 4 and 12 weeks")

@@ -2,6 +2,11 @@ import Foundation
 
 /// A calendar day as the learning log keeps it (#136): year, month and day
 /// in one number, 20261111. No time of day.
+///
+/// Always a Gregorian day, in the calendar's time zone: the Mac's own
+/// calendar may count years by era or repeat a month number, and the user
+/// may change it, which must not move the days already kept. The Mac's
+/// calendar still decides where a week starts (`LearningRules.week`).
 public struct LearningDay: Sendable, Hashable, Comparable, Codable {
 
     public let number: Int
@@ -10,16 +15,22 @@ public struct LearningDay: Sendable, Hashable, Comparable, Codable {
         self.number = number
     }
 
-    /// The day `date` falls on in `calendar`.
+    /// The Gregorian day `date` falls on in `calendar`'s time zone.
     public init(_ date: Date, calendar: Calendar) {
-        let parts = calendar.dateComponents([.year, .month, .day], from: date)
+        let parts = Self.gregorian(calendar).dateComponents([.year, .month, .day], from: date)
         number = (parts.year ?? 0) * 10_000 + (parts.month ?? 0) * 100 + (parts.day ?? 0)
     }
 
     /// Noon of the day, so a change of clocks cannot move it to another.
     public func date(calendar: Calendar) -> Date? {
-        calendar.date(from: DateComponents(
+        Self.gregorian(calendar).date(from: DateComponents(
             year: number / 10_000, month: number / 100 % 100, day: number % 100, hour: 12))
+    }
+
+    static func gregorian(_ calendar: Calendar) -> Calendar {
+        var gregorian = Calendar(identifier: .gregorian)
+        gregorian.timeZone = calendar.timeZone
+        return gregorian
     }
 
     public static func < (lhs: LearningDay, rhs: LearningDay) -> Bool {
@@ -65,6 +76,35 @@ public struct LearningLog: Sendable, Equatable, Codable {
     public private(set) var lastHintDay: LearningDay?
 
     public init() {}
+
+    enum CodingKeys: String, CodingKey {
+        case days, wordsCorrected, explanations, earned, lastHintDay
+    }
+
+    /// Reads what it can: a field another version left out is empty, and
+    /// a milestone this version does not know is skipped, so a log written
+    /// by a newer lingoSwen keeps everything else.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let stored = try container.decodeIfPresent([LearningDay].self, forKey: .days) ?? []
+        for day in stored { add(day) }
+        wordsCorrected = try container.decodeIfPresent(Int.self, forKey: .wordsCorrected) ?? 0
+        explanations = try container.decodeIfPresent(Int.self, forKey: .explanations) ?? 0
+        let entries = try container.decodeIfPresent([Readable].self, forKey: .earned) ?? []
+        for entry in entries {
+            if let known = entry.entry { earn(known.milestone, on: known.day) }
+        }
+        lastHintDay = try container.decodeIfPresent(LearningDay.self, forKey: .lastHintDay)
+    }
+
+    /// An earned milestone, or nil where this version cannot read it.
+    struct Readable: Decodable {
+        let entry: EarnedMilestone?
+
+        init(from decoder: any Decoder) throws {
+            entry = try? EarnedMilestone(from: decoder)
+        }
+    }
 
     /// Nothing counted and nothing earned.
     public var isEmpty: Bool {
