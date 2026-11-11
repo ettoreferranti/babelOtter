@@ -77,6 +77,14 @@ live, and waits for you to decide — it never touches your text until you say s
 
 Every result offers **Replace / Copy / Regenerate / Dismiss**.
 
+Translating everything teaches nothing, so lingoSwen nudges the other way: a
+**weekly learning goal** counts the days on which you Correct your own text in
+another language or Explain one, with a streak of weeks and a few milestones
+(words corrected, a clean text, a mistake category whose rate halved). The
+**Progress** window shows them above your recurring mistakes, and a Translate
+result carries, at most once a day, a quiet hint to write it yourself next
+time. No points, no leaderboards; one switch in Settings turns it off.
+
 ### Audience profiles
 
 Writing to students and writing to colleagues are not the same register.

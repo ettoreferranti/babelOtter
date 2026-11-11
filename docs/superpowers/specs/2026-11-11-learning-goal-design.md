@@ -49,11 +49,13 @@ From the popup and the scratchpad alike. Translate and Re-pitch never count.
 
 Otherwise nothing. The line never delays or replaces the result, and is not recorded in History.
 
+A popup saves its History record when it closes, so the line is a **preview**: the same rules applied to the log as it is when the result arrives. The log itself changes only when the record is saved (and so not at all if the popup's result is never kept, e.g. History was cleared meanwhile).
+
 ## 3. What is kept, and where
 
 A small **learning log** in the app's preferences (where the audience and target memories already live), never in `config.json` and not in `history.sqlite`:
 
-- the dates of the learning days (day only, no time; the last 400 days),
+- the dates of the learning days (day only, no time; at most the 400 most recent, which caps the streak shown at 57 weeks for a 7-day goal and more for a smaller one),
 - two totals: words corrected and explanations,
 - the milestones earned, each with its date (a "tamed" one names its category and language),
 - the day the last hint was shown.
@@ -106,9 +108,8 @@ Optional: a file without it means on, 3 days, and is not rewritten until Setting
   - `TranslateHint`: which hint, if any, for a direction, my language, a word count, the log's last hint day and today.
   - `SettingsEditor` gains the switch and the days.
 - **App** (thin):
-  - `LearningStore`: the log in `UserDefaults`, as JSON under one key.
-  - `HistoryRecorder`: after a record is saved (so only while History records), applies `LearningRules`, stores the log and returns the line; for a Correct it reads `corrections(since:)` for the "tamed" check, as Progress does.
-  - `PopupModel` / `PopupView`: the line and the hint. `ScratchpadModel` records through the same recorder, so its actions count; the scratchpad shows no line and no hint.
+  - `LearningTracker`: the log in `UserDefaults`, as JSON under one key; the preview for the popup, and the log's update when `HistoryRecorder` reports a saved record (`onSaved`, so only while History records). For a Correct it reads `corrections(since:)` for the "tamed" check, as Progress does.
+  - `PopupModel` / `PopupView`: the line and the hint (one per popup and direction: Regenerate keeps it, Swap does not show a hint about the other direction). `ScratchpadModel` records through the same recorder, so its actions count; the scratchpad shows no line and no hint.
   - `ProgressReportView`: the Learning section; `ProgressModel` reads the log and reloads on `onRecord`.
   - `GeneralSettingsView`, `PrivacyWindow`.
 
