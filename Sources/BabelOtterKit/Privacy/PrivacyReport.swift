@@ -43,7 +43,8 @@ public enum PrivacyReport {
         server: ModelServer = .own,
         endpoint: OllamaEndpoint, listening: ListeningExposure, historyFolder: String,
         historyRefusal: StorageLocationError?, historyUnavailable: String? = nil,
-        history: HistoryPolicy, packages: Int = BuildFacts.thirdPartyPackages
+        history: HistoryPolicy, learning: LearningSettings = .default,
+        packages: Int = BuildFacts.thirdPartyPackages
     ) -> [PrivacyLine] {
         [
             PrivacyLine(
@@ -52,6 +53,7 @@ public enum PrivacyReport {
                 mark: .ok, remedy: nil),
             listeningLine(listening, server: server),
             historyLine(historyFolder, historyRefusal, historyUnavailable, history),
+            learningLine(learning),
             PrivacyLine(
                 title: "Dependencies",
                 detail: packagesText(packages) + "; checked against the allowlist on every change.",
@@ -133,6 +135,18 @@ public enum PrivacyReport {
             title: "History",
             detail: "\(folder), outside iCloud. \(Self.progressNote) \(retention(policy))",
             mark: .ok, remedy: nil)
+    }
+
+    /// The learning log is the one thing kept outside the History file
+    /// (#136): days, totals and milestones, never text.
+    static func learningLine(_ settings: LearningSettings) -> PrivacyLine {
+        let kept = "lingoSwen's preferences keep the days you corrected or explained a text, "
+            + "two totals and the milestones earned - never text. Reset it in Progress."
+        if settings.enabled {
+            return PrivacyLine(title: "Learning goal", detail: kept, mark: .ok, remedy: nil)
+        }
+        return PrivacyLine(
+            title: "Learning goal", detail: "Off: nothing is added. " + kept, mark: .ok, remedy: nil)
     }
 
     /// Progress's data is History's (#78), so the panel says it is kept.

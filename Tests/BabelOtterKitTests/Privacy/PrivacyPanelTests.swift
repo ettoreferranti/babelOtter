@@ -84,7 +84,9 @@ struct PrivacyReportTests {
     @Test("all is well: five lines, all checks, no remedy")
     func allWell() {
         let report = lines()
-        #expect(report.map(\.title) == ["Model connection", "Ollama listens on", "History", "Dependencies", "Telemetry"])
+        #expect(report.map(\.title) == [
+            "Model connection", "Ollama listens on", "History", "Learning goal", "Dependencies", "Telemetry",
+        ])
         #expect(report.allSatisfy { $0.mark == .ok })
         #expect(report.allSatisfy { $0.remedy == nil })
         #expect(report[0].detail == "My own Ollama: http://127.0.0.1:11434 - this Mac only (loopback).")
@@ -93,9 +95,24 @@ struct PrivacyReportTests {
         #expect(report[2].detail
             == "~/Library/Application Support/ch.lingoswen, outside iCloud. "
                 + "Corrections also keep the errors found, for Progress. Records are kept for 90 days.")
-        #expect(report[3].detail == "0 third-party packages; checked against the allowlist on every change.")
-        #expect(report[4].detail
+        #expect(report[3].detail
+            == "lingoSwen's preferences keep the days you corrected or explained a text, "
+                + "two totals and the milestones earned - never text. Reset it in Progress.")
+        #expect(report[4].detail == "0 third-party packages; checked against the allowlist on every change.")
+        #expect(report[5].detail
             == "No telemetry, analytics or crash reporting. Nothing is sent anywhere but the local model.")
+    }
+
+    @Test("the learning goal switched off still says what is kept (#136)")
+    func learningOff() {
+        let line = PrivacyReport.lines(
+            endpoint: .loopback, listening: .unknown, historyFolder: "h", historyRefusal: nil,
+            history: .keep(.days(90)), learning: LearningSettings(enabled: false, daysPerWeek: 3), packages: 0)[3]
+        #expect(line == PrivacyLine(
+            title: "Learning goal",
+            detail: "Off: nothing is added. lingoSwen's preferences keep the days you corrected or "
+                + "explained a text, two totals and the milestones earned - never text. Reset it in Progress.",
+            mark: .ok, remedy: nil))
     }
 
     @Test("the built-in server: its port, and listening worded as lingoSwen's own (#126)")
@@ -106,7 +123,9 @@ struct PrivacyReportTests {
                 historyFolder: "h", historyRefusal: nil, history: .keep(.days(90)), packages: 0)
         }
         let report = builtInLines(.loopbackOnly(["127.0.0.1"]))
-        #expect(report.map(\.title) == ["Model connection", "Built-in server listens on", "History", "Dependencies", "Telemetry"])
+        #expect(report.map(\.title) == [
+            "Model connection", "Built-in server listens on", "History", "Learning goal", "Dependencies", "Telemetry",
+        ])
         #expect(report[0].detail == "Built-in: http://127.0.0.1:47434 - this Mac only (loopback).")
         #expect(report[1] == PrivacyLine(
             title: "Built-in server listens on", detail: "This Mac only (127.0.0.1).", mark: .ok, remedy: nil))
@@ -172,8 +191,8 @@ struct PrivacyReportTests {
 
     @Test("one package is singular")
     func packages() {
-        #expect(lines(packages: 1)[3].detail.hasPrefix("1 third-party package;"))
-        #expect(lines(packages: 2)[3].detail.hasPrefix("2 third-party packages;"))
+        #expect(lines(packages: 1)[4].detail.hasPrefix("1 third-party package;"))
+        #expect(lines(packages: 2)[4].detail.hasPrefix("2 third-party packages;"))
     }
 
     @Test("the clipboard note names Universal Clipboard and PRIVACY.md")
