@@ -103,6 +103,16 @@ Everything lives under `~/Library/Application Support/ch.lingoswen/`:
   removed at commit but its disk blocks are not overwritten. FileVault, not
   lingoSwen, protects those.
 
+**The learning log** (#136) is the one thing kept elsewhere: in the app's
+preferences (macOS user defaults), beside the audience and target-language
+choices. It holds the dates of the days on which you corrected or explained a
+text (at most 400), two totals (words corrected, texts explained), the
+milestones earned with their dates, and the day the last hint was shown.
+**No text, no fragments, no application names.** Nothing is added while
+History is off or the weekly learning goal is switched off in Settings.
+History's Clear All does not clear it; **Reset…** in the Progress window does.
+Preferences are not excluded from backups.
+
 Nothing lingoSwen writes ever lands inside the repository. See `.gitignore`.
 
 ---

@@ -62,6 +62,24 @@ struct GeneralSettingsView: View {
                     RefusalText(text: model.refusals[.retention])
                 }
                 .disabled(model.isReadOnly)
+                Section("Learning") {
+                    Toggle("Weekly learning goal", isOn: Binding(
+                        get: { model.configuration.learningSettings.enabled },
+                        set: { on in model.edit(.learning) { $0.setLearning(enabled: on) } }))
+                    Picker("Learning days a week", selection: Binding(
+                        get: { model.configuration.learningSettings.daysPerWeek },
+                        set: { days in model.edit(.learning) { try $0.setLearningDays(days) } })) {
+                        ForEach(Array(LearningSettings.daysRange), id: \.self) { days in
+                            Text("\(days)").tag(days)
+                        }
+                    }
+                    .disabled(!model.configuration.learningSettings.enabled)
+                    Text("A day counts when you Correct a text you wrote in another language, or Explain one. "
+                        + "Progress shows the week, the streak and the milestones.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    RefusalText(text: model.refusals[.learning])
+                }
+                .disabled(model.isReadOnly)
                 Section("Requests") {
                     LabeledContent("Timeout in seconds") {
                         TextField("Seconds", text: $timeout)

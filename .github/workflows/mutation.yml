@@ -144,6 +144,11 @@ jobs:
           PASS1="Sources/BabelOtterKit/BabelOtterKit.swift
           Sources/BabelOtterKit/Text/WordCount.swift
           Sources/BabelOtterKit/History/ProgressReport.swift
+          Sources/BabelOtterKit/Config/LearningSettings.swift
+          Sources/BabelOtterKit/Learning/LearningLog.swift
+          Sources/BabelOtterKit/Learning/Milestone.swift
+          Sources/BabelOtterKit/Learning/LearningRules.swift
+          Sources/BabelOtterKit/Learning/TranslateHint.swift
           Sources/BabelOtterKit/Text/ChunkPlan.swift
           Sources/BabelOtterKit/Pipeline/ChunkedRun.swift
           Sources/BabelOtterKit/Scratchpad/ScratchpadPolicy.swift

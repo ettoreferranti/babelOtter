@@ -62,6 +62,10 @@ public struct Configuration: Sendable, Equatable, Codable {
     /// loads unchanged, as the user's own Ollama: everyone running lingoSwen
     /// then keeps what they have. Use `server`.
     public var modelServer: ModelServer?
+    /// The weekly learning goal (#136). Optional so an older file loads
+    /// unchanged and is not rewritten: nil means on, three days. Use
+    /// `learningSettings`.
+    public var learning: LearningSettings?
 
     public init(
         languages: [LanguageConfig],
@@ -76,7 +80,8 @@ public struct Configuration: Sendable, Equatable, Codable {
         strictCaptureOnly: Bool = false,
         hotkeys: HotKeyBindings? = nil,
         myLanguage: LanguageCode? = nil,
-        modelServer: ModelServer? = nil
+        modelServer: ModelServer? = nil,
+        learning: LearningSettings? = nil
     ) {
         self.languages = languages
         self.profiles = profiles
@@ -91,6 +96,12 @@ public struct Configuration: Sendable, Equatable, Codable {
         self.hotkeys = hotkeys
         self.myLanguage = myLanguage
         self.modelServer = modelServer
+        self.learning = learning
+    }
+
+    /// The learning goal in use: the one in the file, else the default.
+    public var learningSettings: LearningSettings {
+        learning ?? .default
     }
 
     /// The model server in use: the one named, else the user's own Ollama.

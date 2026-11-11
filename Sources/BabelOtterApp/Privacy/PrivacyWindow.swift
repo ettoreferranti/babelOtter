@@ -13,17 +13,19 @@ final class PrivacyModel: ObservableObject {
     private let historyPolicy: () -> HistoryPolicy
     private let historyUnavailable: () -> String?
     private let server: () -> ModelServer
+    private let learning: () -> LearningSettings
     /// Only the latest check's result is shown.
     private var generation = 0
     private var copies = 0
 
     init(
         historyPolicy: @escaping () -> HistoryPolicy, historyUnavailable: @escaping () -> String?,
-        server: @escaping () -> ModelServer
+        server: @escaping () -> ModelServer, learning: @escaping () -> LearningSettings
     ) {
         self.historyPolicy = historyPolicy
         self.historyUnavailable = historyUnavailable
         self.server = server
+        self.learning = learning
     }
 
     /// The bundled copy, nil when running outside the app bundle.
@@ -57,7 +59,7 @@ final class PrivacyModel: ObservableObject {
             lines = PrivacyReport.lines(
                 server: server, endpoint: server.endpoint, listening: listening,
                 historyFolder: Self.abbreviated(folder), historyRefusal: refusal,
-                historyUnavailable: unavailable, history: historyPolicy())
+                historyUnavailable: unavailable, history: historyPolicy(), learning: learning())
             checking = false
         }
     }
@@ -96,9 +98,11 @@ final class PrivacyWindowController {
 
     init(
         historyPolicy: @escaping () -> HistoryPolicy, historyUnavailable: @escaping () -> String?,
-        server: @escaping () -> ModelServer
+        server: @escaping () -> ModelServer, learning: @escaping () -> LearningSettings
     ) {
-        model = PrivacyModel(historyPolicy: historyPolicy, historyUnavailable: historyUnavailable, server: server)
+        model = PrivacyModel(
+            historyPolicy: historyPolicy, historyUnavailable: historyUnavailable, server: server,
+            learning: learning)
     }
 
     func show() {

@@ -28,6 +28,27 @@ Read this first if you are picking babelOtter up in a new session.
 
 **Starting a new session:** "Read docs/HANDOFF.md and let's decide what to do next in M4." Everything above, plus the per-feature updates below, is the context.
 
+## Update 2026-11-11: Learning goal, streak and milestones (#136)
+
+On `feature/learning-goal`. Spec `docs/superpowers/specs/2026-11-11-learning-goal-design.md`, plan `docs/superpowers/plans/2026-11-11-learning-goal.md`. A weekly goal (3 learning days by default, 1 to 7; a day counts with a Correct of 10 words or more in a language that is not mine, or an Explain), a streak of weeks, and milestones (First steps; 1,000 / 5,000 / 10,000 words; 10 / 50 explanations; Clean text; a category tamed; 4 / 12 weeks). The popup shows one line under a Correct or Explain when something moved, and under a Translate, at most once a day, a hint to write it yourself or to try Explain. Progress has a Learning section on top with Reset. Settings > General has the switch and the days (`learning` in `config.json`, optional). No points or levels.
+
+**What is kept:** a learning log in the app's preferences (`learning.log`: days, two totals, milestones, last hint day; never text), not in `history.sqlite`, which stays at schema 2. It changes only when History saves a record, so nothing is counted with History off. Clear All leaves it; Reset clears it. `LearningRules` (kit) holds every rule; `LearningTracker` (app) stores the log. The popup's line is a preview: the record is saved when the popup closes.
+
+**Manual checks: all passed on 2026-11-11** (G10, the next day's line, is the one that could not be seen the same day). (`Tools/make-app.sh --run`, with the real model.) What they touch: your real learning log starts counting (Reset... in Progress empties it, and also frees the day's one hint); G6 writes a `learning` entry into your `config.json` (remove the entry to go back to a file without it); the checks add History records, which Clear All removes with all your others, so do G9's Clear All only if you do not mind, or skip that half. The streak and "tamed" need weeks of use and are covered by unit tests only.
+
+| # | Do | Expect |
+|---|---|---|
+| G1 | Menu > Progress... | A Learning section on top: "This week", three empty dots, "0 of 3 learning days", the line about starting your week; Reset... greyed out |
+| G2 | Explain a German text | Under the explanation: "Milestone: First steps". Progress: one filled dot, "1 of 3", a First steps capsule (hover: the date), "Next: 10 explanations (1 so far)" |
+| G3 | Correct a German text of 10 words or more, the same day; then one of under 10 words | No line under either; Progress still "1 of 3" |
+| G4 | Correct a German text of 100 words or more that has no mistakes | "Milestone: Clean text" (if the model finds an error, no milestone: that is right) |
+| G5 | Translate an English text of 5 words or more into German; Regenerate; then translate another | The first shows "Next time, try writing it in ... yourself, then press Correct (control+option+C)." with your own hotkey; Regenerate keeps it; the second popup shows no hint |
+| G6 | Settings > General > Learning: days to 1; then the switch off; then on again | With 1: Progress shows "1 of 1" and "Goal met". Off: the section is gone, Correct and Translate show no line. On: the milestones are back |
+| G7 | Privacy... | A "Learning goal" line saying what the preferences keep, and "Off: nothing is added." while the switch is off |
+| G8 | Settings: Keep records Off; Explain a text; set it back | No line; Progress shows the note that it needs History, and the log unchanged |
+| G9 | History... > Clear All (optional); then Progress > Reset... > Reset | After Clear All the milestones are still there; after Reset the section is as in G1 |
+| G10 | Tomorrow: Correct or Explain once | "Learning day 2 of 3 this week" (or "Weekly goal met" with the goal at 2) |
+
 ## Update 2026-10-30: Progress, recurring mistakes over time (#78)
 
 Merged in #134, released in v1.2.0. Spec `docs/superpowers/specs/2026-10-30-progress-design.md`. A **Progress...** menu item opens a window with the kinds of mistakes Correct keeps finding, per language and period (7, 30 or 90 days): errors per 100 words, the trend against the period before (a change of at least 20 % and 0.1), a small chart per day or week, and the most recent examples. History now keeps, for each Correct record, the words corrected and each error with its fragments and explanation (never suggestions): `history.sqlite` schema 2, migrated in place from 1, with a trigger that deletes a record's mistakes with it. Only corrections from this version on count. `ProgressReport` holds every rule; PRIVACY.md and the Privacy panel say what is kept.

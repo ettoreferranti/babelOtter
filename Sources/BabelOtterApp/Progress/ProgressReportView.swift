@@ -10,6 +10,12 @@ struct ProgressReportView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            // Above the report, and there with no corrections yet: an
+            // Explain alone starts a week (#136).
+            if model.learningSettings.enabled {
+                LearningSectionView(model: model).padding(12)
+                Divider()
+            }
             controls.padding(12)
             if let notice = model.notice {
                 Label(notice, systemImage: "info.circle")
